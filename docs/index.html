@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fabric Path Editor</title>
-    <link rel="icon" href="./favicon.ico" type="image/ico">
+    <link rel="icon" href="./favicon.ico" type="image/ico" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <script>
       fabric.fabric = fabric;
     </script>
+    <script src="./index.js" defer></script>
     <style>
       * {
         margin: 0;
@@ -19,9 +20,17 @@
         height: 100%;
         overflow: hidden;
       }
+      #container {
+        max-width: 800px;
+        height: 500px;
+        border: 1px solid #efefef;
+        margin: 32px auto;
+        border-radius: 4px;
+        overflow: hidden;
+      }
     </style>
   </head>
   <body>
-    <script src="./index.js"></script>
+    <div id="container"></div>
   </body>
 </html>

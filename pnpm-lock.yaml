@@ -11,7 +11,9 @@ specifiers:
   '@rollup/plugin-terser': ^0.4.4
   '@rollup/plugin-typescript': ^11.1.6
   '@types/fabric': ^5.3.7
+  '@types/lodash-es': ^4.17.12
   fabric: ^5.3.0
+  lodash-es: ^4.17.21
   rollup: ^4.9.6
   rollup-plugin-clear: ^2.0.7
   rollup-plugin-copy: ^3.5.0
@@ -20,6 +22,9 @@ specifiers:
   rollup-plugin-serve: ^1.1.1
   tslib: ^2.6.2
   typescript: ^5.3.3
+
+dependencies:
+  lodash-es: 4.17.21
 
 devDependencies:
   '@babel/core': 7.24.1
@@ -32,6 +37,7 @@ devDependencies:
   '@rollup/plugin-terser': 0.4.4_rollup@4.13.0
   '@rollup/plugin-typescript': 11.1.6_rf7dg5eyhgcu7huxvzkrvqbhii
   '@types/fabric': 5.3.7
+  '@types/lodash-es': 4.17.12
   fabric: 5.3.0
   rollup: 4.13.0
   rollup-plugin-clear: 2.0.7
@@ -1614,6 +1620,16 @@ packages:
       '@types/node': 20.10.7
     dev: true
 
+  /@types/lodash-es/4.17.12:
+    resolution: {integrity: sha512-0NgftHUcV4v34VhXm8QBSftKVXtbkBG3ViCjs6+eJ5a6y6Mi/jiFGPc1sC7QK+9BFhWrURE3EOggmWaSxL9OzQ==}
+    dependencies:
+      '@types/lodash': 4.17.0
+    dev: true
+
+  /@types/lodash/4.17.0:
+    resolution: {integrity: sha512-t7dhREVv6dbNj0q17X12j7yDG4bD/DHYX7o5/DbDxobP0HnGPgpRz2Ej77aL7TZT3DSw13fqUTj8J4mMnqa7WA==}
+    dev: true
+
   /@types/minimatch/5.1.2:
     resolution: {integrity: sha512-K0VQKziLUWkVKiRVrx4a40iPaxTUefQmjtkQofBkYRcoaaL/8rhwDWww9qWbrgicNOgnpIsMxyNIUM4+n6dUIA==}
     dev: true
@@ -2460,6 +2476,10 @@ packages:
       - bufferutil
       - utf-8-validate
     dev: true
+
+  /lodash-es/4.17.21:
+    resolution: {integrity: sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw==}
+    dev: false
 
   /lodash.debounce/4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}

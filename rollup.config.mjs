@@ -66,8 +66,8 @@ const build_serve = () => {
         file: 'docs/index.js',
         format: 'iife',
         globals: {
-          fabric: 'fabric'
-        }
+          fabric: 'fabric',
+        },
       },
     ],
     plugins: [
