@@ -6,8 +6,9 @@
   "module": "dist/index.es.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "start": "npm run dev",
-    "dev": "rollup --config --environment ENV:dev --watch",
+    "start": "pnpm link . && npm run dev",
+    "dev": "rollup --config --watch --environment ENV:dev,ROLLUP_WATCH:true",
+    "build:docs": "rollup --config --environment ENV:dev",
     "build": "rollup --config"
   },
   "repository": {

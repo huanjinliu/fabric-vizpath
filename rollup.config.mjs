@@ -58,36 +58,46 @@ const build_es = () => ({
   ],
 });
 
-const build_serve = () => ({
-  input: 'src/example/index.ts',
-  output: [
-    {
-      file: 'public/index.js',
-      format: 'iife',
-    },
-  ],
-  plugins: [
-    resolve(),
-    peerDepsExternal(),
-    commonjs(),
-    json(),
-    typescript({
-      declaration: false,
-    }),
-    babel({
-      babelHelpers: 'bundled',
-    }),
-    serve({
-      open: true,
-      contentBase: 'public/',
-      verbose: true,
-    }),
-    livereload({
-      watch: ['public'],
-      verbose: false,
-    }),
-  ],
-});
+const build_serve = () => {
+  const config = {
+    input: 'src/example/index.ts',
+    output: [
+      {
+        file: 'docs/index.js',
+        format: 'iife',
+        globals: {
+          fabric: 'fabric'
+        }
+      },
+    ],
+    plugins: [
+      resolve(),
+      peerDepsExternal(),
+      commonjs(),
+      json(),
+      typescript({
+        declaration: false,
+      }),
+      babel({
+        babelHelpers: 'bundled',
+      }),
+    ],
+  };
+  if (process.env.ROLLUP_WATCH) {
+    config.plugins.push(
+      serve({
+        open: true,
+        contentBase: 'docs/',
+        verbose: true,
+      }),
+      livereload({
+        watch: ['docs'],
+        verbose: false,
+      })
+    );
+  }
+  return config;
+};
 
 const configs = {
   umd: build_umd(),
