@@ -1,14 +1,12 @@
 import { fabric } from 'fabric';
-import type { Theme } from '.';
+import type { Theme } from '..';
 
 const createDefaultNode: Theme['node'] = (decorator) => {
   const object = new fabric.Circle({
     strokeWidth: 4,
     radius: 6,
     fill: "#ffffff",
-    stroke: "#4b4b4b",
-    originX: "center",
-    originY: "center"
+    stroke: "#4b4b4b"
   });
   
   const group = decorator(object);

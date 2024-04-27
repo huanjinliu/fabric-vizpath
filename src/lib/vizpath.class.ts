@@ -7,7 +7,6 @@ import {
   InstructionType,
   type PathwayNode,
 } from '.';
-import { transform } from './utils';
 
 export type ResponsiveCrood = Crood & {
   set: (crood: Crood, skipObserverIDs?: (string | undefined)[]) => void;
@@ -23,9 +22,7 @@ export type ResponsiveCrood = Crood & {
 
 export type ResponsivePathway = {
   section: PathwayNode<ResponsiveCrood>[];
-  info: Record<string, any> & {
-    label?: string;
-  };
+  originPath: fabric.Path;
 }[];
 
 /**
@@ -123,8 +120,13 @@ class VizPath {
             const x = p === 'x' ? newValue : target.x;
             const y = p === 'y' ? newValue : target.y;
             observes.forEach((item) => {
-              if (item.id && temporaryIgnoreIds.length && temporaryIgnoreIds.includes(item.id)) return;
-              item.handler(x, y)
+              if (
+                item.id &&
+                temporaryIgnoreIds.length &&
+                temporaryIgnoreIds.includes(item.id)
+              )
+                return;
+              item.handler(x, y);
             });
             this._fire('update');
           }
@@ -142,7 +144,7 @@ class VizPath {
       if (crood.x) proxy.x = crood.x;
       if (crood.y) proxy.y = crood.y;
       temporaryIgnoreIds = [];
-    }
+    };
     proxy.observe = (handler, options = {}) => {
       const { immediate, id } = options;
       if (immediate) handler(crood.x, crood.y);
@@ -162,8 +164,10 @@ class VizPath {
    * 绘制路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
    * @param pathway 路径信息
    */
-  draw(pathway: Pathway, pathwayInfo: Record<string, any> & { label?: string } = {}) {
-    pathway.forEach((section) => {
+  draw(
+    pathway: Pathway
+  ) {
+    pathway.forEach(({ section, originPath }) => {
       const _section: PathwayNode<ResponsiveCrood>[] = [];
       section.forEach((item, idx) => {
         const proxyItem: PathwayNode<ResponsiveCrood> = {
@@ -205,7 +209,7 @@ class VizPath {
       });
       this.pathway.push({
         section: _section,
-        info: pathwayInfo,
+        originPath,
       });
     });
 
@@ -219,8 +223,8 @@ class VizPath {
     this.pathway.forEach(({ section }) => {
       section.forEach(({ node }) => {
         node?.unobserve();
-      })
-    })
+      });
+    });
     this.pathway = [];
     this.pathwayMap = new WeakMap([]);
 
@@ -245,10 +249,7 @@ class VizPath {
   /**
    * 移动控制点
    */
-  move(
-    target: ResponsiveCrood,
-    crood: Crood,
-  ) {
+  move(target: ResponsiveCrood, crood: Crood) {
     if (target.x === crood.x && target.y === crood.y) return;
 
     target.x = crood.x;

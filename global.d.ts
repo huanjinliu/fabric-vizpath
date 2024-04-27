@@ -2,6 +2,15 @@ declare type Crood = { x: number; y: number };
 
 declare type Position = { left: number; top: number };
 
+declare type Matrix = [
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number
+];
+
 declare type Constructor = abstract new (...args: any) => any;
 
 declare type Transform = {

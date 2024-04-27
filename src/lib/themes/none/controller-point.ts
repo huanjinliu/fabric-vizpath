@@ -3,23 +3,23 @@ import type { Theme } from '..';
 
 const createDefaultPoint: Theme['controllerPoint'] = (decorator) => {
   const circle = new fabric.Circle({
-    radius: 4,
-    fill: '#bebebe',
-    stroke: '#bebebe',
-    strokeWidth: 2,
+    radius: 3,
+    fill: '#ffffff',
+    stroke: '#1884ec',
+    strokeWidth: 1,
   });
 
   const object = decorator(circle);
   object.on('selected', () => {
     circle.set({
-      stroke: '#333',
+      fill: '#1884ec',
     });
     object.canvas?.renderAll();
   });
 
   object.on('deselected', () => {
     circle.set({
-      stroke: '#bebebe',
+      fill: '#ffffff',
     });
     object.canvas?.renderAll();
   });

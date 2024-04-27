@@ -549,493 +549,6 @@
     };
   }
 
-  /** Detect free variable `global` from Node.js. */
-  var freeGlobal = (typeof global === "undefined" ? "undefined" : _typeof(global)) == 'object' && global && global.Object === Object && global;
-
-  /** Detect free variable `self`. */
-  var freeSelf = (typeof self === "undefined" ? "undefined" : _typeof(self)) == 'object' && self && self.Object === Object && self;
-
-  /** Used as a reference to the global object. */
-  var root = freeGlobal || freeSelf || Function('return this')();
-
-  /** Used to match a single whitespace character. */
-  var reWhitespace = /\s/;
-
-  /**
-   * Used by `_.trim` and `_.trimEnd` to get the index of the last non-whitespace
-   * character of `string`.
-   *
-   * @private
-   * @param {string} string The string to inspect.
-   * @returns {number} Returns the index of the last non-whitespace character.
-   */
-  function trimmedEndIndex(string) {
-    var index = string.length;
-    while (index-- && reWhitespace.test(string.charAt(index))) {}
-    return index;
-  }
-
-  /** Used to match leading whitespace. */
-  var reTrimStart = /^\s+/;
-
-  /**
-   * The base implementation of `_.trim`.
-   *
-   * @private
-   * @param {string} string The string to trim.
-   * @returns {string} Returns the trimmed string.
-   */
-  function baseTrim(string) {
-    return string ? string.slice(0, trimmedEndIndex(string) + 1).replace(reTrimStart, '') : string;
-  }
-
-  /**
-   * Checks if `value` is the
-   * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
-   * of `Object`. (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
-   *
-   * @static
-   * @memberOf _
-   * @since 0.1.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is an object, else `false`.
-   * @example
-   *
-   * _.isObject({});
-   * // => true
-   *
-   * _.isObject([1, 2, 3]);
-   * // => true
-   *
-   * _.isObject(_.noop);
-   * // => true
-   *
-   * _.isObject(null);
-   * // => false
-   */
-  function isObject(value) {
-    var type = _typeof(value);
-    return value != null && (type == 'object' || type == 'function');
-  }
-
-  /** Built-in value references. */
-  var Symbol$1 = root.Symbol;
-
-  /** Used for built-in method references. */
-  var objectProto$d = Object.prototype;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty$a = objectProto$d.hasOwnProperty;
-
-  /**
-   * Used to resolve the
-   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
-   * of values.
-   */
-  var nativeObjectToString$1 = objectProto$d.toString;
-
-  /** Built-in value references. */
-  var symToStringTag$1 = Symbol$1 ? Symbol$1.toStringTag : undefined;
-
-  /**
-   * A specialized version of `baseGetTag` which ignores `Symbol.toStringTag` values.
-   *
-   * @private
-   * @param {*} value The value to query.
-   * @returns {string} Returns the raw `toStringTag`.
-   */
-  function getRawTag(value) {
-    var isOwn = hasOwnProperty$a.call(value, symToStringTag$1),
-      tag = value[symToStringTag$1];
-    try {
-      value[symToStringTag$1] = undefined;
-      var unmasked = true;
-    } catch (e) {}
-    var result = nativeObjectToString$1.call(value);
-    if (unmasked) {
-      if (isOwn) {
-        value[symToStringTag$1] = tag;
-      } else {
-        delete value[symToStringTag$1];
-      }
-    }
-    return result;
-  }
-
-  /** Used for built-in method references. */
-  var objectProto$c = Object.prototype;
-
-  /**
-   * Used to resolve the
-   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
-   * of values.
-   */
-  var nativeObjectToString = objectProto$c.toString;
-
-  /**
-   * Converts `value` to a string using `Object.prototype.toString`.
-   *
-   * @private
-   * @param {*} value The value to convert.
-   * @returns {string} Returns the converted string.
-   */
-  function objectToString(value) {
-    return nativeObjectToString.call(value);
-  }
-
-  /** `Object#toString` result references. */
-  var nullTag = '[object Null]',
-    undefinedTag = '[object Undefined]';
-
-  /** Built-in value references. */
-  var symToStringTag = Symbol$1 ? Symbol$1.toStringTag : undefined;
-
-  /**
-   * The base implementation of `getTag` without fallbacks for buggy environments.
-   *
-   * @private
-   * @param {*} value The value to query.
-   * @returns {string} Returns the `toStringTag`.
-   */
-  function baseGetTag(value) {
-    if (value == null) {
-      return value === undefined ? undefinedTag : nullTag;
-    }
-    return symToStringTag && symToStringTag in Object(value) ? getRawTag(value) : objectToString(value);
-  }
-
-  /**
-   * Checks if `value` is object-like. A value is object-like if it's not `null`
-   * and has a `typeof` result of "object".
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
-   * @example
-   *
-   * _.isObjectLike({});
-   * // => true
-   *
-   * _.isObjectLike([1, 2, 3]);
-   * // => true
-   *
-   * _.isObjectLike(_.noop);
-   * // => false
-   *
-   * _.isObjectLike(null);
-   * // => false
-   */
-  function isObjectLike(value) {
-    return value != null && _typeof(value) == 'object';
-  }
-
-  /** `Object#toString` result references. */
-  var symbolTag$2 = '[object Symbol]';
-
-  /**
-   * Checks if `value` is classified as a `Symbol` primitive or object.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
-   * @example
-   *
-   * _.isSymbol(Symbol.iterator);
-   * // => true
-   *
-   * _.isSymbol('abc');
-   * // => false
-   */
-  function isSymbol(value) {
-    return _typeof(value) == 'symbol' || isObjectLike(value) && baseGetTag(value) == symbolTag$2;
-  }
-
-  /** Used as references for various `Number` constants. */
-  var NAN = 0 / 0;
-
-  /** Used to detect bad signed hexadecimal string values. */
-  var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
-
-  /** Used to detect binary string values. */
-  var reIsBinary = /^0b[01]+$/i;
-
-  /** Used to detect octal string values. */
-  var reIsOctal = /^0o[0-7]+$/i;
-
-  /** Built-in method references without a dependency on `root`. */
-  var freeParseInt = parseInt;
-
-  /**
-   * Converts `value` to a number.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to process.
-   * @returns {number} Returns the number.
-   * @example
-   *
-   * _.toNumber(3.2);
-   * // => 3.2
-   *
-   * _.toNumber(Number.MIN_VALUE);
-   * // => 5e-324
-   *
-   * _.toNumber(Infinity);
-   * // => Infinity
-   *
-   * _.toNumber('3.2');
-   * // => 3.2
-   */
-  function toNumber(value) {
-    if (typeof value == 'number') {
-      return value;
-    }
-    if (isSymbol(value)) {
-      return NAN;
-    }
-    if (isObject(value)) {
-      var other = typeof value.valueOf == 'function' ? value.valueOf() : value;
-      value = isObject(other) ? other + '' : other;
-    }
-    if (typeof value != 'string') {
-      return value === 0 ? value : +value;
-    }
-    value = baseTrim(value);
-    var isBinary = reIsBinary.test(value);
-    return isBinary || reIsOctal.test(value) ? freeParseInt(value.slice(2), isBinary ? 2 : 8) : reIsBadHex.test(value) ? NAN : +value;
-  }
-
-  /** Used as references for various `Number` constants. */
-  var INFINITY$1 = 1 / 0,
-    MAX_INTEGER = 1.7976931348623157e+308;
-
-  /**
-   * Converts `value` to a finite number.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.12.0
-   * @category Lang
-   * @param {*} value The value to convert.
-   * @returns {number} Returns the converted number.
-   * @example
-   *
-   * _.toFinite(3.2);
-   * // => 3.2
-   *
-   * _.toFinite(Number.MIN_VALUE);
-   * // => 5e-324
-   *
-   * _.toFinite(Infinity);
-   * // => 1.7976931348623157e+308
-   *
-   * _.toFinite('3.2');
-   * // => 3.2
-   */
-  function toFinite(value) {
-    if (!value) {
-      return value === 0 ? value : 0;
-    }
-    value = toNumber(value);
-    if (value === INFINITY$1 || value === -INFINITY$1) {
-      var sign = value < 0 ? -1 : 1;
-      return sign * MAX_INTEGER;
-    }
-    return value === value ? value : 0;
-  }
-
-  /**
-   * Converts `value` to an integer.
-   *
-   * **Note:** This method is loosely based on
-   * [`ToInteger`](http://www.ecma-international.org/ecma-262/7.0/#sec-tointeger).
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to convert.
-   * @returns {number} Returns the converted integer.
-   * @example
-   *
-   * _.toInteger(3.2);
-   * // => 3
-   *
-   * _.toInteger(Number.MIN_VALUE);
-   * // => 0
-   *
-   * _.toInteger(Infinity);
-   * // => 1.7976931348623157e+308
-   *
-   * _.toInteger('3.2');
-   * // => 3
-   */
-  function toInteger(value) {
-    var result = toFinite(value),
-      remainder = result % 1;
-    return result === result ? remainder ? result - remainder : result : 0;
-  }
-
-  /**
-   * A specialized version of `_.map` for arrays without support for iteratee
-   * shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {Array} Returns the new mapped array.
-   */
-  function arrayMap(array, iteratee) {
-    var index = -1,
-      length = array == null ? 0 : array.length,
-      result = Array(length);
-    while (++index < length) {
-      result[index] = iteratee(array[index], index, array);
-    }
-    return result;
-  }
-
-  /**
-   * Checks if `value` is classified as an `Array` object.
-   *
-   * @static
-   * @memberOf _
-   * @since 0.1.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is an array, else `false`.
-   * @example
-   *
-   * _.isArray([1, 2, 3]);
-   * // => true
-   *
-   * _.isArray(document.body.children);
-   * // => false
-   *
-   * _.isArray('abc');
-   * // => false
-   *
-   * _.isArray(_.noop);
-   * // => false
-   */
-  var isArray = Array.isArray;
-
-  /** Used as references for various `Number` constants. */
-  var INFINITY = 1 / 0;
-
-  /** Used to convert symbols to primitives and strings. */
-  var symbolProto$1 = Symbol$1 ? Symbol$1.prototype : undefined,
-    symbolToString = symbolProto$1 ? symbolProto$1.toString : undefined;
-
-  /**
-   * The base implementation of `_.toString` which doesn't convert nullish
-   * values to empty strings.
-   *
-   * @private
-   * @param {*} value The value to process.
-   * @returns {string} Returns the string.
-   */
-  function baseToString(value) {
-    // Exit early for strings to avoid a performance hit in some environments.
-    if (typeof value == 'string') {
-      return value;
-    }
-    if (isArray(value)) {
-      // Recursively convert values (susceptible to call stack limits).
-      return arrayMap(value, baseToString) + '';
-    }
-    if (isSymbol(value)) {
-      return symbolToString ? symbolToString.call(value) : '';
-    }
-    var result = value + '';
-    return result == '0' && 1 / value == -INFINITY ? '-0' : result;
-  }
-
-  /**
-   * Converts `value` to a string. An empty string is returned for `null`
-   * and `undefined` values. The sign of `-0` is preserved.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to convert.
-   * @returns {string} Returns the converted string.
-   * @example
-   *
-   * _.toString(null);
-   * // => ''
-   *
-   * _.toString(-0);
-   * // => '-0'
-   *
-   * _.toString([1, 2, 3]);
-   * // => '1,2,3'
-   */
-  function toString(value) {
-    return value == null ? '' : baseToString(value);
-  }
-
-  /* Built-in method references for those with the same name as other `lodash` methods. */
-  var nativeIsFinite = root.isFinite,
-    nativeMin = Math.min;
-
-  /**
-   * Creates a function like `_.round`.
-   *
-   * @private
-   * @param {string} methodName The name of the `Math` method to use when rounding.
-   * @returns {Function} Returns the new round function.
-   */
-  function createRound(methodName) {
-    var func = Math[methodName];
-    return function (number, precision) {
-      number = toNumber(number);
-      precision = precision == null ? 0 : nativeMin(toInteger(precision), 292);
-      if (precision && nativeIsFinite(number)) {
-        // Shift with exponential notation to avoid floating-point issues.
-        // See [MDN](https://mdn.io/round#Examples) for more details.
-        var pair = (toString(number) + 'e').split('e'),
-          value = func(pair[0] + 'e' + (+pair[1] + precision));
-        pair = (toString(value) + 'e').split('e');
-        return +(pair[0] + 'e' + (+pair[1] - precision));
-      }
-      return func(number);
-    };
-  }
-
-  /**
-   * Computes `number` rounded to `precision`.
-   *
-   * @static
-   * @memberOf _
-   * @since 3.10.0
-   * @category Math
-   * @param {number} number The number to round.
-   * @param {number} [precision=0] The precision to round to.
-   * @returns {number} Returns the rounded number.
-   * @example
-   *
-   * _.round(4.006);
-   * // => 4
-   *
-   * _.round(4.006, 2);
-   * // => 4.01
-   *
-   * _.round(4060, -2);
-   * // => 4100
-   */
-  var round = createRound('round');
-
   /**
    * Removes all key-value entries from the list cache.
    *
@@ -1259,6 +772,131 @@
    */
   function stackHas(key) {
     return this.__data__.has(key);
+  }
+
+  /** Detect free variable `global` from Node.js. */
+  var freeGlobal = (typeof global === "undefined" ? "undefined" : _typeof(global)) == 'object' && global && global.Object === Object && global;
+
+  /** Detect free variable `self`. */
+  var freeSelf = (typeof self === "undefined" ? "undefined" : _typeof(self)) == 'object' && self && self.Object === Object && self;
+
+  /** Used as a reference to the global object. */
+  var root = freeGlobal || freeSelf || Function('return this')();
+
+  /** Built-in value references. */
+  var Symbol$1 = root.Symbol;
+
+  /** Used for built-in method references. */
+  var objectProto$d = Object.prototype;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty$a = objectProto$d.hasOwnProperty;
+
+  /**
+   * Used to resolve the
+   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+   * of values.
+   */
+  var nativeObjectToString$1 = objectProto$d.toString;
+
+  /** Built-in value references. */
+  var symToStringTag$1 = Symbol$1 ? Symbol$1.toStringTag : undefined;
+
+  /**
+   * A specialized version of `baseGetTag` which ignores `Symbol.toStringTag` values.
+   *
+   * @private
+   * @param {*} value The value to query.
+   * @returns {string} Returns the raw `toStringTag`.
+   */
+  function getRawTag(value) {
+    var isOwn = hasOwnProperty$a.call(value, symToStringTag$1),
+      tag = value[symToStringTag$1];
+    try {
+      value[symToStringTag$1] = undefined;
+      var unmasked = true;
+    } catch (e) {}
+    var result = nativeObjectToString$1.call(value);
+    if (unmasked) {
+      if (isOwn) {
+        value[symToStringTag$1] = tag;
+      } else {
+        delete value[symToStringTag$1];
+      }
+    }
+    return result;
+  }
+
+  /** Used for built-in method references. */
+  var objectProto$c = Object.prototype;
+
+  /**
+   * Used to resolve the
+   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+   * of values.
+   */
+  var nativeObjectToString = objectProto$c.toString;
+
+  /**
+   * Converts `value` to a string using `Object.prototype.toString`.
+   *
+   * @private
+   * @param {*} value The value to convert.
+   * @returns {string} Returns the converted string.
+   */
+  function objectToString(value) {
+    return nativeObjectToString.call(value);
+  }
+
+  /** `Object#toString` result references. */
+  var nullTag = '[object Null]',
+    undefinedTag = '[object Undefined]';
+
+  /** Built-in value references. */
+  var symToStringTag = Symbol$1 ? Symbol$1.toStringTag : undefined;
+
+  /**
+   * The base implementation of `getTag` without fallbacks for buggy environments.
+   *
+   * @private
+   * @param {*} value The value to query.
+   * @returns {string} Returns the `toStringTag`.
+   */
+  function baseGetTag(value) {
+    if (value == null) {
+      return value === undefined ? undefinedTag : nullTag;
+    }
+    return symToStringTag && symToStringTag in Object(value) ? getRawTag(value) : objectToString(value);
+  }
+
+  /**
+   * Checks if `value` is the
+   * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
+   * of `Object`. (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+   *
+   * @static
+   * @memberOf _
+   * @since 0.1.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is an object, else `false`.
+   * @example
+   *
+   * _.isObject({});
+   * // => true
+   *
+   * _.isObject([1, 2, 3]);
+   * // => true
+   *
+   * _.isObject(_.noop);
+   * // => true
+   *
+   * _.isObject(null);
+   * // => false
+   */
+  function isObject(value) {
+    var type = _typeof(value);
+    return value != null && (type == 'object' || type == 'function');
   }
 
   /** `Object#toString` result references. */
@@ -1819,6 +1457,34 @@
     return result;
   }
 
+  /**
+   * Checks if `value` is object-like. A value is object-like if it's not `null`
+   * and has a `typeof` result of "object".
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+   * @example
+   *
+   * _.isObjectLike({});
+   * // => true
+   *
+   * _.isObjectLike([1, 2, 3]);
+   * // => true
+   *
+   * _.isObjectLike(_.noop);
+   * // => false
+   *
+   * _.isObjectLike(null);
+   * // => false
+   */
+  function isObjectLike(value) {
+    return value != null && _typeof(value) == 'object';
+  }
+
   /** `Object#toString` result references. */
   var argsTag$2 = '[object Arguments]';
 
@@ -1865,6 +1531,31 @@
   }()) ? baseIsArguments : function (value) {
     return isObjectLike(value) && hasOwnProperty$5.call(value, 'callee') && !propertyIsEnumerable$1.call(value, 'callee');
   };
+
+  /**
+   * Checks if `value` is classified as an `Array` object.
+   *
+   * @static
+   * @memberOf _
+   * @since 0.1.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is an array, else `false`.
+   * @example
+   *
+   * _.isArray([1, 2, 3]);
+   * // => true
+   *
+   * _.isArray(document.body.children);
+   * // => false
+   *
+   * _.isArray('abc');
+   * // => false
+   *
+   * _.isArray(_.noop);
+   * // => false
+   */
+  var isArray = Array.isArray;
 
   /**
    * This method returns `false`.
@@ -2686,8 +2377,8 @@
   }
 
   /** Used to convert symbols to primitives and strings. */
-  var symbolProto = Symbol$1 ? Symbol$1.prototype : undefined,
-    symbolValueOf = symbolProto ? symbolProto.valueOf : undefined;
+  var symbolProto$1 = Symbol$1 ? Symbol$1.prototype : undefined,
+    symbolValueOf = symbolProto$1 ? symbolProto$1.valueOf : undefined;
 
   /**
    * Creates a clone of the `symbol` object.
@@ -2721,7 +2412,7 @@
     regexpTag$1 = '[object RegExp]',
     setTag$2 = '[object Set]',
     stringTag$1 = '[object String]',
-    symbolTag$1 = '[object Symbol]';
+    symbolTag$2 = '[object Symbol]';
   var arrayBufferTag$1 = '[object ArrayBuffer]',
     dataViewTag$1 = '[object DataView]',
     float32Tag$1 = '[object Float32Array]',
@@ -2775,7 +2466,7 @@
         return cloneRegExp(object);
       case setTag$2:
         return new Ctor();
-      case symbolTag$1:
+      case symbolTag$2:
         return cloneSymbol(object);
     }
   }
@@ -2909,7 +2600,7 @@
     regexpTag = '[object RegExp]',
     setTag = '[object Set]',
     stringTag = '[object String]',
-    symbolTag = '[object Symbol]',
+    symbolTag$1 = '[object Symbol]',
     weakMapTag = '[object WeakMap]';
   var arrayBufferTag = '[object ArrayBuffer]',
     dataViewTag = '[object DataView]',
@@ -2925,7 +2616,7 @@
 
   /** Used to identify `toStringTag` values supported by `_.clone`. */
   var cloneableTags = {};
-  cloneableTags[argsTag] = cloneableTags[arrayTag] = cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] = cloneableTags[boolTag] = cloneableTags[dateTag] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag] = cloneableTags[numberTag] = cloneableTags[objectTag] = cloneableTags[regexpTag] = cloneableTags[setTag] = cloneableTags[stringTag] = cloneableTags[symbolTag] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
+  cloneableTags[argsTag] = cloneableTags[arrayTag] = cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] = cloneableTags[boolTag] = cloneableTags[dateTag] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag] = cloneableTags[numberTag] = cloneableTags[objectTag] = cloneableTags[regexpTag] = cloneableTags[setTag] = cloneableTags[stringTag] = cloneableTags[symbolTag$1] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
   cloneableTags[errorTag] = cloneableTags[funcTag] = cloneableTags[weakMapTag] = false;
 
   /**
@@ -3038,91 +2729,560 @@
   }
 
   /**
-   * 获取二阶曲线的三阶表现
+   * This method returns the first argument it receives.
+   *
+   * @static
+   * @since 0.1.0
+   * @memberOf _
+   * @category Util
+   * @param {*} value Any value.
+   * @returns {*} Returns `value`.
+   * @example
+   *
+   * var object = { 'a': 1 };
+   *
+   * console.log(_.identity(object) === object);
+   * // => true
    */
-  var getCubicFromQuadratic = function getCubicFromQuadratic(p0, instruction) {
-    // 如果不是二阶直接返回
-    if (instruction[0] !== 'Q') return cloneDeep(instruction);
-    // 解析输入字符串
-    var points = Array.from({
-      length: 2
-    }).map(function (_, i) {
-      return {
-        x: instruction[i * 2 + 1],
-        y: instruction[i * 2 + 2]
-      };
-    });
-    // 二阶贝塞尔曲线的点
-    var _points = _slicedToArray(points, 2),
-      p1 = _points[0],
-      p2 = _points[1];
-    // 计算三阶贝塞尔曲线的控制点
-    var q1 = {
-      x: 2 / 3 * p1.x + 1 / 3 * p0.x,
-      y: 2 / 3 * p1.y + 1 / 3 * p0.y
-    };
-    var q2 = {
-      x: 2 / 3 * p1.x + 1 / 3 * p2.x,
-      y: 2 / 3 * p1.y + 1 / 3 * p2.y
-    };
-    var q3 = p2;
-    // 创建三阶贝塞尔曲线指令
-    return ['C', q1.x, q1.y, q2.x, q2.y, q3.x, q3.y];
-  };
+  function identity(value) {
+    return value;
+  }
 
   /**
-   * 变换
-   * @param crood 路径
-   * @param process 变换流程
+   * A faster alternative to `Function#apply`, this function invokes `func`
+   * with the `this` binding of `thisArg` and the arguments of `args`.
+   *
+   * @private
+   * @param {Function} func The function to invoke.
+   * @param {*} thisArg The `this` binding of `func`.
+   * @param {Array} args The arguments to invoke `func` with.
+   * @returns {*} Returns the result of `func`.
    */
-  var transform = function transform(crood, process) {
-    var x = crood.x,
-      y = crood.y;
-    process.forEach(function (item) {
-      var translate = item.translate,
-        scale = item.scale,
-        rotate = item.rotate;
-      if (scale !== undefined) {
-        x *= scale.x;
-        y *= scale.y;
-      }
-      if (rotate !== undefined) {
-        x = Math.cos(rotate * Math.PI / 180) * x - Math.sin(rotate * Math.PI / 180) * y;
-        y = Math.sin(rotate * Math.PI / 180) * x + Math.cos(rotate * Math.PI / 180) * y;
-      }
-      if (translate !== undefined) {
-        x += translate.x;
-        y += translate.y;
-      }
-    });
-    return {
-      x: x,
-      y: y
-    };
-  };
+  function apply(func, thisArg, args) {
+    switch (args.length) {
+      case 0:
+        return func.call(thisArg);
+      case 1:
+        return func.call(thisArg, args[0]);
+      case 2:
+        return func.call(thisArg, args[0], args[1]);
+      case 3:
+        return func.call(thisArg, args[0], args[1], args[2]);
+    }
+    return func.apply(thisArg, args);
+  }
+
+  /* Built-in method references for those with the same name as other `lodash` methods. */
+  var nativeMax = Math.max;
 
   /**
-   * 注册响应式
+   * A specialized version of `baseRest` which transforms the rest array.
+   *
+   * @private
+   * @param {Function} func The function to apply a rest parameter to.
+   * @param {number} [start=func.length-1] The start position of the rest parameter.
+   * @param {Function} transform The rest array transform.
+   * @returns {Function} Returns the new function.
    */
-  var observe = function observe(point, keys, callback) {
-    var data = {};
-    var properties = {};
-    keys.forEach(function (key) {
-      data[key] = point[key];
-      properties[key] = {
-        get: function get() {
-          return data[key];
-        },
-        set: function set(value) {
-          if (data[key] === value) return;
-          var oldValue = cloneDeep(data);
-          data[key] = value;
-          callback(data, oldValue);
+  function overRest(func, start, transform) {
+    start = nativeMax(start === undefined ? func.length - 1 : start, 0);
+    return function () {
+      var args = arguments,
+        index = -1,
+        length = nativeMax(args.length - start, 0),
+        array = Array(length);
+      while (++index < length) {
+        array[index] = args[start + index];
+      }
+      index = -1;
+      var otherArgs = Array(start + 1);
+      while (++index < start) {
+        otherArgs[index] = args[index];
+      }
+      otherArgs[start] = transform(array);
+      return apply(func, this, otherArgs);
+    };
+  }
+
+  /**
+   * Creates a function that returns `value`.
+   *
+   * @static
+   * @memberOf _
+   * @since 2.4.0
+   * @category Util
+   * @param {*} value The value to return from the new function.
+   * @returns {Function} Returns the new constant function.
+   * @example
+   *
+   * var objects = _.times(2, _.constant({ 'a': 1 }));
+   *
+   * console.log(objects);
+   * // => [{ 'a': 1 }, { 'a': 1 }]
+   *
+   * console.log(objects[0] === objects[1]);
+   * // => true
+   */
+  function constant(value) {
+    return function () {
+      return value;
+    };
+  }
+
+  /**
+   * The base implementation of `setToString` without support for hot loop shorting.
+   *
+   * @private
+   * @param {Function} func The function to modify.
+   * @param {Function} string The `toString` result.
+   * @returns {Function} Returns `func`.
+   */
+  var baseSetToString = !defineProperty ? identity : function (func, string) {
+    return defineProperty(func, 'toString', {
+      'configurable': true,
+      'enumerable': false,
+      'value': constant(string),
+      'writable': true
+    });
+  };
+  var baseSetToString$1 = baseSetToString;
+
+  /** Used to detect hot functions by number of calls within a span of milliseconds. */
+  var HOT_COUNT = 800,
+    HOT_SPAN = 16;
+
+  /* Built-in method references for those with the same name as other `lodash` methods. */
+  var nativeNow = Date.now;
+
+  /**
+   * Creates a function that'll short out and invoke `identity` instead
+   * of `func` when it's called `HOT_COUNT` or more times in `HOT_SPAN`
+   * milliseconds.
+   *
+   * @private
+   * @param {Function} func The function to restrict.
+   * @returns {Function} Returns the new shortable function.
+   */
+  function shortOut(func) {
+    var count = 0,
+      lastCalled = 0;
+    return function () {
+      var stamp = nativeNow(),
+        remaining = HOT_SPAN - (stamp - lastCalled);
+      lastCalled = stamp;
+      if (remaining > 0) {
+        if (++count >= HOT_COUNT) {
+          return arguments[0];
         }
-      };
-    });
-    Object.defineProperties(point, properties);
-  };
+      } else {
+        count = 0;
+      }
+      return func.apply(undefined, arguments);
+    };
+  }
+
+  /**
+   * Sets the `toString` method of `func` to return `string`.
+   *
+   * @private
+   * @param {Function} func The function to modify.
+   * @param {Function} string The `toString` result.
+   * @returns {Function} Returns `func`.
+   */
+  var setToString = shortOut(baseSetToString$1);
+
+  /**
+   * The base implementation of `_.rest` which doesn't validate or coerce arguments.
+   *
+   * @private
+   * @param {Function} func The function to apply a rest parameter to.
+   * @param {number} [start=func.length-1] The start position of the rest parameter.
+   * @returns {Function} Returns the new function.
+   */
+  function baseRest(func, start) {
+    return setToString(overRest(func, start, identity), func + '');
+  }
+
+  /**
+   * Checks if the given arguments are from an iteratee call.
+   *
+   * @private
+   * @param {*} value The potential iteratee value argument.
+   * @param {*} index The potential iteratee index or key argument.
+   * @param {*} object The potential iteratee object argument.
+   * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
+   *  else `false`.
+   */
+  function isIterateeCall(value, index, object) {
+    if (!isObject(object)) {
+      return false;
+    }
+    var type = _typeof(index);
+    if (type == 'number' ? isArrayLike(object) && isIndex(index, object.length) : type == 'string' && index in object) {
+      return eq(object[index], value);
+    }
+    return false;
+  }
+
+  /** Used for built-in method references. */
+  var objectProto = Object.prototype;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty = objectProto.hasOwnProperty;
+
+  /**
+   * Assigns own and inherited enumerable string keyed properties of source
+   * objects to the destination object for all destination properties that
+   * resolve to `undefined`. Source objects are applied from left to right.
+   * Once a property is set, additional values of the same property are ignored.
+   *
+   * **Note:** This method mutates `object`.
+   *
+   * @static
+   * @since 0.1.0
+   * @memberOf _
+   * @category Object
+   * @param {Object} object The destination object.
+   * @param {...Object} [sources] The source objects.
+   * @returns {Object} Returns `object`.
+   * @see _.defaultsDeep
+   * @example
+   *
+   * _.defaults({ 'a': 1 }, { 'b': 2 }, { 'a': 3 });
+   * // => { 'a': 1, 'b': 2 }
+   */
+  var defaults = baseRest(function (object, sources) {
+    object = Object(object);
+    var index = -1;
+    var length = sources.length;
+    var guard = length > 2 ? sources[2] : undefined;
+    if (guard && isIterateeCall(sources[0], sources[1], guard)) {
+      length = 1;
+    }
+    while (++index < length) {
+      var source = sources[index];
+      var props = keysIn(source);
+      var propsIndex = -1;
+      var propsLength = props.length;
+      while (++propsIndex < propsLength) {
+        var key = props[propsIndex];
+        var value = object[key];
+        if (value === undefined || eq(value, objectProto[key]) && !hasOwnProperty.call(object, key)) {
+          object[key] = source[key];
+        }
+      }
+    }
+    return object;
+  });
+
+  /** Used to match a single whitespace character. */
+  var reWhitespace = /\s/;
+
+  /**
+   * Used by `_.trim` and `_.trimEnd` to get the index of the last non-whitespace
+   * character of `string`.
+   *
+   * @private
+   * @param {string} string The string to inspect.
+   * @returns {number} Returns the index of the last non-whitespace character.
+   */
+  function trimmedEndIndex(string) {
+    var index = string.length;
+    while (index-- && reWhitespace.test(string.charAt(index))) {}
+    return index;
+  }
+
+  /** Used to match leading whitespace. */
+  var reTrimStart = /^\s+/;
+
+  /**
+   * The base implementation of `_.trim`.
+   *
+   * @private
+   * @param {string} string The string to trim.
+   * @returns {string} Returns the trimmed string.
+   */
+  function baseTrim(string) {
+    return string ? string.slice(0, trimmedEndIndex(string) + 1).replace(reTrimStart, '') : string;
+  }
+
+  /** `Object#toString` result references. */
+  var symbolTag = '[object Symbol]';
+
+  /**
+   * Checks if `value` is classified as a `Symbol` primitive or object.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
+   * @example
+   *
+   * _.isSymbol(Symbol.iterator);
+   * // => true
+   *
+   * _.isSymbol('abc');
+   * // => false
+   */
+  function isSymbol(value) {
+    return _typeof(value) == 'symbol' || isObjectLike(value) && baseGetTag(value) == symbolTag;
+  }
+
+  /** Used as references for various `Number` constants. */
+  var NAN = 0 / 0;
+
+  /** Used to detect bad signed hexadecimal string values. */
+  var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
+
+  /** Used to detect binary string values. */
+  var reIsBinary = /^0b[01]+$/i;
+
+  /** Used to detect octal string values. */
+  var reIsOctal = /^0o[0-7]+$/i;
+
+  /** Built-in method references without a dependency on `root`. */
+  var freeParseInt = parseInt;
+
+  /**
+   * Converts `value` to a number.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to process.
+   * @returns {number} Returns the number.
+   * @example
+   *
+   * _.toNumber(3.2);
+   * // => 3.2
+   *
+   * _.toNumber(Number.MIN_VALUE);
+   * // => 5e-324
+   *
+   * _.toNumber(Infinity);
+   * // => Infinity
+   *
+   * _.toNumber('3.2');
+   * // => 3.2
+   */
+  function toNumber(value) {
+    if (typeof value == 'number') {
+      return value;
+    }
+    if (isSymbol(value)) {
+      return NAN;
+    }
+    if (isObject(value)) {
+      var other = typeof value.valueOf == 'function' ? value.valueOf() : value;
+      value = isObject(other) ? other + '' : other;
+    }
+    if (typeof value != 'string') {
+      return value === 0 ? value : +value;
+    }
+    value = baseTrim(value);
+    var isBinary = reIsBinary.test(value);
+    return isBinary || reIsOctal.test(value) ? freeParseInt(value.slice(2), isBinary ? 2 : 8) : reIsBadHex.test(value) ? NAN : +value;
+  }
+
+  /** Used as references for various `Number` constants. */
+  var INFINITY$1 = 1 / 0,
+    MAX_INTEGER = 1.7976931348623157e+308;
+
+  /**
+   * Converts `value` to a finite number.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.12.0
+   * @category Lang
+   * @param {*} value The value to convert.
+   * @returns {number} Returns the converted number.
+   * @example
+   *
+   * _.toFinite(3.2);
+   * // => 3.2
+   *
+   * _.toFinite(Number.MIN_VALUE);
+   * // => 5e-324
+   *
+   * _.toFinite(Infinity);
+   * // => 1.7976931348623157e+308
+   *
+   * _.toFinite('3.2');
+   * // => 3.2
+   */
+  function toFinite(value) {
+    if (!value) {
+      return value === 0 ? value : 0;
+    }
+    value = toNumber(value);
+    if (value === INFINITY$1 || value === -INFINITY$1) {
+      var sign = value < 0 ? -1 : 1;
+      return sign * MAX_INTEGER;
+    }
+    return value === value ? value : 0;
+  }
+
+  /**
+   * Converts `value` to an integer.
+   *
+   * **Note:** This method is loosely based on
+   * [`ToInteger`](http://www.ecma-international.org/ecma-262/7.0/#sec-tointeger).
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to convert.
+   * @returns {number} Returns the converted integer.
+   * @example
+   *
+   * _.toInteger(3.2);
+   * // => 3
+   *
+   * _.toInteger(Number.MIN_VALUE);
+   * // => 0
+   *
+   * _.toInteger(Infinity);
+   * // => 1.7976931348623157e+308
+   *
+   * _.toInteger('3.2');
+   * // => 3
+   */
+  function toInteger(value) {
+    var result = toFinite(value),
+      remainder = result % 1;
+    return result === result ? remainder ? result - remainder : result : 0;
+  }
+
+  /**
+   * A specialized version of `_.map` for arrays without support for iteratee
+   * shorthands.
+   *
+   * @private
+   * @param {Array} [array] The array to iterate over.
+   * @param {Function} iteratee The function invoked per iteration.
+   * @returns {Array} Returns the new mapped array.
+   */
+  function arrayMap(array, iteratee) {
+    var index = -1,
+      length = array == null ? 0 : array.length,
+      result = Array(length);
+    while (++index < length) {
+      result[index] = iteratee(array[index], index, array);
+    }
+    return result;
+  }
+
+  /** Used as references for various `Number` constants. */
+  var INFINITY = 1 / 0;
+
+  /** Used to convert symbols to primitives and strings. */
+  var symbolProto = Symbol$1 ? Symbol$1.prototype : undefined,
+    symbolToString = symbolProto ? symbolProto.toString : undefined;
+
+  /**
+   * The base implementation of `_.toString` which doesn't convert nullish
+   * values to empty strings.
+   *
+   * @private
+   * @param {*} value The value to process.
+   * @returns {string} Returns the string.
+   */
+  function baseToString(value) {
+    // Exit early for strings to avoid a performance hit in some environments.
+    if (typeof value == 'string') {
+      return value;
+    }
+    if (isArray(value)) {
+      // Recursively convert values (susceptible to call stack limits).
+      return arrayMap(value, baseToString) + '';
+    }
+    if (isSymbol(value)) {
+      return symbolToString ? symbolToString.call(value) : '';
+    }
+    var result = value + '';
+    return result == '0' && 1 / value == -INFINITY ? '-0' : result;
+  }
+
+  /**
+   * Converts `value` to a string. An empty string is returned for `null`
+   * and `undefined` values. The sign of `-0` is preserved.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to convert.
+   * @returns {string} Returns the converted string.
+   * @example
+   *
+   * _.toString(null);
+   * // => ''
+   *
+   * _.toString(-0);
+   * // => '-0'
+   *
+   * _.toString([1, 2, 3]);
+   * // => '1,2,3'
+   */
+  function toString(value) {
+    return value == null ? '' : baseToString(value);
+  }
+
+  /* Built-in method references for those with the same name as other `lodash` methods. */
+  var nativeIsFinite = root.isFinite,
+    nativeMin = Math.min;
+
+  /**
+   * Creates a function like `_.round`.
+   *
+   * @private
+   * @param {string} methodName The name of the `Math` method to use when rounding.
+   * @returns {Function} Returns the new round function.
+   */
+  function createRound(methodName) {
+    var func = Math[methodName];
+    return function (number, precision) {
+      number = toNumber(number);
+      precision = precision == null ? 0 : nativeMin(toInteger(precision), 292);
+      if (precision && nativeIsFinite(number)) {
+        // Shift with exponential notation to avoid floating-point issues.
+        // See [MDN](https://mdn.io/round#Examples) for more details.
+        var pair = (toString(number) + 'e').split('e'),
+          value = func(pair[0] + 'e' + (+pair[1] + precision));
+        pair = (toString(value) + 'e').split('e');
+        return +(pair[0] + 'e' + (+pair[1] - precision));
+      }
+      return func(number);
+    };
+  }
+
+  /**
+   * Computes `number` rounded to `precision`.
+   *
+   * @static
+   * @memberOf _
+   * @since 3.10.0
+   * @category Math
+   * @param {number} number The number to round.
+   * @param {number} [precision=0] The precision to round to.
+   * @returns {number} Returns the rounded number.
+   * @example
+   *
+   * _.round(4.006);
+   * // => 4
+   *
+   * _.round(4.006, 2);
+   * // => 4.01
+   *
+   * _.round(4060, -2);
+   * // => 4100
+   */
+  var round = createRound('round');
 
   /**
    * VizPath (Visualization Path，可视化路径)
@@ -3226,8 +3386,9 @@
       key: "draw",
       value: function draw(pathway) {
         var _this2 = this;
-        var pathwayInfo = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-        pathway.forEach(function (section) {
+        pathway.forEach(function (_ref) {
+          var section = _ref.section,
+            originPath = _ref.originPath;
           var _section = [];
           section.forEach(function (item, idx) {
             var proxyItem = {
@@ -3268,7 +3429,7 @@
           });
           _this2.pathway.push({
             section: _section,
-            info: pathwayInfo
+            originPath: originPath
           });
         });
         this._fire('draw');
@@ -3279,10 +3440,10 @@
     }, {
       key: "clean",
       value: function clean() {
-        this.pathway.forEach(function (_ref) {
-          var section = _ref.section;
-          section.forEach(function (_ref2) {
-            var node = _ref2.node;
+        this.pathway.forEach(function (_ref2) {
+          var section = _ref2.section;
+          section.forEach(function (_ref3) {
+            var node = _ref3.node;
             node === null || node === void 0 ? void 0 : node.unobserve();
           });
         });
@@ -3326,8 +3487,8 @@
       key: "toPaths",
       value: function toPaths() {
         var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
-        return pathway.map(function (_ref3) {
-          var section = _ref3.section;
+        return pathway.map(function (_ref4) {
+          var section = _ref4.section;
           return section.map(function (i) {
             return i.instruction;
           });
@@ -3372,6 +3533,342 @@
   }();
   VizPath.symbol = Symbol('vizpath');
 
+  /**
+   * 获取二阶曲线的三阶表现
+   */
+  var getCubicFromQuadratic = function getCubicFromQuadratic(p0, instruction) {
+    // 如果不是二阶直接返回
+    if (instruction[0] !== 'Q') return cloneDeep(instruction);
+    // 解析输入字符串
+    var points = Array.from({
+      length: 2
+    }).map(function (_, i) {
+      return {
+        x: instruction[i * 2 + 1],
+        y: instruction[i * 2 + 2]
+      };
+    });
+    // 二阶贝塞尔曲线的点
+    var _points = _slicedToArray(points, 2),
+      p1 = _points[0],
+      p2 = _points[1];
+    // 计算三阶贝塞尔曲线的控制点
+    var q1 = {
+      x: 2 / 3 * p1.x + 1 / 3 * p0.x,
+      y: 2 / 3 * p1.y + 1 / 3 * p0.y
+    };
+    var q2 = {
+      x: 2 / 3 * p1.x + 1 / 3 * p2.x,
+      y: 2 / 3 * p1.y + 1 / 3 * p2.y
+    };
+    var q3 = p2;
+    // 创建三阶贝塞尔曲线指令
+    return ['C', q1.x, q1.y, q2.x, q2.y, q3.x, q3.y];
+  };
+
+  /**
+   * 变换
+   * @param crood 路径
+   * @param process 变换流程
+   */
+  var transform = function transform(crood, process) {
+    var x = crood.x,
+      y = crood.y;
+    process.forEach(function (item) {
+      var translate = item.translate,
+        scale = item.scale,
+        rotate = item.rotate;
+      if (scale !== undefined) {
+        x *= scale.x;
+        y *= scale.y;
+      }
+      if (rotate !== undefined) {
+        x = Math.cos(rotate * Math.PI / 180) * x - Math.sin(rotate * Math.PI / 180) * y;
+        y = Math.sin(rotate * Math.PI / 180) * x + Math.cos(rotate * Math.PI / 180) * y;
+      }
+      if (translate !== undefined) {
+        x += translate.x;
+        y += translate.y;
+      }
+    });
+    return {
+      x: x,
+      y: y
+    };
+  };
+
+  /**
+   * 注册响应式
+   */
+  var observe = function observe(point, keys, callback) {
+    var data = {};
+    var properties = {};
+    keys.forEach(function (key) {
+      data[key] = point[key];
+      properties[key] = {
+        get: function get() {
+          return data[key];
+        },
+        set: function set(value) {
+          if (data[key] === value) return;
+          var oldValue = cloneDeep(data);
+          data[key] = value;
+          callback(data, oldValue);
+        }
+      };
+    });
+    Object.defineProperties(point, properties);
+  };
+
+  /******************************************************************************
+  Copyright (c) Microsoft Corporation.
+
+  Permission to use, copy, modify, and/or distribute this software for any
+  purpose with or without fee is hereby granted.
+
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+  AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+  OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+  PERFORMANCE OF THIS SOFTWARE.
+  ***************************************************************************** */
+  /* global Reflect, Promise, SuppressedError, Symbol */
+
+  function __rest(s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0) t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function") for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+      if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i])) t[p[i]] = s[p[i]];
+    }
+    return t;
+  }
+  typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+  };
+
+  /**
+   * 加载svg文件并将内部基础形状转化为纯路径
+   */
+  var loadSVGToPathFromURL = /*#__PURE__*/function () {
+    var _ref5 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee(url) {
+      var shapeToPath, storeShapeSourceData, svgPromise, svg;
+      return _regeneratorRuntime().wrap(function _callee$(_context) {
+        while (1) switch (_context.prev = _context.next) {
+          case 0:
+            /**
+             * 将svg基本图像转为路径
+             */
+            shapeToPath = function shapeToPath(svg) {
+              var path = new fabric.fabric.Path();
+              var type = svg.type;
+              /** 如果是多形状组成,拼接路径 */
+              if (type === 'group') {
+                var group = svg;
+                group.forEachObject(function (child, index) {
+                  var childPath = shapeToPath(child);
+                  group.insertAt(childPath, index, true);
+                });
+                return group;
+              }
+              /** 转化矩形形状 */
+              var convertRectPath = function convertRectPath(params) {
+                var w = params.w,
+                  h = params.h,
+                  x = params.x,
+                  y = params.y;
+                var _params$rx = params.rx,
+                  rx = _params$rx === void 0 ? 0 : _params$rx,
+                  _params$ry = params.ry,
+                  ry = _params$ry === void 0 ? 0 : _params$ry;
+                // normalise radius values, just like the original does it (or should do)
+                if (rx < 0) rx = 0;
+                if (ry < 0) ry = 0;
+                rx = rx || ry;
+                ry = ry || rx;
+                if (rx > w / 2) rx = w / 2;
+                if (ry > h / 2) ry = h / 2;
+                var d = rx && ry ? [['M', rx + x, y], ['h', w - 2 * rx], ['a', rx, ry, 0, 0, 1, rx, ry], ['v', h - 2 * ry], ['a', rx, ry, 0, 0, 1, -rx, ry], ['h', -w + 2 * rx], ['a', rx, ry, 0, 0, 1, -rx, -ry], ['v', -h + 2 * ry], ['a', rx, ry, 0, 0, 1, rx, -ry], ['z']] : [['M', x, y], ['h', w], ['v', h], ['h', -w], ['v', -h], ['z']];
+                return new fabric.fabric.Path(d);
+              };
+              /** 转化类椭圆形形状 */
+              var convertEllipsePath = function convertEllipsePath(_ref6) {
+                var x = _ref6.x,
+                  y = _ref6.y,
+                  _ref6$rx = _ref6.rx,
+                  rx = _ref6$rx === void 0 ? 0 : _ref6$rx,
+                  _ref6$ry = _ref6.ry,
+                  ry = _ref6$ry === void 0 ? 0 : _ref6$ry;
+                var d = [['M', x - rx, y], ['A', rx, ry, 0, 0, 0, x + rx, y], ['A', rx, ry, 0, 0, 0, x - rx, y], ['z']];
+                return new fabric.fabric.Path(d);
+              };
+              /** 转化类多边形形状 */
+              var convertPolygonPath = function convertPolygonPath(points) {
+                var d = points.map(function (point) {
+                  return ['L', point.x, point.y];
+                });
+                d[0][0] = 'M';
+                if (type === 'polygon') {
+                  d.push('z');
+                }
+                return new fabric.fabric.Path(d);
+              };
+              /** 根据fabric元素类型进行转化 */
+              switch (type) {
+                case 'rect':
+                  {
+                    var _a = svg.toJSON();
+                      _a.type;
+                      _a.visible;
+                      var _a$width = _a.width,
+                      width = _a$width === void 0 ? 0 : _a$width,
+                      _a$height = _a.height,
+                      height = _a$height === void 0 ? 0 : _a$height,
+                      _a$x = _a.x,
+                      x = _a$x === void 0 ? 0 : _a$x,
+                      _a$y = _a.y,
+                      y = _a$y === void 0 ? 0 : _a$y,
+                      _a$rx = _a.rx,
+                      rx = _a$rx === void 0 ? 0 : _a$rx,
+                      _a$ry = _a.ry,
+                      ry = _a$ry === void 0 ? 0 : _a$ry,
+                      rest = __rest(_a, ["type", "visible", "width", "height", "x", "y", "rx", "ry"]);
+                    path = convertRectPath({
+                      w: width,
+                      h: height,
+                      x: x,
+                      y: y,
+                      rx: rx,
+                      ry: ry
+                    });
+                    path.set(rest);
+                    break;
+                  }
+                case 'circle':
+                  {
+                    var _b = svg;
+                      _b.type;
+                      _b.visible;
+                      var _b$x = _b.x,
+                      _x2 = _b$x === void 0 ? 0 : _b$x,
+                      _b$y = _b.y,
+                      _y = _b$y === void 0 ? 0 : _b$y,
+                      _b$radius = _b.radius,
+                      r = _b$radius === void 0 ? 0 : _b$radius,
+                      _rest = __rest(_b, ["type", "visible", "x", "y", "radius"]);
+                    path = convertEllipsePath({
+                      x: _x2,
+                      y: _y,
+                      rx: r,
+                      ry: r
+                    });
+                    path.set(_rest);
+                    break;
+                  }
+                case 'ellipse':
+                  {
+                    var _c = svg;
+                      _c.type;
+                      _c.visible;
+                      var _c$x = _c.x,
+                      _x3 = _c$x === void 0 ? 0 : _c$x,
+                      _c$y = _c.y,
+                      _y2 = _c$y === void 0 ? 0 : _c$y,
+                      _c$rx = _c.rx,
+                      _rx = _c$rx === void 0 ? 0 : _c$rx,
+                      _c$ry = _c.ry,
+                      _ry = _c$ry === void 0 ? 0 : _c$ry,
+                      _rest2 = __rest(_c, ["type", "visible", "x", "y", "rx", "ry"]);
+                    path = convertEllipsePath({
+                      x: _x3,
+                      y: _y2,
+                      rx: _rx,
+                      ry: _ry
+                    });
+                    path.set(_rest2);
+                    break;
+                  }
+                case 'line':
+                  {
+                    var _d = svg;
+                      _d.type;
+                      _d.visible;
+                      var _d$x = _d.x1,
+                      x1 = _d$x === void 0 ? 0 : _d$x,
+                      _d$x2 = _d.x2,
+                      x2 = _d$x2 === void 0 ? 0 : _d$x2,
+                      _d$y = _d.y1,
+                      y1 = _d$y === void 0 ? 0 : _d$y,
+                      _d$y2 = _d.y2,
+                      y2 = _d$y2 === void 0 ? 0 : _d$y2,
+                      _rest3 = __rest(_d, ["type", "visible", "x1", "x2", "y1", "y2"]);
+                    path = convertPolygonPath([new fabric.fabric.Point(x1, y1), new fabric.fabric.Point(x2, y2)]);
+                    path.set(_rest3);
+                    break;
+                  }
+                case 'polygon':
+                case 'polyline':
+                  {
+                    var _e = svg;
+                      _e.type;
+                      _e.visible;
+                      var _e$points = _e.points,
+                      points = _e$points === void 0 ? [] : _e$points,
+                      _rest4 = __rest(_e, ["type", "visible", "points"]);
+                    path = convertPolygonPath(points);
+                    path.set(_rest4);
+                    break;
+                  }
+                case 'path':
+                  {
+                    path = svg;
+                    break;
+                  }
+              }
+              return path;
+            };
+            _context.prev = 1;
+            /** 保存部分形状的偏移属性值,直接生成的fabric对象不会记录相关信息 */
+            storeShapeSourceData = function storeShapeSourceData(element, object) {
+              if (object.type === 'circle' || object.type === 'ellipse') {
+                object.set({
+                  x: Number(element.getAttribute('cx')),
+                  y: Number(element.getAttribute('cy'))
+                });
+              } else if (object.type === 'rect') {
+                object.set({
+                  x: Number(element.getAttribute('x')),
+                  y: Number(element.getAttribute('y'))
+                });
+              }
+            };
+            svgPromise = new Promise(function (resolve) {
+              fabric.fabric.loadSVGFromURL(url, function (objects) {
+                resolve(fabric.fabric.util.groupSVGElements(objects));
+              }, storeShapeSourceData);
+            });
+            _context.next = 6;
+            return svgPromise;
+          case 6:
+            svg = _context.sent;
+            return _context.abrupt("return", shapeToPath(svg));
+          case 10:
+            _context.prev = 10;
+            _context.t0 = _context["catch"](1);
+            console.log(_context.t0);
+          case 13:
+          case "end":
+            return _context.stop();
+        }
+      }, _callee, null, [[1, 10]]);
+    }));
+    return function loadSVGToPathFromURL(_x) {
+      return _ref5.apply(this, arguments);
+    };
+  }();
+
   /** 指令类型 */
   var InstructionType;
   (function (InstructionType) {
@@ -3393,7 +3890,7 @@
       this._modules = [];
     }
     /**
-     * 通过fabric.Path对象获取Editor路径信息
+     * 通过fabric.Path对象解析路径信息
      *
      * @param path farbic路径对象
      * @example
@@ -3432,54 +3929,54 @@
     }, {
       key: "initialize",
       value: (function () {
-        var _initialize = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
+        var _initialize = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
           var _this3 = this;
           var vizPath;
-          return _regeneratorRuntime().wrap(function _callee2$(_context2) {
-            while (1) switch (_context2.prev = _context2.next) {
+          return _regeneratorRuntime().wrap(function _callee3$(_context3) {
+            while (1) switch (_context3.prev = _context3.next) {
               case 0:
                 vizPath = new VizPath(this);
-                return _context2.abrupt("return", new Promise(function (resolve) {
+                return _context3.abrupt("return", new Promise(function (resolve) {
                   var next = 0;
                   var loadModule = /*#__PURE__*/function () {
-                    var _ref4 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee() {
+                    var _ref7 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
                       var module;
-                      return _regeneratorRuntime().wrap(function _callee$(_context) {
-                        while (1) switch (_context.prev = _context.next) {
+                      return _regeneratorRuntime().wrap(function _callee2$(_context2) {
+                        while (1) switch (_context2.prev = _context2.next) {
                           case 0:
                             module = _this3._modules[next];
                             if (module) {
-                              _context.next = 4;
+                              _context2.next = 4;
                               break;
                             }
                             resolve(vizPath);
-                            return _context.abrupt("return");
+                            return _context2.abrupt("return");
                           case 4:
-                            _context.next = 6;
+                            _context2.next = 6;
                             return module.prepare();
                           case 6:
-                            _context.next = 8;
+                            _context2.next = 8;
                             return Promise.resolve(module.load(vizPath));
                           case 8:
                             next++;
                             loadModule();
                           case 10:
                           case "end":
-                            return _context.stop();
+                            return _context2.stop();
                         }
-                      }, _callee);
+                      }, _callee2);
                     }));
                     return function loadModule() {
-                      return _ref4.apply(this, arguments);
+                      return _ref7.apply(this, arguments);
                     };
                   }();
                   loadModule();
                 }));
               case 2:
               case "end":
-                return _context2.stop();
+                return _context3.stop();
             }
-          }, _callee2, this);
+          }, _callee3, this);
         }));
         function initialize() {
           return _initialize.apply(this, arguments);
@@ -3487,8 +3984,8 @@
         return initialize;
       }())
     }], [{
-      key: "getPathwayFromObject",
-      value: function getPathwayFromObject(path) {
+      key: "parsePathFromObject",
+      value: function parsePathFromObject(path) {
         // ① 清除路径自带偏移，如果不消除，后续的所有关键点、控制点的编辑都要额外处理路径自身的偏移
         var instructions = cloneDeep(path.path);
         instructions.forEach(function (item, pathIdx) {
@@ -3569,7 +4066,10 @@
               } : undefined
             });
           });
-          return _section;
+          return {
+            section: _section,
+            originPath: path
+          };
         });
         return pathway;
       }
@@ -3582,11 +4082,74 @@
        * const pathway = getPathwayFromPathD('M 0 0 L 100 100');
        */
     }, {
-      key: "getPathwayFromPathD",
-      value: function getPathwayFromPathD(d) {
-        var path = new fabric.fabric.Path(d);
-        return this.getPathwayFromObject(path);
+      key: "parsePathFromPathD",
+      value: function parsePathFromPathD(d) {
+        var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+        var path = new fabric.fabric.Path(d, defaults(options, {
+          left: 0,
+          top: 0
+        }));
+        return this.parsePathFromObject(path);
       }
+      /**
+       * 通过svg文件链接加载并获取Editor路径信息
+       *
+       * @param d 路径指令信息
+       * @example
+       *
+       * const pathway = getPathwayFromPathD('M 0 0 L 100 100');
+       */
+    }, {
+      key: "parsePathFromURL",
+      value: (function () {
+        var _parsePathFromURL = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4(url) {
+          var options,
+            object,
+            pathGroup,
+            pathways,
+            extract,
+            _args4 = arguments;
+          return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+            while (1) switch (_context4.prev = _context4.next) {
+              case 0:
+                options = _args4.length > 1 && _args4[1] !== undefined ? _args4[1] : {};
+                _context4.next = 3;
+                return loadSVGToPathFromURL(url);
+              case 3:
+                object = _context4.sent;
+                if (object) {
+                  _context4.next = 6;
+                  break;
+                }
+                return _context4.abrupt("return");
+              case 6:
+                pathGroup = new fabric.fabric.Group([object]);
+                if (options) pathGroup.set(Object.assign({}, options));
+                pathways = [];
+                extract = function extract(group) {
+                  var children = group.getObjects();
+                  group.destroy();
+                  children.forEach(function (child) {
+                    if (child.type === 'group') {
+                      extract(child);
+                    } else if (child.type === 'path') {
+                      pathways.push(VizPathContext.parsePathFromObject(child));
+                    }
+                  });
+                };
+                extract(pathGroup);
+                return _context4.abrupt("return", pathways);
+              case 12:
+              case "end":
+                return _context4.stop();
+            }
+          }, _callee4);
+        }));
+        function parsePathFromURL(_x4) {
+          return _parsePathFromURL.apply(this, arguments);
+        }
+        return parsePathFromURL;
+      }())
     }]);
   }();
   var EditorModule = /*#__PURE__*/function () {
@@ -3596,14 +4159,14 @@
     return _createClass(EditorModule, [{
       key: "prepare",
       value: function () {
-        var _prepare = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
-          return _regeneratorRuntime().wrap(function _callee3$(_context3) {
-            while (1) switch (_context3.prev = _context3.next) {
+        var _prepare = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
+          return _regeneratorRuntime().wrap(function _callee5$(_context5) {
+            while (1) switch (_context5.prev = _context5.next) {
               case 0:
               case "end":
-                return _context3.stop();
+                return _context5.stop();
             }
-          }, _callee3);
+          }, _callee5);
         }));
         function prepare() {
           return _prepare.apply(this, arguments);
@@ -3815,255 +4378,88 @@
     }
     return unsafeStringify(rnds);
   }
-
-  /**
-   * This method returns the first argument it receives.
-   *
-   * @static
-   * @since 0.1.0
-   * @memberOf _
-   * @category Util
-   * @param {*} value Any value.
-   * @returns {*} Returns `value`.
-   * @example
-   *
-   * var object = { 'a': 1 };
-   *
-   * console.log(_.identity(object) === object);
-   * // => true
-   */
-  function identity(value) {
-    return value;
-  }
-
-  /**
-   * A faster alternative to `Function#apply`, this function invokes `func`
-   * with the `this` binding of `thisArg` and the arguments of `args`.
-   *
-   * @private
-   * @param {Function} func The function to invoke.
-   * @param {*} thisArg The `this` binding of `func`.
-   * @param {Array} args The arguments to invoke `func` with.
-   * @returns {*} Returns the result of `func`.
-   */
-  function apply(func, thisArg, args) {
-    switch (args.length) {
-      case 0:
-        return func.call(thisArg);
-      case 1:
-        return func.call(thisArg, args[0]);
-      case 2:
-        return func.call(thisArg, args[0], args[1]);
-      case 3:
-        return func.call(thisArg, args[0], args[1], args[2]);
-    }
-    return func.apply(thisArg, args);
-  }
-
-  /** Used to detect hot functions by number of calls within a span of milliseconds. */
-  var HOT_COUNT = 800,
-    HOT_SPAN = 16;
-
-  /* Built-in method references for those with the same name as other `lodash` methods. */
-  var nativeNow = Date.now;
-
-  /**
-   * Creates a function that'll short out and invoke `identity` instead
-   * of `func` when it's called `HOT_COUNT` or more times in `HOT_SPAN`
-   * milliseconds.
-   *
-   * @private
-   * @param {Function} func The function to restrict.
-   * @returns {Function} Returns the new shortable function.
-   */
-  function shortOut(func) {
-    var count = 0,
-      lastCalled = 0;
-    return function () {
-      var stamp = nativeNow(),
-        remaining = HOT_SPAN - (stamp - lastCalled);
-      lastCalled = stamp;
-      if (remaining > 0) {
-        if (++count >= HOT_COUNT) {
-          return arguments[0];
-        }
-      } else {
-        count = 0;
-      }
-      return func.apply(undefined, arguments);
-    };
-  }
-
-  /**
-   * Creates a function that returns `value`.
-   *
-   * @static
-   * @memberOf _
-   * @since 2.4.0
-   * @category Util
-   * @param {*} value The value to return from the new function.
-   * @returns {Function} Returns the new constant function.
-   * @example
-   *
-   * var objects = _.times(2, _.constant({ 'a': 1 }));
-   *
-   * console.log(objects);
-   * // => [{ 'a': 1 }, { 'a': 1 }]
-   *
-   * console.log(objects[0] === objects[1]);
-   * // => true
-   */
-  function constant(value) {
-    return function () {
-      return value;
-    };
-  }
-
-  /**
-   * The base implementation of `setToString` without support for hot loop shorting.
-   *
-   * @private
-   * @param {Function} func The function to modify.
-   * @param {Function} string The `toString` result.
-   * @returns {Function} Returns `func`.
-   */
-  var baseSetToString = !defineProperty ? identity : function (func, string) {
-    return defineProperty(func, 'toString', {
-      'configurable': true,
-      'enumerable': false,
-      'value': constant(string),
-      'writable': true
+  var createDefaultPath$1 = function createDefaultPath$1(decorator, originPath) {
+    var path = new fabric.fabric.Path();
+    path.set(originPath.toJSON());
+    var _originPath$pathOffse = originPath.pathOffset,
+      x = _originPath$pathOffse.x,
+      y = _originPath$pathOffse.y;
+    path.pathOffset = new fabric.fabric.Point(x, y);
+    path.set({
+      stroke: '#1884ec',
+      strokeWidth: 2
     });
+    return decorator(path);
   };
-  var baseSetToString$1 = baseSetToString;
-
-  /**
-   * Sets the `toString` method of `func` to return `string`.
-   *
-   * @private
-   * @param {Function} func The function to modify.
-   * @param {Function} string The `toString` result.
-   * @returns {Function} Returns `func`.
-   */
-  var setToString = shortOut(baseSetToString$1);
-
-  /* Built-in method references for those with the same name as other `lodash` methods. */
-  var nativeMax = Math.max;
-
-  /**
-   * A specialized version of `baseRest` which transforms the rest array.
-   *
-   * @private
-   * @param {Function} func The function to apply a rest parameter to.
-   * @param {number} [start=func.length-1] The start position of the rest parameter.
-   * @param {Function} transform The rest array transform.
-   * @returns {Function} Returns the new function.
-   */
-  function overRest(func, start, transform) {
-    start = nativeMax(start === undefined ? func.length - 1 : start, 0);
-    return function () {
-      var args = arguments,
-        index = -1,
-        length = nativeMax(args.length - start, 0),
-        array = Array(length);
-      while (++index < length) {
-        array[index] = args[start + index];
-      }
-      index = -1;
-      var otherArgs = Array(start + 1);
-      while (++index < start) {
-        otherArgs[index] = args[index];
-      }
-      otherArgs[start] = transform(array);
-      return apply(func, this, otherArgs);
-    };
-  }
-
-  /**
-   * The base implementation of `_.rest` which doesn't validate or coerce arguments.
-   *
-   * @private
-   * @param {Function} func The function to apply a rest parameter to.
-   * @param {number} [start=func.length-1] The start position of the rest parameter.
-   * @returns {Function} Returns the new function.
-   */
-  function baseRest(func, start) {
-    return setToString(overRest(func, start, identity), func + '');
-  }
-
-  /**
-   * Checks if the given arguments are from an iteratee call.
-   *
-   * @private
-   * @param {*} value The potential iteratee value argument.
-   * @param {*} index The potential iteratee index or key argument.
-   * @param {*} object The potential iteratee object argument.
-   * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
-   *  else `false`.
-   */
-  function isIterateeCall(value, index, object) {
-    if (!isObject(object)) {
-      return false;
-    }
-    var type = _typeof(index);
-    if (type == 'number' ? isArrayLike(object) && isIndex(index, object.length) : type == 'string' && index in object) {
-      return eq(object[index], value);
-    }
-    return false;
-  }
-
-  /** Used for built-in method references. */
-  var objectProto = Object.prototype;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty = objectProto.hasOwnProperty;
-
-  /**
-   * Assigns own and inherited enumerable string keyed properties of source
-   * objects to the destination object for all destination properties that
-   * resolve to `undefined`. Source objects are applied from left to right.
-   * Once a property is set, additional values of the same property are ignored.
-   *
-   * **Note:** This method mutates `object`.
-   *
-   * @static
-   * @since 0.1.0
-   * @memberOf _
-   * @category Object
-   * @param {Object} object The destination object.
-   * @param {...Object} [sources] The source objects.
-   * @returns {Object} Returns `object`.
-   * @see _.defaultsDeep
-   * @example
-   *
-   * _.defaults({ 'a': 1 }, { 'b': 2 }, { 'a': 3 });
-   * // => { 'a': 1, 'b': 2 }
-   */
-  var defaults = baseRest(function (object, sources) {
-    object = Object(object);
-    var index = -1;
-    var length = sources.length;
-    var guard = length > 2 ? sources[2] : undefined;
-    if (guard && isIterateeCall(sources[0], sources[1], guard)) {
-      length = 1;
-    }
-    while (++index < length) {
-      var source = sources[index];
-      var props = keysIn(source);
-      var propsIndex = -1;
-      var propsLength = props.length;
-      while (++propsIndex < propsLength) {
-        var key = props[propsIndex];
-        var value = object[key];
-        if (value === undefined || eq(value, objectProto[key]) && !hasOwnProperty.call(object, key)) {
-          object[key] = source[key];
-        }
-      }
-    }
+  var createDefaultNode$1 = function createDefaultNode$1(decorator) {
+    var rect = new fabric.fabric.Rect({
+      width: 6,
+      height: 6,
+      fill: "#ffffff",
+      stroke: "#1784ec",
+      strokeWidth: 1
+    });
+    var object = decorator(rect);
+    object.on('selected', function () {
+      var _a;
+      rect.set({
+        fill: '#1884ec'
+      });
+      (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    object.on('deselected', function () {
+      var _a;
+      rect.set({
+        fill: '#ffffff'
+      });
+      (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
     return object;
-  });
-  var createDefaultPath = function createDefaultPath(decorator) {
-    var path = new fabric.fabric.Path('M 0 0');
+  };
+  var createDefaultPoint$1 = function createDefaultPoint$1(decorator) {
+    var circle = new fabric.fabric.Circle({
+      radius: 3,
+      fill: '#ffffff',
+      stroke: '#1884ec',
+      strokeWidth: 1
+    });
+    var object = decorator(circle);
+    object.on('selected', function () {
+      var _a;
+      circle.set({
+        fill: '#1884ec'
+      });
+      (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    object.on('deselected', function () {
+      var _a;
+      circle.set({
+        fill: '#ffffff'
+      });
+      (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    return object;
+  };
+  var createDefaultLine$1 = function createDefaultLine$1(decorator) {
+    var line = new fabric.fabric.Line([0, 0, 0, 0], {
+      stroke: '#1884ec',
+      strokeWidth: 1
+    });
+    return decorator(line);
+  };
+  var noneTheme = {
+    path: createDefaultPath$1,
+    node: createDefaultNode$1,
+    controllerPoint: createDefaultPoint$1,
+    controllerLine: createDefaultLine$1
+  };
+  var createDefaultPath = function createDefaultPath(decorator, originPath) {
+    var path = new fabric.fabric.Path();
+    path.set(originPath.toJSON());
+    var _originPath$pathOffse2 = originPath.pathOffset,
+      x = _originPath$pathOffse2.x,
+      y = _originPath$pathOffse2.y;
+    path.pathOffset = new fabric.fabric.Point(x, y);
     path.set({
       stroke: '#333',
       strokeWidth: 4,
@@ -4076,9 +4472,7 @@
       strokeWidth: 4,
       radius: 6,
       fill: "#ffffff",
-      stroke: "#4b4b4b",
-      originX: "center",
-      originY: "center"
+      stroke: "#4b4b4b"
     });
     var group = decorator(object);
     group.on("mouseover", function () {
@@ -4116,9 +4510,7 @@
       radius: 4,
       fill: '#bebebe',
       stroke: '#bebebe',
-      strokeWidth: 2,
-      originX: 'center',
-      originY: 'center'
+      strokeWidth: 2
     });
     var object = decorator(circle);
     object.on('selected', function () {
@@ -4141,12 +4533,7 @@
     var line = new fabric.fabric.Line([0, 0, 0, 0], {
       stroke: '#bebebe',
       strokeWidth: 1,
-      strokeDashArray: [4, 3],
-      strokeUniform: true,
-      selectable: false,
-      evented: false,
-      originX: 'center',
-      originY: 'center'
+      strokeDashArray: [4, 3]
     });
     return decorator(line);
   };
@@ -4170,28 +4557,37 @@
     return _createClass(EditorUI);
   }(EditorModule);
   EditorUI.ID = Symbol('editor-ui');
+  EditorUI.noneUI = noneTheme;
   EditorUI.defaultUI = defaultTheme;
   var EditorPath = /*#__PURE__*/function (_EditorModule4) {
-    function EditorPath(originPath) {
+    function EditorPath() {
       var _this6;
       _classCallCheck(this, EditorPath);
-      _this6 = _callSuper(this, EditorPath);
+      _this6 = _callSuper(this, EditorPath, arguments);
       _this6.paths = [];
-      /**
-       * 视图变换
-       */
-      _this6.editorTransformMatrix = [1, 0, 0, 1, 0, 0];
-      _this6.originPath = originPath;
       return _this6;
     }
     /**
-     * 将相对坐标点转化为带元素本身变换的偏移位置
+     * 获取指令所在路径信息
+     * @param instruction 指令
+     * @returns 路径信息
      */
     _inherits(EditorPath, _EditorModule4);
     return _createClass(EditorPath, [{
+      key: "getPath",
+      value: function getPath(instruction) {
+        return this.paths.find(function (_ref8) {
+          var path = _ref8.path;
+          var _a;
+          return (_a = path.path) === null || _a === void 0 ? void 0 : _a.includes(instruction);
+        });
+      }
+      /**
+       * 将相对坐标点转化为带元素本身变换的偏移位置
+       */
+    }, {
       key: "calcAbsolutePosition",
-      value: function calcAbsolutePosition(crood) {
-        var matrix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : this.editorTransformMatrix;
+      value: function calcAbsolutePosition(crood, matrix) {
         var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(crood.x, crood.y), matrix);
         return {
           left: point.x,
@@ -4203,8 +4599,7 @@
        */
     }, {
       key: "calcRelativeCrood",
-      value: function calcRelativeCrood(position) {
-        var matrix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : this.editorTransformMatrix;
+      value: function calcRelativeCrood(position, matrix) {
         var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(position.left, position.top), fabric.fabric.util.invertTransform(matrix));
         return {
           x: round(point.x, 4),
@@ -4223,7 +4618,7 @@
        */
     }, {
       key: "reinitializePath",
-      value: function reinitializePath(path) {
+      value: function reinitializePath(path, matrix) {
         // 记录旧的路径信息
         var oldInfo = {
           left: path.left,
@@ -4238,9 +4633,6 @@
         path.initialize(fabric.fabric.util.joinPath(instructions));
         path.path = instructions;
         // 计算路径偏移差值
-        var matrix = _toConsumableArray(this.editorTransformMatrix);
-        matrix[4] = 0;
-        matrix[5] = 0;
         var distance = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - (path.width - oldInfo.width) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - (path.height - oldInfo.height) / 2 - oldInfo.pathOffset.y), matrix);
         // 设置回正确的偏移位置
         path.set({
@@ -4261,18 +4653,18 @@
         if (!canvas) {
           return;
         }
-        vizPath.on('draw', /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
-          var _a, ui, paths, _ref7, _ref7$originX, originX, _ref7$originY, originY, _ref7$left, left, _ref7$top, top, _ref7$angle, angle, _ref7$scaleX, scaleX, _ref7$scaleY, scaleY, group;
-          return _regeneratorRuntime().wrap(function _callee4$(_context4) {
-            while (1) switch (_context4.prev = _context4.next) {
+        vizPath.on('draw', /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6() {
+          var ui, paths;
+          return _regeneratorRuntime().wrap(function _callee6$(_context6) {
+            while (1) switch (_context6.prev = _context6.next) {
               case 0:
                 ui = vizPath.context.find(EditorUI);
-                paths = vizPath.pathway.map(function (_ref6, index, arr) {
-                  var info = _ref6.info;
+                paths = vizPath.pathway.map(function (_ref10, index, arr) {
+                  var originPath = _ref10.originPath;
                   var _a;
-                  var decorator = function decorator(_path) {
-                    _path.initialize(vizPath.toPathD([arr[index]]));
-                    _path.path = vizPath.toPaths([arr[index]]).flat(1);
+                  var decorator = function decorator(customPath) {
+                    var _path = new fabric.fabric.Path();
+                    _path.set(customPath.toJSON());
                     _path.set({
                       name: v4(),
                       // 路径本身不可选中，后续通过操纵点和线条来更改路径
@@ -4283,44 +4675,41 @@
                       objectCaching: false
                     });
                     _path[VizPath.symbol] = true;
+                    _path.path = vizPath.toPaths([arr[index]]).flat(1);
+                    _path.pathOffset = new fabric.fabric.Point(0, 0);
                     return _path;
                   };
-                  var path = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.path) !== null && _a !== void 0 ? _a : EditorUI.defaultUI.path)(decorator, info);
+                  var path = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.path) !== null && _a !== void 0 ? _a : EditorUI.noneUI.path)(decorator, originPath);
                   if (!path[VizPath.symbol]) path = decorator(path);
-                  return path;
-                });
-                _ref7 = (_a = _this7.originPath) !== null && _a !== void 0 ? _a : {}, _ref7$originX = _ref7.originX, originX = _ref7$originX === void 0 ? 'center' : _ref7$originX, _ref7$originY = _ref7.originY, originY = _ref7$originY === void 0 ? 'center' : _ref7$originY, _ref7$left = _ref7.left, left = _ref7$left === void 0 ? canvas.getWidth() / 2 : _ref7$left, _ref7$top = _ref7.top, top = _ref7$top === void 0 ? canvas.getHeight() / 2 : _ref7$top, _ref7$angle = _ref7.angle, angle = _ref7$angle === void 0 ? 0 : _ref7$angle, _ref7$scaleX = _ref7.scaleX, scaleX = _ref7$scaleX === void 0 ? 1 : _ref7$scaleX, _ref7$scaleY = _ref7.scaleY, scaleY = _ref7$scaleY === void 0 ? 1 : _ref7$scaleY;
-                group = new fabric.fabric.Group(paths, {
-                  originX: originX,
-                  originY: originY,
-                  left: left,
-                  top: top,
-                  angle: angle,
-                  scaleX: scaleX,
-                  scaleY: scaleY
-                }); // 记录路径在编辑器中的变换值
-                _this7.editorTransformMatrix = group.calcOwnMatrix();
-                group.destroy();
-                // 移除旧的路径对象并添加新的路径对象
+                  var matrix = path.calcOwnMatrix();
+                  return {
+                    path: path,
+                    matrix: matrix
+                  };
+                }); // 移除旧的路径对象并添加新的路径对象
                 canvas.renderOnAddRemove = true;
-                _this7.paths.forEach(function (path) {
+                _this7.paths.forEach(function (_ref11) {
+                  var path = _ref11.path;
                   canvas.remove(path);
                 });
-                paths.forEach(function (path) {
+                paths.forEach(function (_ref12) {
+                  var path = _ref12.path;
                   canvas.add(path);
                 });
                 canvas.renderOnAddRemove = false;
                 canvas.renderAll();
                 _this7.paths = paths;
-              case 12:
+              case 8:
               case "end":
-                return _context4.stop();
+                return _context6.stop();
             }
-          }, _callee4);
+          }, _callee6);
         })));
         vizPath.on('update', function () {
-          _this7.paths.forEach(function (path) {
-            _this7.reinitializePath(path);
+          _this7.paths.forEach(function (_ref13) {
+            var path = _ref13.path,
+              matrix = _ref13.matrix;
+            _this7.reinitializePath(path, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
           });
         });
       }
@@ -4353,11 +4742,12 @@
         var ui = vizPath.context.find(EditorUI);
         var nodes = [];
         // 创建路径关键点的操作点（即实际路径上的节点，而非曲线上的虚拟点）
-        vizPath.pathway.forEach(function (_ref8) {
-          var section = _ref8.section;
+        vizPath.pathway.forEach(function (_ref14) {
+          var section = _ref14.section;
           section.forEach(function (item, index) {
             var _a, _b, _c;
-            var node = item.node;
+            var node = item.node,
+              instruction = item.instruction;
             if (!node) return;
             // 如果下一个指令是闭合点，则不添加关键点
             // 因为路径补丁的时候遇到闭合点会添加一条到起始点的路径，所以当前关键点正好和起始点一致
@@ -4365,11 +4755,12 @@
             var decorator = function decorator(innerObject) {
               var _object = new fabric.fabric.Group([innerObject], {
                 name: v4(),
-                originX: 'center',
-                originY: 'center',
                 // 选中时不出现选中框
                 hasBorders: false,
-                hasControls: false
+                hasControls: false,
+                // 保持居中
+                originX: 'center',
+                originY: 'center'
               });
               _object[VizPath.symbol] = true;
               // 响应指令的直接修改
@@ -4377,7 +4768,7 @@
                 var position = editorPath.calcAbsolutePosition({
                   x: x,
                   y: y
-                });
+                }, editorPath.getPath(instruction).matrix);
                 if (_object.group) {
                   var relativePosition = editorPath.calcRelativeCrood(position, _object.group.calcTransformMatrix());
                   _object.set({
@@ -4394,7 +4785,7 @@
               });
               return _object;
             };
-            var object = ((_c = ui === null || ui === void 0 ? void 0 : ui.options.node) !== null && _c !== void 0 ? _c : EditorUI.defaultUI.node)(decorator);
+            var object = ((_c = ui === null || ui === void 0 ? void 0 : ui.options.node) !== null && _c !== void 0 ? _c : EditorUI.noneUI.node)(decorator);
             if (!object[VizPath.symbol]) object = decorator(object);
             nodes.push(object);
             _this9.objectMap.set(object, item);
@@ -4412,10 +4803,11 @@
         var pathway = (_b = this.vizPath) === null || _b === void 0 ? void 0 : _b.pathway;
         var ui = (_c = this.vizPath) === null || _c === void 0 ? void 0 : _c.context.find(EditorUI);
         if (editorPath && pathway) {
-          pathway.forEach(function (_ref9) {
-            var section = _ref9.section;
+          pathway.forEach(function (_ref15) {
+            var section = _ref15.section;
             section.forEach(function (item) {
               var node = item.node,
+                instruction = item.instruction,
                 _item$controllers = item.controllers,
                 controllers = _item$controllers === void 0 ? {} : _item$controllers;
               if (!node) return;
@@ -4430,11 +4822,12 @@
                 var pointDecorator = function pointDecorator(innerObject) {
                   var _object = new fabric.fabric.Group([innerObject], {
                     name: v4(),
-                    originX: 'center',
-                    originY: 'center',
                     // 选中时不出现选中框
                     hasBorders: false,
-                    hasControls: false
+                    hasControls: false,
+                    // 保持居中
+                    originX: 'center',
+                    originY: 'center'
                   });
                   _object[VizPath.symbol] = true;
                   // 建立相互响应，指令的数据和元素的位置更改会相互同步
@@ -4444,33 +4837,41 @@
                     var position = editorPath.calcAbsolutePosition({
                       x: x,
                       y: y
-                    });
+                    }, editorPath.getPath(instruction).matrix);
                     _object.set(position).setCoords();
                   }, {
                     immediate: true,
                     id: _object.name
                   });
-                  observe(_object, ['left', 'top'], function (_ref10) {
-                    var left = _ref10.left,
-                      top = _ref10.top;
+                  observe(_object, ['left', 'top'], function (_ref16) {
+                    var left = _ref16.left,
+                      top = _ref16.top;
                     var _a;
                     if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) !== _object) return;
                     var crood = editorPath.calcRelativeCrood({
                       left: left,
                       top: top
-                    });
+                    }, editorPath.getPath(instruction).matrix);
                     controller.set(crood, [_object.name]);
                   });
                   return _object;
                 };
-                var point = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.controllerPoint) !== null && _a !== void 0 ? _a : EditorUI.defaultUI.controllerPoint)(pointDecorator);
+                var point = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.controllerPoint) !== null && _a !== void 0 ? _a : EditorUI.noneUI.controllerPoint)(pointDecorator);
                 if (!point[VizPath.symbol]) point = pointDecorator(point);
                 /**
                  * 创建控制点和节点的连线
                  */
                 var lineDecorator = function lineDecorator(_line) {
                   _line.set({
-                    name: v4()
+                    name: v4(),
+                    // 保持比例
+                    strokeUniform: true,
+                    // 不允许选中
+                    selectable: false,
+                    evented: false,
+                    // 保持居中
+                    originX: 'center',
+                    originY: 'center'
                   });
                   _line[VizPath.symbol] = true;
                   // 建立响应式，让连线随时跟随指令的值进行变化
@@ -4478,7 +4879,7 @@
                     var position = editorPath.calcAbsolutePosition({
                       x: x,
                       y: y
-                    });
+                    }, editorPath.getPath(instruction).matrix);
                     _line.set({
                       x1: position.left,
                       y1: position.top
@@ -4491,7 +4892,7 @@
                     var position = editorPath.calcAbsolutePosition({
                       x: x,
                       y: y
-                    });
+                    }, editorPath.getPath(instruction).matrix);
                     _line.set({
                       x2: position.left,
                       y2: position.top
@@ -4502,7 +4903,7 @@
                   });
                   return _line;
                 };
-                var line = ((_b = ui === null || ui === void 0 ? void 0 : ui.options.controllerLine) !== null && _b !== void 0 ? _b : EditorUI.defaultUI.controllerLine)(lineDecorator);
+                var line = ((_b = ui === null || ui === void 0 ? void 0 : ui.options.controllerLine) !== null && _b !== void 0 ? _b : EditorUI.noneUI.controllerLine)(lineDecorator);
                 if (!line[VizPath.symbol]) line = lineDecorator(line);
                 points.push(point);
                 lines.push(line);
@@ -4541,6 +4942,7 @@
         if (!pathwayNode) return;
         var node = pathwayNode.node,
           section = pathwayNode.section,
+          instruction = pathwayNode.instruction,
           _pathwayNode$controll = pathwayNode.controllers,
           controllers = _pathwayNode$controll === void 0 ? {} : _pathwayNode$controll;
         var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath);
@@ -4552,7 +4954,7 @@
           preScaleY = _object$scaleY === void 0 ? 1 : _object$scaleY,
           _object$angle = object.angle,
           preAngle = _object$angle === void 0 ? 0 : _object$angle;
-        var _ref11 = selectionGroup ? {
+        var _ref17 = selectionGroup ? {
             scaleX: 1 / selectionGroup.scaleX,
             scaleY: 1 / selectionGroup.scaleY,
             angle: -selectionGroup.angle
@@ -4561,15 +4963,15 @@
             scaleY: 1,
             angle: 0
           },
-          newScaleX = _ref11.scaleX,
-          newScaleY = _ref11.scaleY,
-          newAngle = _ref11.angle;
+          newScaleX = _ref17.scaleX,
+          newScaleY = _ref17.scaleY,
+          newAngle = _ref17.angle;
         object.set({
           scaleX: newScaleX,
           scaleY: newScaleY,
           angle: newAngle
         }).setCoords();
-        var newCrood = editorPath.calcRelativeCrood(position);
+        var newCrood = editorPath.calcRelativeCrood(position, editorPath.getPath(instruction).matrix);
         // 需要跟随变化的曲线控制点
         var followCroods = [];
         var followTransform = {
@@ -4665,9 +5067,9 @@
         };
         // 添加单个活跃对象的响应式变化
         var addActivePointObserve = function addActivePointObserve(object) {
-          observe(object, ['left', 'top'], function (_ref12) {
-            var left = _ref12.left,
-              top = _ref12.top;
+          observe(object, ['left', 'top'], function (_ref18) {
+            var left = _ref18.left,
+              top = _ref18.top;
             if (object.group) return;
             _this11.move(object, {
               left: left,
@@ -4711,17 +5113,17 @@
         if (!editorPath) return;
         this.editor = editor;
         this._initSelectEvents();
-        vizPath.on('draw', /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
+        vizPath.on('draw', /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7() {
           var canvas;
-          return _regeneratorRuntime().wrap(function _callee5$(_context5) {
-            while (1) switch (_context5.prev = _context5.next) {
+          return _regeneratorRuntime().wrap(function _callee7$(_context7) {
+            while (1) switch (_context7.prev = _context7.next) {
               case 0:
                 canvas = editor.canvas;
                 if (canvas) {
-                  _context5.next = 3;
+                  _context7.next = 3;
                   break;
                 }
-                return _context5.abrupt("return");
+                return _context7.abrupt("return");
               case 3:
                 // 由于需要多次添加关键点和控制点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
                 canvas.renderOnAddRemove = false;
@@ -4737,9 +5139,9 @@
                 canvas.renderAll();
               case 10:
               case "end":
-                return _context5.stop();
+                return _context7.stop();
             }
-          }, _callee5);
+          }, _callee7);
         })));
       }
     }]);
@@ -4749,13 +5151,13 @@
   const EXAMPLE_PATH_D = {
       circle: 'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
       bubble: 'M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z',
-      shapes: 'L-188.7846 -47L-100.923 97H-256.3538 z M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z'
+      shapes: 'L-188.7846 -47L-100.923 97H-256.3538 z M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
   };
   (async () => {
+      // 取得上传文件输入框
+      const uploader = document.getElementById('upload');
       // 取得容器节点
-      const container = document.getElementById('container');
-      if (!container)
-          return;
+      const container = document.getElementsByTagName('main')[0];
       // 创建画布节点
       const canvas = document.createElement('canvas');
       container.appendChild(canvas);
@@ -4776,49 +5178,87 @@
           // selection: false,
       });
       fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-      // const path = new fabric.Path(EXAMPLE_PATH_D.bubble, {
-      //   originX: 'center',
-      //   originY: 'center',
-      //   left: 100,
-      //   top: 100,
-      //   objectCaching: false,
-      //   noScaleCache: false,
-      //   fill: 'transparent',
-      //   stroke: '#333',
-      //   strokeWidth: 2,
-      //   // angle: 60,
-      //   // scaleX: 1.5,
-      //   // scaleY: 1.5
-      // });
+      new fabric.fabric.Path(EXAMPLE_PATH_D.bubble, {
+          originX: 'center',
+          originY: 'center',
+          left: 100,
+          top: 100,
+          objectCaching: false,
+          noScaleCache: false,
+          fill: '#59d571',
+          stroke: '#5c7461',
+          strokeWidth: 2,
+          // angle: 60,
+          // scaleX: 1.5,
+          // scaleY: 1.5
+      });
       // fabricCanvas.add(path);
       // fabricCanvas.renderAll();
       const vizPath = new VizPathContext();
       const operator = await vizPath
           .use(new Editor(fabricCanvas))
-          .use(new EditorUI({
-      // path: () => {
-      //   const path = new fabric.Path('');
-      //   path.set({
-      //     fill: 'rgba(50, 50, 50, 0.8)',
-      //     stroke: '#333',
-      //     strokeWidth: 2,
-      //   });
-      //   return path;
-      // }
-      }))
+          // .use(
+          //   new EditorUI({
+          //     // path: (decorator, originPath) => {
+          //     //   return originPath;
+          //     // },
+          //   })
+          // )
           .use(new EditorBackground())
           .use(new EditorPath())
           .use(new EditorNode())
           .initialize();
-      // operator.draw(VizPath.getPathwayFromObject(path));
-      operator.draw(VizPathContext.getPathwayFromPathD(EXAMPLE_PATH_D.bubble), { label: 'bubble' });
-      // operator.clean();
+      // ① 通过路径指令直接绘制
+      // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
+      //   left: fabricCanvas.getWidth() / 2,
+      //   top: fabricCanvas.getHeight() / 2,
+      //   originX: 'center',
+      //   originY: 'center',
+      // });
+      // operator.draw(pathway);
+      // ② 通过路径对象绘制
+      // const pathway = VizPath.parsePathFromObject(path);
+      // operator.draw(pathway);
+      // ③ 通过URL绘制
+      const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
+      const pathways = await VizPathContext.parsePathFromURL(svgURL, {
+          left: fabricCanvas.getWidth() / 2,
+          top: fabricCanvas.getHeight() / 2,
+          originX: 'center',
+          originY: 'center',
+          scaleX: 2,
+          scaleY: 2
+      });
+      pathways === null || pathways === void 0 ? void 0 : pathways.forEach((pathway) => {
+          operator.draw(pathway);
+      });
+      // ④ 快速使用
+      // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.bubble, {
+      //   left: fabricCanvas.getWidth() / 2,
+      //   top: fabricCanvas.getHeight() / 2,
+      //   originX: 'center',
+      //   originY: 'center'
+      // });
+      // operator.draw(pathway);
+      // 上传input
+      uploader.onchange = async (e) => {
+          var _a, _b;
+          const file = ((_b = (_a = e.target) === null || _a === void 0 ? void 0 : _a.files) !== null && _b !== void 0 ? _b : [])[0];
+          if (!file)
+              return;
+          operator.clean();
+          const url = URL.createObjectURL(file);
+          const pathways = await VizPathContext.parsePathFromURL(url, {
+              left: fabricCanvas.getWidth() / 2,
+              top: fabricCanvas.getHeight() / 2,
+              originX: 'center',
+              originY: 'center',
+          });
+          pathways === null || pathways === void 0 ? void 0 : pathways.forEach((pathway) => {
+              operator.draw(pathway);
+          });
+      };
       // operator.move(operator.pathway[0][0].node, { x: 200, y: 200 })
-      // editor.draw(VizPath.getPathwayFromObject(path));
-      // vizPath.
-      // path.path = vizPath.toPath() as unknown as fabric.Point[];
-      // fabricCanvas.renderAll();
-      // console.log(vizPath.toPathD())
   })();
 
 })(fabric);

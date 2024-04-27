@@ -20,17 +20,28 @@
         height: 100%;
         overflow: hidden;
       }
-      #container {
+      .container {
         max-width: 780px;
-        height: 580px;
-        border: 1px solid #efefef;
         margin: 32px auto;
+      }
+      main {
+        height: 580px;
+        margin: 20px auto;
+        border: 1px solid #efefef;
         border-radius: 4px;
         overflow: hidden;
       }
     </style>
   </head>
   <body>
-    <div id="container"></div>
+    <div class="container">
+      <header>
+        <div class="">
+          <span>上传文件</span>
+          <input id="upload" type="file">
+        </div>
+      </header>
+      <main></main>
+    </div>
   </body>
 </html>

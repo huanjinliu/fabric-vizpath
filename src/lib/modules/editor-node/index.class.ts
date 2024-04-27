@@ -43,7 +43,7 @@ class EditorNode extends EditorModule {
     // 创建路径关键点的操作点（即实际路径上的节点，而非曲线上的虚拟点）
     vizPath.pathway.forEach(({ section }) => {
       section.forEach((item, index) => {
-        const { node } = item;
+        const { node, instruction } = item;
         if (!node) return;
 
         // 如果下一个指令是闭合点，则不添加关键点
@@ -54,11 +54,12 @@ class EditorNode extends EditorModule {
         const decorator = (innerObject: fabric.Object) => {
           const _object = new fabric.Group([innerObject], {
             name: uuid(),
-            originX: 'center',
-            originY: 'center',
             // 选中时不出现选中框
             hasBorders: false,
             hasControls: false,
+            // 保持居中
+            originX: 'center',
+            originY: 'center',
           });
 
           _object[VizPath.symbol] = true;
@@ -66,7 +67,10 @@ class EditorNode extends EditorModule {
           // 响应指令的直接修改
           node.observe(
             (x, y) => {
-              const position = editorPath.calcAbsolutePosition({ x, y });
+              const position = editorPath.calcAbsolutePosition(
+                { x, y },
+                editorPath.getPath(instruction)!.matrix
+              );
               if (_object.group) {
                 const relativePosition = editorPath.calcRelativeCrood(
                   position,
@@ -90,9 +94,11 @@ class EditorNode extends EditorModule {
           );
 
           return _object;
-        }
+        };
 
-        let object = (ui?.options.node ?? EditorUI.defaultUI.node)(decorator);
+        let object = (ui?.options.node ?? EditorUI.noneUI.node)(
+          decorator
+        ) as fabric.Group;
 
         if (!object[VizPath.symbol]) object = decorator(object);
 
@@ -117,7 +123,7 @@ class EditorNode extends EditorModule {
     if (editorPath && pathway) {
       pathway.forEach(({ section }) => {
         section.forEach((item) => {
-          const { node, controllers = {} } = item;
+          const { node, instruction, controllers = {} } = item;
           if (!node) return;
 
           const { pre, next } = controllers;
@@ -131,11 +137,12 @@ class EditorNode extends EditorModule {
             const pointDecorator = (innerObject: fabric.Object) => {
               const _object = new fabric.Group([innerObject], {
                 name: uuid(),
-                originX: 'center',
-                originY: 'center',
                 // 选中时不出现选中框
                 hasBorders: false,
                 hasControls: false,
+                // 保持居中
+                originX: 'center',
+                originY: 'center',
               });
 
               _object[VizPath.symbol] = true;
@@ -144,7 +151,10 @@ class EditorNode extends EditorModule {
               controller.observe(
                 (x, y) => {
                   if (_object.canvas?.getActiveObject() === _object) return;
-                  const position = editorPath.calcAbsolutePosition({ x, y });
+                  const position = editorPath.calcAbsolutePosition(
+                    { x, y },
+                    editorPath.getPath(instruction)!.matrix
+                  );
                   _object.set(position).setCoords();
                 },
                 {
@@ -155,10 +165,13 @@ class EditorNode extends EditorModule {
 
               observe(_object, ['left', 'top'], ({ left, top }) => {
                 if (_object.canvas?.getActiveObject() !== _object) return;
-                const crood = editorPath.calcRelativeCrood({
-                  left: left!,
-                  top: top!,
-                });
+                const crood = editorPath.calcRelativeCrood(
+                  {
+                    left: left!,
+                    top: top!,
+                  },
+                  editorPath.getPath(instruction)!.matrix
+                );
                 controller.set(crood, [_object.name]);
               });
 
@@ -166,8 +179,8 @@ class EditorNode extends EditorModule {
             };
 
             let point = (
-              ui?.options.controllerPoint ?? EditorUI.defaultUI.controllerPoint
-            )(pointDecorator);
+              ui?.options.controllerPoint ?? EditorUI.noneUI.controllerPoint
+            )(pointDecorator) as fabric.Group;
 
             if (!point[VizPath.symbol]) point = pointDecorator(point);
 
@@ -175,14 +188,27 @@ class EditorNode extends EditorModule {
              * 创建控制点和节点的连线
              */
             const lineDecorator = (_line: fabric.Line) => {
-              _line.set({  name: uuid() });
+              _line.set({
+                name: uuid(),
+                // 保持比例
+                strokeUniform: true,
+                // 不允许选中
+                selectable: false,
+                evented: false,
+                // 保持居中
+                originX: 'center',
+                originY: 'center',
+              });
 
               _line[VizPath.symbol] = true;
 
               // 建立响应式，让连线随时跟随指令的值进行变化
               node.observe(
                 (x, y) => {
-                  const position = editorPath.calcAbsolutePosition({ x, y });
+                  const position = editorPath.calcAbsolutePosition(
+                    { x, y },
+                    editorPath.getPath(instruction)!.matrix
+                  );
                   _line.set({ x1: position.left, y1: position.top });
                 },
                 {
@@ -192,7 +218,10 @@ class EditorNode extends EditorModule {
               );
               controller.observe(
                 (x, y) => {
-                  const position = editorPath.calcAbsolutePosition({ x, y });
+                  const position = editorPath.calcAbsolutePosition(
+                    { x, y },
+                    editorPath.getPath(instruction)!.matrix
+                  );
                   _line.set({ x2: position.left, y2: position.top });
                 },
                 {
@@ -204,7 +233,7 @@ class EditorNode extends EditorModule {
               return _line;
             };
             let line = (
-              ui?.options.controllerLine ?? EditorUI.defaultUI.controllerLine
+              ui?.options.controllerLine ?? EditorUI.noneUI.controllerLine
             )(lineDecorator);
 
             if (!line[VizPath.symbol]) line = lineDecorator(line);
@@ -246,7 +275,7 @@ class EditorNode extends EditorModule {
     const pathwayNode = this.objectMap.get(object);
     if (!pathwayNode) return;
 
-    const { node, section, controllers = {} } = pathwayNode;
+    const { node, section, instruction, controllers = {} } = pathwayNode;
 
     const editorPath = this.vizPath?.context.find(EditorPath);
     if (!editorPath) return [];
@@ -278,7 +307,10 @@ class EditorNode extends EditorModule {
       })
       .setCoords();
 
-    const newCrood = editorPath.calcRelativeCrood(position);
+    const newCrood = editorPath.calcRelativeCrood(
+      position,
+      editorPath.getPath(instruction)!.matrix
+    );
     // 需要跟随变化的曲线控制点
     const followCroods: ResponsiveCrood[] = [];
     const followTransform = {

@@ -1,8 +1,13 @@
 import { fabric } from 'fabric';
-import VizPath, { type ResponsiveCrood } from './vizpath.class';
-import type EditorModule from './modules/base.class';
-import { getCubicFromQuadratic, transform } from './utils';
 import cloneDeep from 'lodash-es/cloneDeep';
+import defaults from 'lodash-es/defaults';
+import VizPath from './vizpath.class';
+import type EditorModule from './modules/base.class';
+import {
+  getCubicFromQuadratic,
+  loadSVGToPathFromURL,
+  transform,
+} from './utils';
 
 /** 指令类型 */
 export enum InstructionType {
@@ -25,7 +30,10 @@ export type PathwayNode<Node extends Crood = Crood> = {
   }>;
 };
 
-export type Pathway = PathwayNode[][];
+export type Pathway = {
+  section: PathwayNode[];
+  originPath: fabric.Path;
+}[];
 
 /**
  * VizPath
@@ -37,14 +45,14 @@ class VizPathContext {
   private _modules: EditorModule[] = [];
 
   /**
-   * 通过fabric.Path对象获取Editor路径信息
+   * 通过fabric.Path对象解析路径信息
    *
    * @param path farbic路径对象
    * @example
    *
    * const pathway = getPathwayFromObject(new fabric.Path());
    */
-  static getPathwayFromObject(path: fabric.Path) {
+  static parsePathFromObject(path: fabric.Path) {
     // ① 清除路径自带偏移，如果不消除，后续的所有关键点、控制点的编辑都要额外处理路径自身的偏移
     const instructions = cloneDeep(path.path as unknown as Instruction[]);
     instructions.forEach((item, pathIdx) => {
@@ -149,7 +157,10 @@ class VizPathContext {
             : undefined,
         });
       });
-      return _section;
+      return {
+        section: _section,
+        originPath: path,
+      };
     });
 
     return pathway;
@@ -163,9 +174,54 @@ class VizPathContext {
    *
    * const pathway = getPathwayFromPathD('M 0 0 L 100 100');
    */
-  static getPathwayFromPathD(d: string) {
-    const path = new fabric.Path(d);
-    return this.getPathwayFromObject(path);
+  static parsePathFromPathD(d: string, options: fabric.IObjectOptions = {}) {
+    const path = new fabric.Path(
+      d,
+      defaults(options, {
+        left: 0,
+        top: 0,
+      })
+    );
+    return this.parsePathFromObject(path);
+  }
+
+  /**
+   * 通过svg文件链接加载并获取Editor路径信息
+   *
+   * @param d 路径指令信息
+   * @example
+   *
+   * const pathway = getPathwayFromPathD('M 0 0 L 100 100');
+   */
+  static async parsePathFromURL(
+    url: string,
+    options: fabric.IObjectOptions = {}
+  ) {
+    const object = await loadSVGToPathFromURL(url);
+    if (!object) return;
+
+    const pathGroup = new fabric.Group([object]);
+
+    if (options) pathGroup.set({ ...options });
+
+    const pathways: Pathway[] = [];
+
+    const extract = (group: fabric.Group) => {
+      const children = group.getObjects();
+      group.destroy();
+      children.forEach((child) => {
+        if (child.type === 'group') {
+          extract(child as fabric.Group);
+        } else if (child.type === 'path') {
+          pathways.push(
+            VizPathContext.parsePathFromObject(child as fabric.Path)
+          );
+        }
+      });
+    };
+    extract(pathGroup);
+
+    return pathways;
   }
 
   /**

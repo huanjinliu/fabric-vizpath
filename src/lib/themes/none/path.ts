@@ -10,9 +10,8 @@ const createDefaultPath: Theme['path'] = (decorator, originPath) => {
   path.pathOffset = new fabric.Point(x, y);
 
   path.set({
-    stroke: '#333',
-    strokeWidth: 4,
-    fill: 'transparent',
+    stroke: '#1884ec',
+    strokeWidth: 2,
   });
 
   return decorator(path);

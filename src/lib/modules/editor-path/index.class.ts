@@ -10,31 +10,26 @@ import EditorUI from '../editor-ui/index.class';
 class EditorPath extends EditorModule {
   static ID = Symbol('editor-path');
 
-  paths: fabric.Path[] = [];
+  paths: {
+    path: fabric.Path;
+    matrix: number[];
+  }[] = [];
 
   /**
-   * 来源路径，路径的变换和中心将作为该模块创建的参考值
+   * 获取指令所在路径信息
+   * @param instruction 指令
+   * @returns 路径信息
    */
-  originPath: fabric.Path | undefined;
-
-  /**
-   * 视图变换
-   */
-  editorTransformMatrix = [1, 0, 0, 1, 0, 0];
-
-  constructor(originPath?: fabric.Path) {
-    super();
-
-    this.originPath = originPath;
+  getPath(instruction: Instruction) {
+    return this.paths.find(({ path }) =>
+      path.path?.includes(instruction as unknown as fabric.Point)
+    );
   }
 
   /**
    * 将相对坐标点转化为带元素本身变换的偏移位置
    */
-  calcAbsolutePosition(
-    crood: Crood,
-    matrix = this.editorTransformMatrix
-  ): Position {
+  calcAbsolutePosition(crood: Crood, matrix: number[]): Position {
     const point = fabric.util.transformPoint(
       new fabric.Point(crood.x, crood.y),
       matrix
@@ -46,10 +41,7 @@ class EditorPath extends EditorModule {
   /**
    * 移除元素本身变换，将实际偏移转化为路径相对坐标
    */
-  calcRelativeCrood(
-    position: Position,
-    matrix = this.editorTransformMatrix
-  ): Crood {
+  calcRelativeCrood(position: Position, matrix: number[]): Crood {
     const point = fabric.util.transformPoint(
       new fabric.Point(position.left, position.top),
       fabric.util.invertTransform(matrix)
@@ -71,7 +63,7 @@ class EditorPath extends EditorModule {
    * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
    * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
    */
-  reinitializePath(path: fabric.Path) {
+  reinitializePath(path: fabric.Path, matrix: number[]) {
     // 记录旧的路径信息
     const oldInfo = {
       left: path.left!,
@@ -90,9 +82,6 @@ class EditorPath extends EditorModule {
     path.path = instructions;
 
     // 计算路径偏移差值
-    const matrix = [...this.editorTransformMatrix];
-    matrix[4] = 0;
-    matrix[5] = 0;
     const distance = fabric.util.transformPoint(
       new fabric.Point(
         path.pathOffset.x -
@@ -128,13 +117,11 @@ class EditorPath extends EditorModule {
     vizPath.on('draw', async () => {
       const ui = vizPath.context.find(EditorUI);
 
-      const paths = vizPath.pathway.map(({ info }, index, arr) => {
-        const decorator = (_path: fabric.Path) => {
-          _path.initialize(vizPath.toPathD([arr[index]]));
+      const paths = vizPath.pathway.map(({ originPath }, index, arr) => {
+        const decorator = (customPath: fabric.Path) => {
+          const _path = new fabric.Path();
 
-          _path.path = vizPath
-            .toPaths([arr[index]])
-            .flat(1) as unknown as fabric.Point[];
+          _path.set((customPath.toJSON()) as any);
 
           _path.set({
             name: uuid(),
@@ -148,46 +135,31 @@ class EditorPath extends EditorModule {
 
           _path[VizPath.symbol] = true;
 
+          _path.path = vizPath
+            .toPaths([arr[index]])
+            .flat(1) as unknown as fabric.Point[];
+
+          _path.pathOffset = new fabric.Point(0, 0);
+
           return _path;
         };
-        let path = (ui?.options.path ?? EditorUI.defaultUI.path)(
+        let path = (ui?.options.path ?? EditorUI.noneUI.path)(
           decorator,
-          info
+          originPath
         );
         if (!path[VizPath.symbol]) path = decorator(path);
 
-        return path;
-      });
+        const matrix = path.calcOwnMatrix() as number[];
 
-      const {
-        originX = 'center',
-        originY = 'center',
-        left = canvas.getWidth() / 2,
-        top = canvas.getHeight() / 2,
-        angle = 0,
-        scaleX = 1,
-        scaleY = 1,
-      } = this.originPath ?? {};
-      const group = new fabric.Group(paths, {
-        originX,
-        originY,
-        left,
-        top,
-        angle,
-        scaleX,
-        scaleY,
+        return { path, matrix };
       });
-      // 记录路径在编辑器中的变换值
-      this.editorTransformMatrix = group.calcOwnMatrix();
-
-      group.destroy();
 
       // 移除旧的路径对象并添加新的路径对象
       canvas.renderOnAddRemove = true;
-      this.paths.forEach((path) => {
+      this.paths.forEach(({ path }) => {
         canvas.remove(path);
       });
-      paths.forEach((path) => {
+      paths.forEach(({ path }) => {
         canvas.add(path);
       });
       canvas.renderOnAddRemove = false;
@@ -197,8 +169,8 @@ class EditorPath extends EditorModule {
     });
 
     vizPath.on('update', () => {
-      this.paths.forEach((path) => {
-        this.reinitializePath(path);
+      this.paths.forEach(({ path, matrix }) => {
+        this.reinitializePath(path, [...matrix.slice(0, 4), 0, 0] as number[]);
       });
     });
   }
