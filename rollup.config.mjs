@@ -9,7 +9,7 @@ import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 import terser from '@rollup/plugin-terser';
 
 const build_umd = () => ({
-  input: 'src/lib/index.ts',
+  input: 'src/index.ts',
   output: [
     {
       file: 'dist/index.js',
@@ -37,7 +37,7 @@ const build_umd = () => ({
 });
 
 const build_es = () => ({
-  input: 'src/lib/index.ts',
+  input: 'src/index.ts',
   output: [
     {
       file: 'dist/index.es.js',

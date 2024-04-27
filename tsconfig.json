@@ -9,6 +9,7 @@
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
     "strict": true,
     "noImplicitAny": false,
     "noImplicitThis": false,

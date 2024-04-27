@@ -3,6 +3,17 @@
 (function (fabric) {
   'use strict';
 
+  function _callSuper(t, o, e) {
+    return o = _getPrototypeOf(o), _possibleConstructorReturn(t, _isNativeReflectConstruct() ? Reflect.construct(o, e || [], _getPrototypeOf(t).constructor) : o.apply(t, e));
+  }
+  function _isNativeReflectConstruct() {
+    try {
+      var t = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {}));
+    } catch (t) {}
+    return (_isNativeReflectConstruct = function () {
+      return !!t;
+    })();
+  }
   function _iterableToArrayLimit(r, l) {
     var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"];
     if (null != t) {
@@ -30,6 +41,307 @@
       return a;
     }
   }
+  function _regeneratorRuntime() {
+    _regeneratorRuntime = function () {
+      return e;
+    };
+    var t,
+      e = {},
+      r = Object.prototype,
+      n = r.hasOwnProperty,
+      o = Object.defineProperty || function (t, e, r) {
+        t[e] = r.value;
+      },
+      i = "function" == typeof Symbol ? Symbol : {},
+      a = i.iterator || "@@iterator",
+      c = i.asyncIterator || "@@asyncIterator",
+      u = i.toStringTag || "@@toStringTag";
+    function define(t, e, r) {
+      return Object.defineProperty(t, e, {
+        value: r,
+        enumerable: !0,
+        configurable: !0,
+        writable: !0
+      }), t[e];
+    }
+    try {
+      define({}, "");
+    } catch (t) {
+      define = function (t, e, r) {
+        return t[e] = r;
+      };
+    }
+    function wrap(t, e, r, n) {
+      var i = e && e.prototype instanceof Generator ? e : Generator,
+        a = Object.create(i.prototype),
+        c = new Context(n || []);
+      return o(a, "_invoke", {
+        value: makeInvokeMethod(t, r, c)
+      }), a;
+    }
+    function tryCatch(t, e, r) {
+      try {
+        return {
+          type: "normal",
+          arg: t.call(e, r)
+        };
+      } catch (t) {
+        return {
+          type: "throw",
+          arg: t
+        };
+      }
+    }
+    e.wrap = wrap;
+    var h = "suspendedStart",
+      l = "suspendedYield",
+      f = "executing",
+      s = "completed",
+      y = {};
+    function Generator() {}
+    function GeneratorFunction() {}
+    function GeneratorFunctionPrototype() {}
+    var p = {};
+    define(p, a, function () {
+      return this;
+    });
+    var d = Object.getPrototypeOf,
+      v = d && d(d(values([])));
+    v && v !== r && n.call(v, a) && (p = v);
+    var g = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(p);
+    function defineIteratorMethods(t) {
+      ["next", "throw", "return"].forEach(function (e) {
+        define(t, e, function (t) {
+          return this._invoke(e, t);
+        });
+      });
+    }
+    function AsyncIterator(t, e) {
+      function invoke(r, o, i, a) {
+        var c = tryCatch(t[r], t, o);
+        if ("throw" !== c.type) {
+          var u = c.arg,
+            h = u.value;
+          return h && "object" == typeof h && n.call(h, "__await") ? e.resolve(h.__await).then(function (t) {
+            invoke("next", t, i, a);
+          }, function (t) {
+            invoke("throw", t, i, a);
+          }) : e.resolve(h).then(function (t) {
+            u.value = t, i(u);
+          }, function (t) {
+            return invoke("throw", t, i, a);
+          });
+        }
+        a(c.arg);
+      }
+      var r;
+      o(this, "_invoke", {
+        value: function (t, n) {
+          function callInvokeWithMethodAndArg() {
+            return new e(function (e, r) {
+              invoke(t, n, e, r);
+            });
+          }
+          return r = r ? r.then(callInvokeWithMethodAndArg, callInvokeWithMethodAndArg) : callInvokeWithMethodAndArg();
+        }
+      });
+    }
+    function makeInvokeMethod(e, r, n) {
+      var o = h;
+      return function (i, a) {
+        if (o === f) throw Error("Generator is already running");
+        if (o === s) {
+          if ("throw" === i) throw a;
+          return {
+            value: t,
+            done: !0
+          };
+        }
+        for (n.method = i, n.arg = a;;) {
+          var c = n.delegate;
+          if (c) {
+            var u = maybeInvokeDelegate(c, n);
+            if (u) {
+              if (u === y) continue;
+              return u;
+            }
+          }
+          if ("next" === n.method) n.sent = n._sent = n.arg;else if ("throw" === n.method) {
+            if (o === h) throw o = s, n.arg;
+            n.dispatchException(n.arg);
+          } else "return" === n.method && n.abrupt("return", n.arg);
+          o = f;
+          var p = tryCatch(e, r, n);
+          if ("normal" === p.type) {
+            if (o = n.done ? s : l, p.arg === y) continue;
+            return {
+              value: p.arg,
+              done: n.done
+            };
+          }
+          "throw" === p.type && (o = s, n.method = "throw", n.arg = p.arg);
+        }
+      };
+    }
+    function maybeInvokeDelegate(e, r) {
+      var n = r.method,
+        o = e.iterator[n];
+      if (o === t) return r.delegate = null, "throw" === n && e.iterator.return && (r.method = "return", r.arg = t, maybeInvokeDelegate(e, r), "throw" === r.method) || "return" !== n && (r.method = "throw", r.arg = new TypeError("The iterator does not provide a '" + n + "' method")), y;
+      var i = tryCatch(o, e.iterator, r.arg);
+      if ("throw" === i.type) return r.method = "throw", r.arg = i.arg, r.delegate = null, y;
+      var a = i.arg;
+      return a ? a.done ? (r[e.resultName] = a.value, r.next = e.nextLoc, "return" !== r.method && (r.method = "next", r.arg = t), r.delegate = null, y) : a : (r.method = "throw", r.arg = new TypeError("iterator result is not an object"), r.delegate = null, y);
+    }
+    function pushTryEntry(t) {
+      var e = {
+        tryLoc: t[0]
+      };
+      1 in t && (e.catchLoc = t[1]), 2 in t && (e.finallyLoc = t[2], e.afterLoc = t[3]), this.tryEntries.push(e);
+    }
+    function resetTryEntry(t) {
+      var e = t.completion || {};
+      e.type = "normal", delete e.arg, t.completion = e;
+    }
+    function Context(t) {
+      this.tryEntries = [{
+        tryLoc: "root"
+      }], t.forEach(pushTryEntry, this), this.reset(!0);
+    }
+    function values(e) {
+      if (e || "" === e) {
+        var r = e[a];
+        if (r) return r.call(e);
+        if ("function" == typeof e.next) return e;
+        if (!isNaN(e.length)) {
+          var o = -1,
+            i = function next() {
+              for (; ++o < e.length;) if (n.call(e, o)) return next.value = e[o], next.done = !1, next;
+              return next.value = t, next.done = !0, next;
+            };
+          return i.next = i;
+        }
+      }
+      throw new TypeError(typeof e + " is not iterable");
+    }
+    return GeneratorFunction.prototype = GeneratorFunctionPrototype, o(g, "constructor", {
+      value: GeneratorFunctionPrototype,
+      configurable: !0
+    }), o(GeneratorFunctionPrototype, "constructor", {
+      value: GeneratorFunction,
+      configurable: !0
+    }), GeneratorFunction.displayName = define(GeneratorFunctionPrototype, u, "GeneratorFunction"), e.isGeneratorFunction = function (t) {
+      var e = "function" == typeof t && t.constructor;
+      return !!e && (e === GeneratorFunction || "GeneratorFunction" === (e.displayName || e.name));
+    }, e.mark = function (t) {
+      return Object.setPrototypeOf ? Object.setPrototypeOf(t, GeneratorFunctionPrototype) : (t.__proto__ = GeneratorFunctionPrototype, define(t, u, "GeneratorFunction")), t.prototype = Object.create(g), t;
+    }, e.awrap = function (t) {
+      return {
+        __await: t
+      };
+    }, defineIteratorMethods(AsyncIterator.prototype), define(AsyncIterator.prototype, c, function () {
+      return this;
+    }), e.AsyncIterator = AsyncIterator, e.async = function (t, r, n, o, i) {
+      void 0 === i && (i = Promise);
+      var a = new AsyncIterator(wrap(t, r, n, o), i);
+      return e.isGeneratorFunction(r) ? a : a.next().then(function (t) {
+        return t.done ? t.value : a.next();
+      });
+    }, defineIteratorMethods(g), define(g, u, "Generator"), define(g, a, function () {
+      return this;
+    }), define(g, "toString", function () {
+      return "[object Generator]";
+    }), e.keys = function (t) {
+      var e = Object(t),
+        r = [];
+      for (var n in e) r.push(n);
+      return r.reverse(), function next() {
+        for (; r.length;) {
+          var t = r.pop();
+          if (t in e) return next.value = t, next.done = !1, next;
+        }
+        return next.done = !0, next;
+      };
+    }, e.values = values, Context.prototype = {
+      constructor: Context,
+      reset: function (e) {
+        if (this.prev = 0, this.next = 0, this.sent = this._sent = t, this.done = !1, this.delegate = null, this.method = "next", this.arg = t, this.tryEntries.forEach(resetTryEntry), !e) for (var r in this) "t" === r.charAt(0) && n.call(this, r) && !isNaN(+r.slice(1)) && (this[r] = t);
+      },
+      stop: function () {
+        this.done = !0;
+        var t = this.tryEntries[0].completion;
+        if ("throw" === t.type) throw t.arg;
+        return this.rval;
+      },
+      dispatchException: function (e) {
+        if (this.done) throw e;
+        var r = this;
+        function handle(n, o) {
+          return a.type = "throw", a.arg = e, r.next = n, o && (r.method = "next", r.arg = t), !!o;
+        }
+        for (var o = this.tryEntries.length - 1; o >= 0; --o) {
+          var i = this.tryEntries[o],
+            a = i.completion;
+          if ("root" === i.tryLoc) return handle("end");
+          if (i.tryLoc <= this.prev) {
+            var c = n.call(i, "catchLoc"),
+              u = n.call(i, "finallyLoc");
+            if (c && u) {
+              if (this.prev < i.catchLoc) return handle(i.catchLoc, !0);
+              if (this.prev < i.finallyLoc) return handle(i.finallyLoc);
+            } else if (c) {
+              if (this.prev < i.catchLoc) return handle(i.catchLoc, !0);
+            } else {
+              if (!u) throw Error("try statement without catch or finally");
+              if (this.prev < i.finallyLoc) return handle(i.finallyLoc);
+            }
+          }
+        }
+      },
+      abrupt: function (t, e) {
+        for (var r = this.tryEntries.length - 1; r >= 0; --r) {
+          var o = this.tryEntries[r];
+          if (o.tryLoc <= this.prev && n.call(o, "finallyLoc") && this.prev < o.finallyLoc) {
+            var i = o;
+            break;
+          }
+        }
+        i && ("break" === t || "continue" === t) && i.tryLoc <= e && e <= i.finallyLoc && (i = null);
+        var a = i ? i.completion : {};
+        return a.type = t, a.arg = e, i ? (this.method = "next", this.next = i.finallyLoc, y) : this.complete(a);
+      },
+      complete: function (t, e) {
+        if ("throw" === t.type) throw t.arg;
+        return "break" === t.type || "continue" === t.type ? this.next = t.arg : "return" === t.type ? (this.rval = this.arg = t.arg, this.method = "return", this.next = "end") : "normal" === t.type && e && (this.next = e), y;
+      },
+      finish: function (t) {
+        for (var e = this.tryEntries.length - 1; e >= 0; --e) {
+          var r = this.tryEntries[e];
+          if (r.finallyLoc === t) return this.complete(r.completion, r.afterLoc), resetTryEntry(r), y;
+        }
+      },
+      catch: function (t) {
+        for (var e = this.tryEntries.length - 1; e >= 0; --e) {
+          var r = this.tryEntries[e];
+          if (r.tryLoc === t) {
+            var n = r.completion;
+            if ("throw" === n.type) {
+              var o = n.arg;
+              resetTryEntry(r);
+            }
+            return o;
+          }
+        }
+        throw Error("illegal catch attempt");
+      },
+      delegateYield: function (e, r, n) {
+        return this.delegate = {
+          iterator: values(e),
+          resultName: r,
+          nextLoc: n
+        }, "next" === this.method && (this.arg = t), y;
+      }
+    }, e;
+  }
   function _toPrimitive(t, r) {
     if ("object" != typeof t || !t) return t;
     var e = t[Symbol.toPrimitive];
@@ -53,6 +365,36 @@
       return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o;
     }, _typeof(o);
   }
+  function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) {
+    try {
+      var info = gen[key](arg);
+      var value = info.value;
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    if (info.done) {
+      resolve(value);
+    } else {
+      Promise.resolve(value).then(_next, _throw);
+    }
+  }
+  function _asyncToGenerator(fn) {
+    return function () {
+      var self = this,
+        args = arguments;
+      return new Promise(function (resolve, reject) {
+        var gen = fn.apply(self, args);
+        function _next(value) {
+          asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value);
+        }
+        function _throw(err) {
+          asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err);
+        }
+        _next(undefined);
+      });
+    };
+  }
   function _classCallCheck(instance, Constructor) {
     if (!(instance instanceof Constructor)) {
       throw new TypeError("Cannot call a class as a function");
@@ -74,6 +416,49 @@
       writable: false
     });
     return Constructor;
+  }
+  function _inherits(subClass, superClass) {
+    if (typeof superClass !== "function" && superClass !== null) {
+      throw new TypeError("Super expression must either be null or a function");
+    }
+    subClass.prototype = Object.create(superClass && superClass.prototype, {
+      constructor: {
+        value: subClass,
+        writable: true,
+        configurable: true
+      }
+    });
+    Object.defineProperty(subClass, "prototype", {
+      writable: false
+    });
+    if (superClass) _setPrototypeOf(subClass, superClass);
+  }
+  function _getPrototypeOf(o) {
+    _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) {
+      return o.__proto__ || Object.getPrototypeOf(o);
+    };
+    return _getPrototypeOf(o);
+  }
+  function _setPrototypeOf(o, p) {
+    _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) {
+      o.__proto__ = p;
+      return o;
+    };
+    return _setPrototypeOf(o, p);
+  }
+  function _assertThisInitialized(self) {
+    if (self === void 0) {
+      throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+    }
+    return self;
+  }
+  function _possibleConstructorReturn(self, call) {
+    if (call && (typeof call === "object" || typeof call === "function")) {
+      return call;
+    } else if (call !== void 0) {
+      throw new TypeError("Derived constructors may only return object or undefined");
+    }
+    return _assertThisInitialized(self);
   }
   function _slicedToArray(arr, i) {
     return _arrayWithHoles(arr) || _iterableToArrayLimit(arr, i) || _unsupportedIterableToArray(arr, i) || _nonIterableRest();
@@ -164,107 +549,6 @@
     };
   }
 
-  /**
-   * This method returns the first argument it receives.
-   *
-   * @static
-   * @since 0.1.0
-   * @memberOf _
-   * @category Util
-   * @param {*} value Any value.
-   * @returns {*} Returns `value`.
-   * @example
-   *
-   * var object = { 'a': 1 };
-   *
-   * console.log(_.identity(object) === object);
-   * // => true
-   */
-  function identity(value) {
-    return value;
-  }
-
-  /**
-   * A faster alternative to `Function#apply`, this function invokes `func`
-   * with the `this` binding of `thisArg` and the arguments of `args`.
-   *
-   * @private
-   * @param {Function} func The function to invoke.
-   * @param {*} thisArg The `this` binding of `func`.
-   * @param {Array} args The arguments to invoke `func` with.
-   * @returns {*} Returns the result of `func`.
-   */
-  function apply(func, thisArg, args) {
-    switch (args.length) {
-      case 0:
-        return func.call(thisArg);
-      case 1:
-        return func.call(thisArg, args[0]);
-      case 2:
-        return func.call(thisArg, args[0], args[1]);
-      case 3:
-        return func.call(thisArg, args[0], args[1], args[2]);
-    }
-    return func.apply(thisArg, args);
-  }
-
-  /* Built-in method references for those with the same name as other `lodash` methods. */
-  var nativeMax = Math.max;
-
-  /**
-   * A specialized version of `baseRest` which transforms the rest array.
-   *
-   * @private
-   * @param {Function} func The function to apply a rest parameter to.
-   * @param {number} [start=func.length-1] The start position of the rest parameter.
-   * @param {Function} transform The rest array transform.
-   * @returns {Function} Returns the new function.
-   */
-  function overRest(func, start, transform) {
-    start = nativeMax(start === undefined ? func.length - 1 : start, 0);
-    return function () {
-      var args = arguments,
-        index = -1,
-        length = nativeMax(args.length - start, 0),
-        array = Array(length);
-      while (++index < length) {
-        array[index] = args[start + index];
-      }
-      index = -1;
-      var otherArgs = Array(start + 1);
-      while (++index < start) {
-        otherArgs[index] = args[index];
-      }
-      otherArgs[start] = transform(array);
-      return apply(func, this, otherArgs);
-    };
-  }
-
-  /**
-   * Creates a function that returns `value`.
-   *
-   * @static
-   * @memberOf _
-   * @since 2.4.0
-   * @category Util
-   * @param {*} value The value to return from the new function.
-   * @returns {Function} Returns the new constant function.
-   * @example
-   *
-   * var objects = _.times(2, _.constant({ 'a': 1 }));
-   *
-   * console.log(objects);
-   * // => [{ 'a': 1 }, { 'a': 1 }]
-   *
-   * console.log(objects[0] === objects[1]);
-   * // => true
-   */
-  function constant(value) {
-    return function () {
-      return value;
-    };
-  }
-
   /** Detect free variable `global` from Node.js. */
   var freeGlobal = (typeof global === "undefined" ? "undefined" : _typeof(global)) == 'object' && global && global.Object === Object && global;
 
@@ -274,90 +558,35 @@
   /** Used as a reference to the global object. */
   var root = freeGlobal || freeSelf || Function('return this')();
 
-  /** Built-in value references. */
-  var _Symbol = root.Symbol;
-
-  /** Used for built-in method references. */
-  var objectProto$d = Object.prototype;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty$a = objectProto$d.hasOwnProperty;
+  /** Used to match a single whitespace character. */
+  var reWhitespace = /\s/;
 
   /**
-   * Used to resolve the
-   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
-   * of values.
-   */
-  var nativeObjectToString$1 = objectProto$d.toString;
-
-  /** Built-in value references. */
-  var symToStringTag$1 = _Symbol ? _Symbol.toStringTag : undefined;
-
-  /**
-   * A specialized version of `baseGetTag` which ignores `Symbol.toStringTag` values.
+   * Used by `_.trim` and `_.trimEnd` to get the index of the last non-whitespace
+   * character of `string`.
    *
    * @private
-   * @param {*} value The value to query.
-   * @returns {string} Returns the raw `toStringTag`.
+   * @param {string} string The string to inspect.
+   * @returns {number} Returns the index of the last non-whitespace character.
    */
-  function getRawTag(value) {
-    var isOwn = hasOwnProperty$a.call(value, symToStringTag$1),
-      tag = value[symToStringTag$1];
-    try {
-      value[symToStringTag$1] = undefined;
-      var unmasked = true;
-    } catch (e) {}
-    var result = nativeObjectToString$1.call(value);
-    if (unmasked) {
-      if (isOwn) {
-        value[symToStringTag$1] = tag;
-      } else {
-        delete value[symToStringTag$1];
-      }
-    }
-    return result;
+  function trimmedEndIndex(string) {
+    var index = string.length;
+    while (index-- && reWhitespace.test(string.charAt(index))) {}
+    return index;
   }
 
-  /** Used for built-in method references. */
-  var objectProto$c = Object.prototype;
+  /** Used to match leading whitespace. */
+  var reTrimStart = /^\s+/;
 
   /**
-   * Used to resolve the
-   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
-   * of values.
-   */
-  var nativeObjectToString = objectProto$c.toString;
-
-  /**
-   * Converts `value` to a string using `Object.prototype.toString`.
+   * The base implementation of `_.trim`.
    *
    * @private
-   * @param {*} value The value to convert.
-   * @returns {string} Returns the converted string.
+   * @param {string} string The string to trim.
+   * @returns {string} Returns the trimmed string.
    */
-  function objectToString(value) {
-    return nativeObjectToString.call(value);
-  }
-
-  /** `Object#toString` result references. */
-  var nullTag = '[object Null]',
-    undefinedTag = '[object Undefined]';
-
-  /** Built-in value references. */
-  var symToStringTag = _Symbol ? _Symbol.toStringTag : undefined;
-
-  /**
-   * The base implementation of `getTag` without fallbacks for buggy environments.
-   *
-   * @private
-   * @param {*} value The value to query.
-   * @returns {string} Returns the `toStringTag`.
-   */
-  function baseGetTag(value) {
-    if (value == null) {
-      return value === undefined ? undefinedTag : nullTag;
-    }
-    return symToStringTag && symToStringTag in Object(value) ? getRawTag(value) : objectToString(value);
+  function baseTrim(string) {
+    return string ? string.slice(0, trimmedEndIndex(string) + 1).replace(reTrimStart, '') : string;
   }
 
   /**
@@ -390,226 +619,433 @@
     return value != null && (type == 'object' || type == 'function');
   }
 
-  /** `Object#toString` result references. */
-  var asyncTag = '[object AsyncFunction]',
-    funcTag$2 = '[object Function]',
-    genTag$1 = '[object GeneratorFunction]',
-    proxyTag = '[object Proxy]';
+  /** Built-in value references. */
+  var Symbol$1 = root.Symbol;
+
+  /** Used for built-in method references. */
+  var objectProto$c = Object.prototype;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty$9 = objectProto$c.hasOwnProperty;
 
   /**
-   * Checks if `value` is classified as a `Function` object.
+   * Used to resolve the
+   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+   * of values.
+   */
+  var nativeObjectToString$1 = objectProto$c.toString;
+
+  /** Built-in value references. */
+  var symToStringTag$1 = Symbol$1 ? Symbol$1.toStringTag : undefined;
+
+  /**
+   * A specialized version of `baseGetTag` which ignores `Symbol.toStringTag` values.
+   *
+   * @private
+   * @param {*} value The value to query.
+   * @returns {string} Returns the raw `toStringTag`.
+   */
+  function getRawTag(value) {
+    var isOwn = hasOwnProperty$9.call(value, symToStringTag$1),
+      tag = value[symToStringTag$1];
+    try {
+      value[symToStringTag$1] = undefined;
+      var unmasked = true;
+    } catch (e) {}
+    var result = nativeObjectToString$1.call(value);
+    if (unmasked) {
+      if (isOwn) {
+        value[symToStringTag$1] = tag;
+      } else {
+        delete value[symToStringTag$1];
+      }
+    }
+    return result;
+  }
+
+  /** Used for built-in method references. */
+  var objectProto$b = Object.prototype;
+
+  /**
+   * Used to resolve the
+   * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+   * of values.
+   */
+  var nativeObjectToString = objectProto$b.toString;
+
+  /**
+   * Converts `value` to a string using `Object.prototype.toString`.
+   *
+   * @private
+   * @param {*} value The value to convert.
+   * @returns {string} Returns the converted string.
+   */
+  function objectToString(value) {
+    return nativeObjectToString.call(value);
+  }
+
+  /** `Object#toString` result references. */
+  var nullTag = '[object Null]',
+    undefinedTag = '[object Undefined]';
+
+  /** Built-in value references. */
+  var symToStringTag = Symbol$1 ? Symbol$1.toStringTag : undefined;
+
+  /**
+   * The base implementation of `getTag` without fallbacks for buggy environments.
+   *
+   * @private
+   * @param {*} value The value to query.
+   * @returns {string} Returns the `toStringTag`.
+   */
+  function baseGetTag(value) {
+    if (value == null) {
+      return value === undefined ? undefinedTag : nullTag;
+    }
+    return symToStringTag && symToStringTag in Object(value) ? getRawTag(value) : objectToString(value);
+  }
+
+  /**
+   * Checks if `value` is object-like. A value is object-like if it's not `null`
+   * and has a `typeof` result of "object".
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+   * @example
+   *
+   * _.isObjectLike({});
+   * // => true
+   *
+   * _.isObjectLike([1, 2, 3]);
+   * // => true
+   *
+   * _.isObjectLike(_.noop);
+   * // => false
+   *
+   * _.isObjectLike(null);
+   * // => false
+   */
+  function isObjectLike(value) {
+    return value != null && _typeof(value) == 'object';
+  }
+
+  /** `Object#toString` result references. */
+  var symbolTag$2 = '[object Symbol]';
+
+  /**
+   * Checks if `value` is classified as a `Symbol` primitive or object.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
+   * @example
+   *
+   * _.isSymbol(Symbol.iterator);
+   * // => true
+   *
+   * _.isSymbol('abc');
+   * // => false
+   */
+  function isSymbol(value) {
+    return _typeof(value) == 'symbol' || isObjectLike(value) && baseGetTag(value) == symbolTag$2;
+  }
+
+  /** Used as references for various `Number` constants. */
+  var NAN = 0 / 0;
+
+  /** Used to detect bad signed hexadecimal string values. */
+  var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
+
+  /** Used to detect binary string values. */
+  var reIsBinary = /^0b[01]+$/i;
+
+  /** Used to detect octal string values. */
+  var reIsOctal = /^0o[0-7]+$/i;
+
+  /** Built-in method references without a dependency on `root`. */
+  var freeParseInt = parseInt;
+
+  /**
+   * Converts `value` to a number.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to process.
+   * @returns {number} Returns the number.
+   * @example
+   *
+   * _.toNumber(3.2);
+   * // => 3.2
+   *
+   * _.toNumber(Number.MIN_VALUE);
+   * // => 5e-324
+   *
+   * _.toNumber(Infinity);
+   * // => Infinity
+   *
+   * _.toNumber('3.2');
+   * // => 3.2
+   */
+  function toNumber(value) {
+    if (typeof value == 'number') {
+      return value;
+    }
+    if (isSymbol(value)) {
+      return NAN;
+    }
+    if (isObject(value)) {
+      var other = typeof value.valueOf == 'function' ? value.valueOf() : value;
+      value = isObject(other) ? other + '' : other;
+    }
+    if (typeof value != 'string') {
+      return value === 0 ? value : +value;
+    }
+    value = baseTrim(value);
+    var isBinary = reIsBinary.test(value);
+    return isBinary || reIsOctal.test(value) ? freeParseInt(value.slice(2), isBinary ? 2 : 8) : reIsBadHex.test(value) ? NAN : +value;
+  }
+
+  /** Used as references for various `Number` constants. */
+  var INFINITY$1 = 1 / 0,
+    MAX_INTEGER = 1.7976931348623157e+308;
+
+  /**
+   * Converts `value` to a finite number.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.12.0
+   * @category Lang
+   * @param {*} value The value to convert.
+   * @returns {number} Returns the converted number.
+   * @example
+   *
+   * _.toFinite(3.2);
+   * // => 3.2
+   *
+   * _.toFinite(Number.MIN_VALUE);
+   * // => 5e-324
+   *
+   * _.toFinite(Infinity);
+   * // => 1.7976931348623157e+308
+   *
+   * _.toFinite('3.2');
+   * // => 3.2
+   */
+  function toFinite(value) {
+    if (!value) {
+      return value === 0 ? value : 0;
+    }
+    value = toNumber(value);
+    if (value === INFINITY$1 || value === -INFINITY$1) {
+      var sign = value < 0 ? -1 : 1;
+      return sign * MAX_INTEGER;
+    }
+    return value === value ? value : 0;
+  }
+
+  /**
+   * Converts `value` to an integer.
+   *
+   * **Note:** This method is loosely based on
+   * [`ToInteger`](http://www.ecma-international.org/ecma-262/7.0/#sec-tointeger).
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to convert.
+   * @returns {number} Returns the converted integer.
+   * @example
+   *
+   * _.toInteger(3.2);
+   * // => 3
+   *
+   * _.toInteger(Number.MIN_VALUE);
+   * // => 0
+   *
+   * _.toInteger(Infinity);
+   * // => 1.7976931348623157e+308
+   *
+   * _.toInteger('3.2');
+   * // => 3
+   */
+  function toInteger(value) {
+    var result = toFinite(value),
+      remainder = result % 1;
+    return result === result ? remainder ? result - remainder : result : 0;
+  }
+
+  /**
+   * A specialized version of `_.map` for arrays without support for iteratee
+   * shorthands.
+   *
+   * @private
+   * @param {Array} [array] The array to iterate over.
+   * @param {Function} iteratee The function invoked per iteration.
+   * @returns {Array} Returns the new mapped array.
+   */
+  function arrayMap(array, iteratee) {
+    var index = -1,
+      length = array == null ? 0 : array.length,
+      result = Array(length);
+    while (++index < length) {
+      result[index] = iteratee(array[index], index, array);
+    }
+    return result;
+  }
+
+  /**
+   * Checks if `value` is classified as an `Array` object.
    *
    * @static
    * @memberOf _
    * @since 0.1.0
    * @category Lang
    * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a function, else `false`.
+   * @returns {boolean} Returns `true` if `value` is an array, else `false`.
    * @example
    *
-   * _.isFunction(_);
+   * _.isArray([1, 2, 3]);
    * // => true
    *
-   * _.isFunction(/abc/);
+   * _.isArray(document.body.children);
+   * // => false
+   *
+   * _.isArray('abc');
+   * // => false
+   *
+   * _.isArray(_.noop);
    * // => false
    */
-  function isFunction(value) {
-    if (!isObject(value)) {
-      return false;
+  var isArray = Array.isArray;
+
+  /** Used as references for various `Number` constants. */
+  var INFINITY = 1 / 0;
+
+  /** Used to convert symbols to primitives and strings. */
+  var symbolProto$1 = Symbol$1 ? Symbol$1.prototype : undefined,
+    symbolToString = symbolProto$1 ? symbolProto$1.toString : undefined;
+
+  /**
+   * The base implementation of `_.toString` which doesn't convert nullish
+   * values to empty strings.
+   *
+   * @private
+   * @param {*} value The value to process.
+   * @returns {string} Returns the string.
+   */
+  function baseToString(value) {
+    // Exit early for strings to avoid a performance hit in some environments.
+    if (typeof value == 'string') {
+      return value;
     }
-    // The use of `Object#toString` avoids issues with the `typeof` operator
-    // in Safari 9 which returns 'object' for typed arrays and other constructors.
-    var tag = baseGetTag(value);
-    return tag == funcTag$2 || tag == genTag$1 || tag == asyncTag || tag == proxyTag;
-  }
-
-  /** Used to detect overreaching core-js shims. */
-  var coreJsData = root['__core-js_shared__'];
-
-  /** Used to detect methods masquerading as native. */
-  var maskSrcKey = function () {
-    var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || '');
-    return uid ? 'Symbol(src)_1.' + uid : '';
-  }();
-
-  /**
-   * Checks if `func` has its source masked.
-   *
-   * @private
-   * @param {Function} func The function to check.
-   * @returns {boolean} Returns `true` if `func` is masked, else `false`.
-   */
-  function isMasked(func) {
-    return !!maskSrcKey && maskSrcKey in func;
-  }
-
-  /** Used for built-in method references. */
-  var funcProto$1 = Function.prototype;
-
-  /** Used to resolve the decompiled source of functions. */
-  var funcToString$1 = funcProto$1.toString;
-
-  /**
-   * Converts `func` to its source code.
-   *
-   * @private
-   * @param {Function} func The function to convert.
-   * @returns {string} Returns the source code.
-   */
-  function toSource(func) {
-    if (func != null) {
-      try {
-        return funcToString$1.call(func);
-      } catch (e) {}
-      try {
-        return func + '';
-      } catch (e) {}
+    if (isArray(value)) {
+      // Recursively convert values (susceptible to call stack limits).
+      return arrayMap(value, baseToString) + '';
     }
-    return '';
-  }
-
-  /**
-   * Used to match `RegExp`
-   * [syntax characters](http://ecma-international.org/ecma-262/7.0/#sec-patterns).
-   */
-  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
-
-  /** Used to detect host constructors (Safari). */
-  var reIsHostCtor = /^\[object .+?Constructor\]$/;
-
-  /** Used for built-in method references. */
-  var funcProto = Function.prototype,
-    objectProto$b = Object.prototype;
-
-  /** Used to resolve the decompiled source of functions. */
-  var funcToString = funcProto.toString;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty$9 = objectProto$b.hasOwnProperty;
-
-  /** Used to detect if a method is native. */
-  var reIsNative = RegExp('^' + funcToString.call(hasOwnProperty$9).replace(reRegExpChar, '\\$&').replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$');
-
-  /**
-   * The base implementation of `_.isNative` without bad shim checks.
-   *
-   * @private
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a native function,
-   *  else `false`.
-   */
-  function baseIsNative(value) {
-    if (!isObject(value) || isMasked(value)) {
-      return false;
+    if (isSymbol(value)) {
+      return symbolToString ? symbolToString.call(value) : '';
     }
-    var pattern = isFunction(value) ? reIsNative : reIsHostCtor;
-    return pattern.test(toSource(value));
+    var result = value + '';
+    return result == '0' && 1 / value == -INFINITY ? '-0' : result;
   }
 
   /**
-   * Gets the value at `key` of `object`.
+   * Converts `value` to a string. An empty string is returned for `null`
+   * and `undefined` values. The sign of `-0` is preserved.
    *
-   * @private
-   * @param {Object} [object] The object to query.
-   * @param {string} key The key of the property to get.
-   * @returns {*} Returns the property value.
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to convert.
+   * @returns {string} Returns the converted string.
+   * @example
+   *
+   * _.toString(null);
+   * // => ''
+   *
+   * _.toString(-0);
+   * // => '-0'
+   *
+   * _.toString([1, 2, 3]);
+   * // => '1,2,3'
    */
-  function getValue(object, key) {
-    return object == null ? undefined : object[key];
+  function toString(value) {
+    return value == null ? '' : baseToString(value);
   }
-
-  /**
-   * Gets the native function at `key` of `object`.
-   *
-   * @private
-   * @param {Object} object The object to query.
-   * @param {string} key The key of the method to get.
-   * @returns {*} Returns the function if it's native, else `undefined`.
-   */
-  function getNative(object, key) {
-    var value = getValue(object, key);
-    return baseIsNative(value) ? value : undefined;
-  }
-  var defineProperty = function () {
-    try {
-      var func = getNative(Object, 'defineProperty');
-      func({}, '', {});
-      return func;
-    } catch (e) {}
-  }();
-
-  /**
-   * The base implementation of `setToString` without support for hot loop shorting.
-   *
-   * @private
-   * @param {Function} func The function to modify.
-   * @param {Function} string The `toString` result.
-   * @returns {Function} Returns `func`.
-   */
-  var baseSetToString = !defineProperty ? identity : function (func, string) {
-    return defineProperty(func, 'toString', {
-      'configurable': true,
-      'enumerable': false,
-      'value': constant(string),
-      'writable': true
-    });
-  };
-  var baseSetToString$1 = baseSetToString;
-
-  /** Used to detect hot functions by number of calls within a span of milliseconds. */
-  var HOT_COUNT = 800,
-    HOT_SPAN = 16;
 
   /* Built-in method references for those with the same name as other `lodash` methods. */
-  var nativeNow = Date.now;
+  var nativeIsFinite = root.isFinite,
+    nativeMin = Math.min;
 
   /**
-   * Creates a function that'll short out and invoke `identity` instead
-   * of `func` when it's called `HOT_COUNT` or more times in `HOT_SPAN`
-   * milliseconds.
+   * Creates a function like `_.round`.
    *
    * @private
-   * @param {Function} func The function to restrict.
-   * @returns {Function} Returns the new shortable function.
+   * @param {string} methodName The name of the `Math` method to use when rounding.
+   * @returns {Function} Returns the new round function.
    */
-  function shortOut(func) {
-    var count = 0,
-      lastCalled = 0;
-    return function () {
-      var stamp = nativeNow(),
-        remaining = HOT_SPAN - (stamp - lastCalled);
-      lastCalled = stamp;
-      if (remaining > 0) {
-        if (++count >= HOT_COUNT) {
-          return arguments[0];
-        }
-      } else {
-        count = 0;
+  function createRound(methodName) {
+    var func = Math[methodName];
+    return function (number, precision) {
+      number = toNumber(number);
+      precision = precision == null ? 0 : nativeMin(toInteger(precision), 292);
+      if (precision && nativeIsFinite(number)) {
+        // Shift with exponential notation to avoid floating-point issues.
+        // See [MDN](https://mdn.io/round#Examples) for more details.
+        var pair = (toString(number) + 'e').split('e'),
+          value = func(pair[0] + 'e' + (+pair[1] + precision));
+        pair = (toString(value) + 'e').split('e');
+        return +(pair[0] + 'e' + (+pair[1] - precision));
       }
-      return func.apply(undefined, arguments);
+      return func(number);
     };
   }
 
   /**
-   * Sets the `toString` method of `func` to return `string`.
+   * Computes `number` rounded to `precision`.
    *
-   * @private
-   * @param {Function} func The function to modify.
-   * @param {Function} string The `toString` result.
-   * @returns {Function} Returns `func`.
+   * @static
+   * @memberOf _
+   * @since 3.10.0
+   * @category Math
+   * @param {number} number The number to round.
+   * @param {number} [precision=0] The precision to round to.
+   * @returns {number} Returns the rounded number.
+   * @example
+   *
+   * _.round(4.006);
+   * // => 4
+   *
+   * _.round(4.006, 2);
+   * // => 4.01
+   *
+   * _.round(4060, -2);
+   * // => 4100
    */
-  var setToString = shortOut(baseSetToString$1);
+  var round = createRound('round');
 
   /**
-   * The base implementation of `_.rest` which doesn't validate or coerce arguments.
+   * Removes all key-value entries from the list cache.
    *
    * @private
-   * @param {Function} func The function to apply a rest parameter to.
-   * @param {number} [start=func.length-1] The start position of the rest parameter.
-   * @returns {Function} Returns the new function.
+   * @name clear
+   * @memberOf ListCache
    */
-  function baseRest(func, start) {
-    return setToString(overRest(func, start, identity), func + '');
+  function listCacheClear() {
+    this.__data__ = [];
+    this.size = 0;
   }
 
   /**
@@ -646,571 +1082,6 @@
    */
   function eq(value, other) {
     return value === other || value !== value && other !== other;
-  }
-
-  /** Used as references for various `Number` constants. */
-  var MAX_SAFE_INTEGER$1 = 9007199254740991;
-
-  /**
-   * Checks if `value` is a valid array-like length.
-   *
-   * **Note:** This method is loosely based on
-   * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
-   * @example
-   *
-   * _.isLength(3);
-   * // => true
-   *
-   * _.isLength(Number.MIN_VALUE);
-   * // => false
-   *
-   * _.isLength(Infinity);
-   * // => false
-   *
-   * _.isLength('3');
-   * // => false
-   */
-  function isLength(value) {
-    return typeof value == 'number' && value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER$1;
-  }
-
-  /**
-   * Checks if `value` is array-like. A value is considered array-like if it's
-   * not a function and has a `value.length` that's an integer greater than or
-   * equal to `0` and less than or equal to `Number.MAX_SAFE_INTEGER`.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
-   * @example
-   *
-   * _.isArrayLike([1, 2, 3]);
-   * // => true
-   *
-   * _.isArrayLike(document.body.children);
-   * // => true
-   *
-   * _.isArrayLike('abc');
-   * // => true
-   *
-   * _.isArrayLike(_.noop);
-   * // => false
-   */
-  function isArrayLike(value) {
-    return value != null && isLength(value.length) && !isFunction(value);
-  }
-
-  /** Used as references for various `Number` constants. */
-  var MAX_SAFE_INTEGER = 9007199254740991;
-
-  /** Used to detect unsigned integer values. */
-  var reIsUint = /^(?:0|[1-9]\d*)$/;
-
-  /**
-   * Checks if `value` is a valid array-like index.
-   *
-   * @private
-   * @param {*} value The value to check.
-   * @param {number} [length=MAX_SAFE_INTEGER] The upper bounds of a valid index.
-   * @returns {boolean} Returns `true` if `value` is a valid index, else `false`.
-   */
-  function isIndex(value, length) {
-    var type = _typeof(value);
-    length = length == null ? MAX_SAFE_INTEGER : length;
-    return !!length && (type == 'number' || type != 'symbol' && reIsUint.test(value)) && value > -1 && value % 1 == 0 && value < length;
-  }
-
-  /**
-   * Checks if the given arguments are from an iteratee call.
-   *
-   * @private
-   * @param {*} value The potential iteratee value argument.
-   * @param {*} index The potential iteratee index or key argument.
-   * @param {*} object The potential iteratee object argument.
-   * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
-   *  else `false`.
-   */
-  function isIterateeCall(value, index, object) {
-    if (!isObject(object)) {
-      return false;
-    }
-    var type = _typeof(index);
-    if (type == 'number' ? isArrayLike(object) && isIndex(index, object.length) : type == 'string' && index in object) {
-      return eq(object[index], value);
-    }
-    return false;
-  }
-
-  /**
-   * The base implementation of `_.times` without support for iteratee shorthands
-   * or max array length checks.
-   *
-   * @private
-   * @param {number} n The number of times to invoke `iteratee`.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {Array} Returns the array of results.
-   */
-  function baseTimes(n, iteratee) {
-    var index = -1,
-      result = Array(n);
-    while (++index < n) {
-      result[index] = iteratee(index);
-    }
-    return result;
-  }
-
-  /**
-   * Checks if `value` is object-like. A value is object-like if it's not `null`
-   * and has a `typeof` result of "object".
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
-   * @example
-   *
-   * _.isObjectLike({});
-   * // => true
-   *
-   * _.isObjectLike([1, 2, 3]);
-   * // => true
-   *
-   * _.isObjectLike(_.noop);
-   * // => false
-   *
-   * _.isObjectLike(null);
-   * // => false
-   */
-  function isObjectLike(value) {
-    return value != null && _typeof(value) == 'object';
-  }
-
-  /** `Object#toString` result references. */
-  var argsTag$2 = '[object Arguments]';
-
-  /**
-   * The base implementation of `_.isArguments`.
-   *
-   * @private
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is an `arguments` object,
-   */
-  function baseIsArguments(value) {
-    return isObjectLike(value) && baseGetTag(value) == argsTag$2;
-  }
-
-  /** Used for built-in method references. */
-  var objectProto$a = Object.prototype;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty$8 = objectProto$a.hasOwnProperty;
-
-  /** Built-in value references. */
-  var propertyIsEnumerable$1 = objectProto$a.propertyIsEnumerable;
-
-  /**
-   * Checks if `value` is likely an `arguments` object.
-   *
-   * @static
-   * @memberOf _
-   * @since 0.1.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is an `arguments` object,
-   *  else `false`.
-   * @example
-   *
-   * _.isArguments(function() { return arguments; }());
-   * // => true
-   *
-   * _.isArguments([1, 2, 3]);
-   * // => false
-   */
-  var isArguments = baseIsArguments(function () {
-    return arguments;
-  }()) ? baseIsArguments : function (value) {
-    return isObjectLike(value) && hasOwnProperty$8.call(value, 'callee') && !propertyIsEnumerable$1.call(value, 'callee');
-  };
-
-  /**
-   * Checks if `value` is classified as an `Array` object.
-   *
-   * @static
-   * @memberOf _
-   * @since 0.1.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is an array, else `false`.
-   * @example
-   *
-   * _.isArray([1, 2, 3]);
-   * // => true
-   *
-   * _.isArray(document.body.children);
-   * // => false
-   *
-   * _.isArray('abc');
-   * // => false
-   *
-   * _.isArray(_.noop);
-   * // => false
-   */
-  var isArray = Array.isArray;
-
-  /**
-   * This method returns `false`.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.13.0
-   * @category Util
-   * @returns {boolean} Returns `false`.
-   * @example
-   *
-   * _.times(2, _.stubFalse);
-   * // => [false, false]
-   */
-  function stubFalse() {
-    return false;
-  }
-
-  /** Detect free variable `exports`. */
-  var freeExports$2 = (typeof exports === "undefined" ? "undefined" : _typeof(exports)) == 'object' && exports && !exports.nodeType && exports;
-
-  /** Detect free variable `module`. */
-  var freeModule$2 = freeExports$2 && (typeof module === "undefined" ? "undefined" : _typeof(module)) == 'object' && module && !module.nodeType && module;
-
-  /** Detect the popular CommonJS extension `module.exports`. */
-  var moduleExports$2 = freeModule$2 && freeModule$2.exports === freeExports$2;
-
-  /** Built-in value references. */
-  var Buffer$1 = moduleExports$2 ? root.Buffer : undefined;
-
-  /* Built-in method references for those with the same name as other `lodash` methods. */
-  var nativeIsBuffer = Buffer$1 ? Buffer$1.isBuffer : undefined;
-
-  /**
-   * Checks if `value` is a buffer.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.3.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a buffer, else `false`.
-   * @example
-   *
-   * _.isBuffer(new Buffer(2));
-   * // => true
-   *
-   * _.isBuffer(new Uint8Array(2));
-   * // => false
-   */
-  var isBuffer = nativeIsBuffer || stubFalse;
-
-  /** `Object#toString` result references. */
-  var argsTag$1 = '[object Arguments]',
-    arrayTag$1 = '[object Array]',
-    boolTag$2 = '[object Boolean]',
-    dateTag$2 = '[object Date]',
-    errorTag$1 = '[object Error]',
-    funcTag$1 = '[object Function]',
-    mapTag$4 = '[object Map]',
-    numberTag$2 = '[object Number]',
-    objectTag$2 = '[object Object]',
-    regexpTag$2 = '[object RegExp]',
-    setTag$4 = '[object Set]',
-    stringTag$2 = '[object String]',
-    weakMapTag$2 = '[object WeakMap]';
-  var arrayBufferTag$2 = '[object ArrayBuffer]',
-    dataViewTag$3 = '[object DataView]',
-    float32Tag$2 = '[object Float32Array]',
-    float64Tag$2 = '[object Float64Array]',
-    int8Tag$2 = '[object Int8Array]',
-    int16Tag$2 = '[object Int16Array]',
-    int32Tag$2 = '[object Int32Array]',
-    uint8Tag$2 = '[object Uint8Array]',
-    uint8ClampedTag$2 = '[object Uint8ClampedArray]',
-    uint16Tag$2 = '[object Uint16Array]',
-    uint32Tag$2 = '[object Uint32Array]';
-
-  /** Used to identify `toStringTag` values of typed arrays. */
-  var typedArrayTags = {};
-  typedArrayTags[float32Tag$2] = typedArrayTags[float64Tag$2] = typedArrayTags[int8Tag$2] = typedArrayTags[int16Tag$2] = typedArrayTags[int32Tag$2] = typedArrayTags[uint8Tag$2] = typedArrayTags[uint8ClampedTag$2] = typedArrayTags[uint16Tag$2] = typedArrayTags[uint32Tag$2] = true;
-  typedArrayTags[argsTag$1] = typedArrayTags[arrayTag$1] = typedArrayTags[arrayBufferTag$2] = typedArrayTags[boolTag$2] = typedArrayTags[dataViewTag$3] = typedArrayTags[dateTag$2] = typedArrayTags[errorTag$1] = typedArrayTags[funcTag$1] = typedArrayTags[mapTag$4] = typedArrayTags[numberTag$2] = typedArrayTags[objectTag$2] = typedArrayTags[regexpTag$2] = typedArrayTags[setTag$4] = typedArrayTags[stringTag$2] = typedArrayTags[weakMapTag$2] = false;
-
-  /**
-   * The base implementation of `_.isTypedArray` without Node.js optimizations.
-   *
-   * @private
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a typed array, else `false`.
-   */
-  function baseIsTypedArray(value) {
-    return isObjectLike(value) && isLength(value.length) && !!typedArrayTags[baseGetTag(value)];
-  }
-
-  /**
-   * The base implementation of `_.unary` without support for storing metadata.
-   *
-   * @private
-   * @param {Function} func The function to cap arguments for.
-   * @returns {Function} Returns the new capped function.
-   */
-  function baseUnary(func) {
-    return function (value) {
-      return func(value);
-    };
-  }
-
-  /** Detect free variable `exports`. */
-  var freeExports$1 = (typeof exports === "undefined" ? "undefined" : _typeof(exports)) == 'object' && exports && !exports.nodeType && exports;
-
-  /** Detect free variable `module`. */
-  var freeModule$1 = freeExports$1 && (typeof module === "undefined" ? "undefined" : _typeof(module)) == 'object' && module && !module.nodeType && module;
-
-  /** Detect the popular CommonJS extension `module.exports`. */
-  var moduleExports$1 = freeModule$1 && freeModule$1.exports === freeExports$1;
-
-  /** Detect free variable `process` from Node.js. */
-  var freeProcess = moduleExports$1 && freeGlobal.process;
-
-  /** Used to access faster Node.js helpers. */
-  var nodeUtil = function () {
-    try {
-      // Use `util.types` for Node.js 10+.
-      var types = freeModule$1 && freeModule$1.require && freeModule$1.require('util').types;
-      if (types) {
-        return types;
-      }
-
-      // Legacy `process.binding('util')` for Node.js < 10.
-      return freeProcess && freeProcess.binding && freeProcess.binding('util');
-    } catch (e) {}
-  }();
-
-  /* Node.js helper references. */
-  var nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
-
-  /**
-   * Checks if `value` is classified as a typed array.
-   *
-   * @static
-   * @memberOf _
-   * @since 3.0.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a typed array, else `false`.
-   * @example
-   *
-   * _.isTypedArray(new Uint8Array);
-   * // => true
-   *
-   * _.isTypedArray([]);
-   * // => false
-   */
-  var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedArray;
-
-  /** Used for built-in method references. */
-  var objectProto$9 = Object.prototype;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty$7 = objectProto$9.hasOwnProperty;
-
-  /**
-   * Creates an array of the enumerable property names of the array-like `value`.
-   *
-   * @private
-   * @param {*} value The value to query.
-   * @param {boolean} inherited Specify returning inherited property names.
-   * @returns {Array} Returns the array of property names.
-   */
-  function arrayLikeKeys(value, inherited) {
-    var isArr = isArray(value),
-      isArg = !isArr && isArguments(value),
-      isBuff = !isArr && !isArg && isBuffer(value),
-      isType = !isArr && !isArg && !isBuff && isTypedArray(value),
-      skipIndexes = isArr || isArg || isBuff || isType,
-      result = skipIndexes ? baseTimes(value.length, String) : [],
-      length = result.length;
-    for (var key in value) {
-      if ((inherited || hasOwnProperty$7.call(value, key)) && !(skipIndexes && (
-      // Safari 9 has enumerable `arguments.length` in strict mode.
-      key == 'length' ||
-      // Node.js 0.10 has enumerable non-index properties on buffers.
-      isBuff && (key == 'offset' || key == 'parent') ||
-      // PhantomJS 2 has enumerable non-index properties on typed arrays.
-      isType && (key == 'buffer' || key == 'byteLength' || key == 'byteOffset') ||
-      // Skip index properties.
-      isIndex(key, length)))) {
-        result.push(key);
-      }
-    }
-    return result;
-  }
-
-  /** Used for built-in method references. */
-  var objectProto$8 = Object.prototype;
-
-  /**
-   * Checks if `value` is likely a prototype object.
-   *
-   * @private
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a prototype, else `false`.
-   */
-  function isPrototype(value) {
-    var Ctor = value && value.constructor,
-      proto = typeof Ctor == 'function' && Ctor.prototype || objectProto$8;
-    return value === proto;
-  }
-
-  /**
-   * This function is like
-   * [`Object.keys`](http://ecma-international.org/ecma-262/7.0/#sec-object.keys)
-   * except that it includes inherited enumerable properties.
-   *
-   * @private
-   * @param {Object} object The object to query.
-   * @returns {Array} Returns the array of property names.
-   */
-  function nativeKeysIn(object) {
-    var result = [];
-    if (object != null) {
-      for (var key in Object(object)) {
-        result.push(key);
-      }
-    }
-    return result;
-  }
-
-  /** Used for built-in method references. */
-  var objectProto$7 = Object.prototype;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty$6 = objectProto$7.hasOwnProperty;
-
-  /**
-   * The base implementation of `_.keysIn` which doesn't treat sparse arrays as dense.
-   *
-   * @private
-   * @param {Object} object The object to query.
-   * @returns {Array} Returns the array of property names.
-   */
-  function baseKeysIn(object) {
-    if (!isObject(object)) {
-      return nativeKeysIn(object);
-    }
-    var isProto = isPrototype(object),
-      result = [];
-    for (var key in object) {
-      if (!(key == 'constructor' && (isProto || !hasOwnProperty$6.call(object, key)))) {
-        result.push(key);
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Creates an array of the own and inherited enumerable property names of `object`.
-   *
-   * **Note:** Non-object values are coerced to objects.
-   *
-   * @static
-   * @memberOf _
-   * @since 3.0.0
-   * @category Object
-   * @param {Object} object The object to query.
-   * @returns {Array} Returns the array of property names.
-   * @example
-   *
-   * function Foo() {
-   *   this.a = 1;
-   *   this.b = 2;
-   * }
-   *
-   * Foo.prototype.c = 3;
-   *
-   * _.keysIn(new Foo);
-   * // => ['a', 'b', 'c'] (iteration order is not guaranteed)
-   */
-  function keysIn(object) {
-    return isArrayLike(object) ? arrayLikeKeys(object, true) : baseKeysIn(object);
-  }
-
-  /** Used for built-in method references. */
-  var objectProto$6 = Object.prototype;
-
-  /** Used to check objects for own properties. */
-  var hasOwnProperty$5 = objectProto$6.hasOwnProperty;
-
-  /**
-   * Assigns own and inherited enumerable string keyed properties of source
-   * objects to the destination object for all destination properties that
-   * resolve to `undefined`. Source objects are applied from left to right.
-   * Once a property is set, additional values of the same property are ignored.
-   *
-   * **Note:** This method mutates `object`.
-   *
-   * @static
-   * @since 0.1.0
-   * @memberOf _
-   * @category Object
-   * @param {Object} object The destination object.
-   * @param {...Object} [sources] The source objects.
-   * @returns {Object} Returns `object`.
-   * @see _.defaultsDeep
-   * @example
-   *
-   * _.defaults({ 'a': 1 }, { 'b': 2 }, { 'a': 3 });
-   * // => { 'a': 1, 'b': 2 }
-   */
-  var defaults = baseRest(function (object, sources) {
-    object = Object(object);
-    var index = -1;
-    var length = sources.length;
-    var guard = length > 2 ? sources[2] : undefined;
-    if (guard && isIterateeCall(sources[0], sources[1], guard)) {
-      length = 1;
-    }
-    while (++index < length) {
-      var source = sources[index];
-      var props = keysIn(source);
-      var propsIndex = -1;
-      var propsLength = props.length;
-      while (++propsIndex < propsLength) {
-        var key = props[propsIndex];
-        var value = object[key];
-        if (value === undefined || eq(value, objectProto$6[key]) && !hasOwnProperty$5.call(object, key)) {
-          object[key] = source[key];
-        }
-      }
-    }
-    return object;
-  });
-
-  /**
-   * Removes all key-value entries from the list cache.
-   *
-   * @private
-   * @name clear
-   * @memberOf ListCache
-   */
-  function listCacheClear() {
-    this.__data__ = [];
-    this.size = 0;
   }
 
   /**
@@ -1390,6 +1261,147 @@
     return this.__data__.has(key);
   }
 
+  /** `Object#toString` result references. */
+  var asyncTag = '[object AsyncFunction]',
+    funcTag$2 = '[object Function]',
+    genTag$1 = '[object GeneratorFunction]',
+    proxyTag = '[object Proxy]';
+
+  /**
+   * Checks if `value` is classified as a `Function` object.
+   *
+   * @static
+   * @memberOf _
+   * @since 0.1.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a function, else `false`.
+   * @example
+   *
+   * _.isFunction(_);
+   * // => true
+   *
+   * _.isFunction(/abc/);
+   * // => false
+   */
+  function isFunction(value) {
+    if (!isObject(value)) {
+      return false;
+    }
+    // The use of `Object#toString` avoids issues with the `typeof` operator
+    // in Safari 9 which returns 'object' for typed arrays and other constructors.
+    var tag = baseGetTag(value);
+    return tag == funcTag$2 || tag == genTag$1 || tag == asyncTag || tag == proxyTag;
+  }
+
+  /** Used to detect overreaching core-js shims. */
+  var coreJsData = root['__core-js_shared__'];
+
+  /** Used to detect methods masquerading as native. */
+  var maskSrcKey = function () {
+    var uid = /[^.]+$/.exec(coreJsData && coreJsData.keys && coreJsData.keys.IE_PROTO || '');
+    return uid ? 'Symbol(src)_1.' + uid : '';
+  }();
+
+  /**
+   * Checks if `func` has its source masked.
+   *
+   * @private
+   * @param {Function} func The function to check.
+   * @returns {boolean} Returns `true` if `func` is masked, else `false`.
+   */
+  function isMasked(func) {
+    return !!maskSrcKey && maskSrcKey in func;
+  }
+
+  /** Used for built-in method references. */
+  var funcProto$1 = Function.prototype;
+
+  /** Used to resolve the decompiled source of functions. */
+  var funcToString$1 = funcProto$1.toString;
+
+  /**
+   * Converts `func` to its source code.
+   *
+   * @private
+   * @param {Function} func The function to convert.
+   * @returns {string} Returns the source code.
+   */
+  function toSource(func) {
+    if (func != null) {
+      try {
+        return funcToString$1.call(func);
+      } catch (e) {}
+      try {
+        return func + '';
+      } catch (e) {}
+    }
+    return '';
+  }
+
+  /**
+   * Used to match `RegExp`
+   * [syntax characters](http://ecma-international.org/ecma-262/7.0/#sec-patterns).
+   */
+  var reRegExpChar = /[\\^$.*+?()[\]{}|]/g;
+
+  /** Used to detect host constructors (Safari). */
+  var reIsHostCtor = /^\[object .+?Constructor\]$/;
+
+  /** Used for built-in method references. */
+  var funcProto = Function.prototype,
+    objectProto$a = Object.prototype;
+
+  /** Used to resolve the decompiled source of functions. */
+  var funcToString = funcProto.toString;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty$8 = objectProto$a.hasOwnProperty;
+
+  /** Used to detect if a method is native. */
+  var reIsNative = RegExp('^' + funcToString.call(hasOwnProperty$8).replace(reRegExpChar, '\\$&').replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$');
+
+  /**
+   * The base implementation of `_.isNative` without bad shim checks.
+   *
+   * @private
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a native function,
+   *  else `false`.
+   */
+  function baseIsNative(value) {
+    if (!isObject(value) || isMasked(value)) {
+      return false;
+    }
+    var pattern = isFunction(value) ? reIsNative : reIsHostCtor;
+    return pattern.test(toSource(value));
+  }
+
+  /**
+   * Gets the value at `key` of `object`.
+   *
+   * @private
+   * @param {Object} [object] The object to query.
+   * @param {string} key The key of the property to get.
+   * @returns {*} Returns the property value.
+   */
+  function getValue(object, key) {
+    return object == null ? undefined : object[key];
+  }
+
+  /**
+   * Gets the native function at `key` of `object`.
+   *
+   * @private
+   * @param {Object} object The object to query.
+   * @param {string} key The key of the method to get.
+   * @returns {*} Returns the function if it's native, else `undefined`.
+   */
+  function getNative(object, key) {
+    var value = getValue(object, key);
+    return baseIsNative(value) ? value : undefined;
+  }
+
   /* Built-in method references that are verified to be native. */
   var Map = getNative(root, 'Map');
 
@@ -1428,10 +1440,10 @@
   var HASH_UNDEFINED$1 = '__lodash_hash_undefined__';
 
   /** Used for built-in method references. */
-  var objectProto$5 = Object.prototype;
+  var objectProto$9 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$4 = objectProto$5.hasOwnProperty;
+  var hasOwnProperty$7 = objectProto$9.hasOwnProperty;
 
   /**
    * Gets the hash value for `key`.
@@ -1448,14 +1460,14 @@
       var result = data[key];
       return result === HASH_UNDEFINED$1 ? undefined : result;
     }
-    return hasOwnProperty$4.call(data, key) ? data[key] : undefined;
+    return hasOwnProperty$7.call(data, key) ? data[key] : undefined;
   }
 
   /** Used for built-in method references. */
-  var objectProto$4 = Object.prototype;
+  var objectProto$8 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$3 = objectProto$4.hasOwnProperty;
+  var hasOwnProperty$6 = objectProto$8.hasOwnProperty;
 
   /**
    * Checks if a hash value for `key` exists.
@@ -1468,7 +1480,7 @@
    */
   function hashHas(key) {
     var data = this.__data__;
-    return nativeCreate ? data[key] !== undefined : hasOwnProperty$3.call(data, key);
+    return nativeCreate ? data[key] !== undefined : hasOwnProperty$6.call(data, key);
   }
 
   /** Used to stand-in for `undefined` hash values. */
@@ -1706,6 +1718,13 @@
     }
     return array;
   }
+  var defineProperty = function () {
+    try {
+      var func = getNative(Object, 'defineProperty');
+      func({}, '', {});
+      return func;
+    } catch (e) {}
+  }();
 
   /**
    * The base implementation of `assignValue` and `assignMergeValue` without
@@ -1730,10 +1749,10 @@
   }
 
   /** Used for built-in method references. */
-  var objectProto$3 = Object.prototype;
+  var objectProto$7 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$2 = objectProto$3.hasOwnProperty;
+  var hasOwnProperty$5 = objectProto$7.hasOwnProperty;
 
   /**
    * Assigns `value` to `key` of `object` if the existing value is not equivalent
@@ -1747,7 +1766,7 @@
    */
   function assignValue(object, key, value) {
     var objValue = object[key];
-    if (!(hasOwnProperty$2.call(object, key) && eq(objValue, value)) || value === undefined && !(key in object)) {
+    if (!(hasOwnProperty$5.call(object, key) && eq(objValue, value)) || value === undefined && !(key in object)) {
       baseAssignValue(object, key, value);
     }
   }
@@ -1783,6 +1802,332 @@
   }
 
   /**
+   * The base implementation of `_.times` without support for iteratee shorthands
+   * or max array length checks.
+   *
+   * @private
+   * @param {number} n The number of times to invoke `iteratee`.
+   * @param {Function} iteratee The function invoked per iteration.
+   * @returns {Array} Returns the array of results.
+   */
+  function baseTimes(n, iteratee) {
+    var index = -1,
+      result = Array(n);
+    while (++index < n) {
+      result[index] = iteratee(index);
+    }
+    return result;
+  }
+
+  /** `Object#toString` result references. */
+  var argsTag$2 = '[object Arguments]';
+
+  /**
+   * The base implementation of `_.isArguments`.
+   *
+   * @private
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is an `arguments` object,
+   */
+  function baseIsArguments(value) {
+    return isObjectLike(value) && baseGetTag(value) == argsTag$2;
+  }
+
+  /** Used for built-in method references. */
+  var objectProto$6 = Object.prototype;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty$4 = objectProto$6.hasOwnProperty;
+
+  /** Built-in value references. */
+  var propertyIsEnumerable$1 = objectProto$6.propertyIsEnumerable;
+
+  /**
+   * Checks if `value` is likely an `arguments` object.
+   *
+   * @static
+   * @memberOf _
+   * @since 0.1.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is an `arguments` object,
+   *  else `false`.
+   * @example
+   *
+   * _.isArguments(function() { return arguments; }());
+   * // => true
+   *
+   * _.isArguments([1, 2, 3]);
+   * // => false
+   */
+  var isArguments = baseIsArguments(function () {
+    return arguments;
+  }()) ? baseIsArguments : function (value) {
+    return isObjectLike(value) && hasOwnProperty$4.call(value, 'callee') && !propertyIsEnumerable$1.call(value, 'callee');
+  };
+
+  /**
+   * This method returns `false`.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.13.0
+   * @category Util
+   * @returns {boolean} Returns `false`.
+   * @example
+   *
+   * _.times(2, _.stubFalse);
+   * // => [false, false]
+   */
+  function stubFalse() {
+    return false;
+  }
+
+  /** Detect free variable `exports`. */
+  var freeExports$2 = (typeof exports === "undefined" ? "undefined" : _typeof(exports)) == 'object' && exports && !exports.nodeType && exports;
+
+  /** Detect free variable `module`. */
+  var freeModule$2 = freeExports$2 && (typeof module === "undefined" ? "undefined" : _typeof(module)) == 'object' && module && !module.nodeType && module;
+
+  /** Detect the popular CommonJS extension `module.exports`. */
+  var moduleExports$2 = freeModule$2 && freeModule$2.exports === freeExports$2;
+
+  /** Built-in value references. */
+  var Buffer$1 = moduleExports$2 ? root.Buffer : undefined;
+
+  /* Built-in method references for those with the same name as other `lodash` methods. */
+  var nativeIsBuffer = Buffer$1 ? Buffer$1.isBuffer : undefined;
+
+  /**
+   * Checks if `value` is a buffer.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.3.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a buffer, else `false`.
+   * @example
+   *
+   * _.isBuffer(new Buffer(2));
+   * // => true
+   *
+   * _.isBuffer(new Uint8Array(2));
+   * // => false
+   */
+  var isBuffer = nativeIsBuffer || stubFalse;
+
+  /** Used as references for various `Number` constants. */
+  var MAX_SAFE_INTEGER$1 = 9007199254740991;
+
+  /** Used to detect unsigned integer values. */
+  var reIsUint = /^(?:0|[1-9]\d*)$/;
+
+  /**
+   * Checks if `value` is a valid array-like index.
+   *
+   * @private
+   * @param {*} value The value to check.
+   * @param {number} [length=MAX_SAFE_INTEGER] The upper bounds of a valid index.
+   * @returns {boolean} Returns `true` if `value` is a valid index, else `false`.
+   */
+  function isIndex(value, length) {
+    var type = _typeof(value);
+    length = length == null ? MAX_SAFE_INTEGER$1 : length;
+    return !!length && (type == 'number' || type != 'symbol' && reIsUint.test(value)) && value > -1 && value % 1 == 0 && value < length;
+  }
+
+  /** Used as references for various `Number` constants. */
+  var MAX_SAFE_INTEGER = 9007199254740991;
+
+  /**
+   * Checks if `value` is a valid array-like length.
+   *
+   * **Note:** This method is loosely based on
+   * [`ToLength`](http://ecma-international.org/ecma-262/7.0/#sec-tolength).
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
+   * @example
+   *
+   * _.isLength(3);
+   * // => true
+   *
+   * _.isLength(Number.MIN_VALUE);
+   * // => false
+   *
+   * _.isLength(Infinity);
+   * // => false
+   *
+   * _.isLength('3');
+   * // => false
+   */
+  function isLength(value) {
+    return typeof value == 'number' && value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
+  }
+
+  /** `Object#toString` result references. */
+  var argsTag$1 = '[object Arguments]',
+    arrayTag$1 = '[object Array]',
+    boolTag$2 = '[object Boolean]',
+    dateTag$2 = '[object Date]',
+    errorTag$1 = '[object Error]',
+    funcTag$1 = '[object Function]',
+    mapTag$4 = '[object Map]',
+    numberTag$2 = '[object Number]',
+    objectTag$2 = '[object Object]',
+    regexpTag$2 = '[object RegExp]',
+    setTag$4 = '[object Set]',
+    stringTag$2 = '[object String]',
+    weakMapTag$2 = '[object WeakMap]';
+  var arrayBufferTag$2 = '[object ArrayBuffer]',
+    dataViewTag$3 = '[object DataView]',
+    float32Tag$2 = '[object Float32Array]',
+    float64Tag$2 = '[object Float64Array]',
+    int8Tag$2 = '[object Int8Array]',
+    int16Tag$2 = '[object Int16Array]',
+    int32Tag$2 = '[object Int32Array]',
+    uint8Tag$2 = '[object Uint8Array]',
+    uint8ClampedTag$2 = '[object Uint8ClampedArray]',
+    uint16Tag$2 = '[object Uint16Array]',
+    uint32Tag$2 = '[object Uint32Array]';
+
+  /** Used to identify `toStringTag` values of typed arrays. */
+  var typedArrayTags = {};
+  typedArrayTags[float32Tag$2] = typedArrayTags[float64Tag$2] = typedArrayTags[int8Tag$2] = typedArrayTags[int16Tag$2] = typedArrayTags[int32Tag$2] = typedArrayTags[uint8Tag$2] = typedArrayTags[uint8ClampedTag$2] = typedArrayTags[uint16Tag$2] = typedArrayTags[uint32Tag$2] = true;
+  typedArrayTags[argsTag$1] = typedArrayTags[arrayTag$1] = typedArrayTags[arrayBufferTag$2] = typedArrayTags[boolTag$2] = typedArrayTags[dataViewTag$3] = typedArrayTags[dateTag$2] = typedArrayTags[errorTag$1] = typedArrayTags[funcTag$1] = typedArrayTags[mapTag$4] = typedArrayTags[numberTag$2] = typedArrayTags[objectTag$2] = typedArrayTags[regexpTag$2] = typedArrayTags[setTag$4] = typedArrayTags[stringTag$2] = typedArrayTags[weakMapTag$2] = false;
+
+  /**
+   * The base implementation of `_.isTypedArray` without Node.js optimizations.
+   *
+   * @private
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a typed array, else `false`.
+   */
+  function baseIsTypedArray(value) {
+    return isObjectLike(value) && isLength(value.length) && !!typedArrayTags[baseGetTag(value)];
+  }
+
+  /**
+   * The base implementation of `_.unary` without support for storing metadata.
+   *
+   * @private
+   * @param {Function} func The function to cap arguments for.
+   * @returns {Function} Returns the new capped function.
+   */
+  function baseUnary(func) {
+    return function (value) {
+      return func(value);
+    };
+  }
+
+  /** Detect free variable `exports`. */
+  var freeExports$1 = (typeof exports === "undefined" ? "undefined" : _typeof(exports)) == 'object' && exports && !exports.nodeType && exports;
+
+  /** Detect free variable `module`. */
+  var freeModule$1 = freeExports$1 && (typeof module === "undefined" ? "undefined" : _typeof(module)) == 'object' && module && !module.nodeType && module;
+
+  /** Detect the popular CommonJS extension `module.exports`. */
+  var moduleExports$1 = freeModule$1 && freeModule$1.exports === freeExports$1;
+
+  /** Detect free variable `process` from Node.js. */
+  var freeProcess = moduleExports$1 && freeGlobal.process;
+
+  /** Used to access faster Node.js helpers. */
+  var nodeUtil = function () {
+    try {
+      // Use `util.types` for Node.js 10+.
+      var types = freeModule$1 && freeModule$1.require && freeModule$1.require('util').types;
+      if (types) {
+        return types;
+      }
+
+      // Legacy `process.binding('util')` for Node.js < 10.
+      return freeProcess && freeProcess.binding && freeProcess.binding('util');
+    } catch (e) {}
+  }();
+
+  /* Node.js helper references. */
+  var nodeIsTypedArray = nodeUtil && nodeUtil.isTypedArray;
+
+  /**
+   * Checks if `value` is classified as a typed array.
+   *
+   * @static
+   * @memberOf _
+   * @since 3.0.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a typed array, else `false`.
+   * @example
+   *
+   * _.isTypedArray(new Uint8Array);
+   * // => true
+   *
+   * _.isTypedArray([]);
+   * // => false
+   */
+  var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedArray;
+
+  /** Used for built-in method references. */
+  var objectProto$5 = Object.prototype;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty$3 = objectProto$5.hasOwnProperty;
+
+  /**
+   * Creates an array of the enumerable property names of the array-like `value`.
+   *
+   * @private
+   * @param {*} value The value to query.
+   * @param {boolean} inherited Specify returning inherited property names.
+   * @returns {Array} Returns the array of property names.
+   */
+  function arrayLikeKeys(value, inherited) {
+    var isArr = isArray(value),
+      isArg = !isArr && isArguments(value),
+      isBuff = !isArr && !isArg && isBuffer(value),
+      isType = !isArr && !isArg && !isBuff && isTypedArray(value),
+      skipIndexes = isArr || isArg || isBuff || isType,
+      result = skipIndexes ? baseTimes(value.length, String) : [],
+      length = result.length;
+    for (var key in value) {
+      if ((inherited || hasOwnProperty$3.call(value, key)) && !(skipIndexes && (
+      // Safari 9 has enumerable `arguments.length` in strict mode.
+      key == 'length' ||
+      // Node.js 0.10 has enumerable non-index properties on buffers.
+      isBuff && (key == 'offset' || key == 'parent') ||
+      // PhantomJS 2 has enumerable non-index properties on typed arrays.
+      isType && (key == 'buffer' || key == 'byteLength' || key == 'byteOffset') ||
+      // Skip index properties.
+      isIndex(key, length)))) {
+        result.push(key);
+      }
+    }
+    return result;
+  }
+
+  /** Used for built-in method references. */
+  var objectProto$4 = Object.prototype;
+
+  /**
+   * Checks if `value` is likely a prototype object.
+   *
+   * @private
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is a prototype, else `false`.
+   */
+  function isPrototype(value) {
+    var Ctor = value && value.constructor,
+      proto = typeof Ctor == 'function' && Ctor.prototype || objectProto$4;
+    return value === proto;
+  }
+
+  /**
    * Creates a unary function that invokes `func` with its argument transformed.
    *
    * @private
@@ -1800,10 +2145,10 @@
   var nativeKeys = overArg(Object.keys, Object);
 
   /** Used for built-in method references. */
-  var objectProto$2 = Object.prototype;
+  var objectProto$3 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$1 = objectProto$2.hasOwnProperty;
+  var hasOwnProperty$2 = objectProto$3.hasOwnProperty;
 
   /**
    * The base implementation of `_.keys` which doesn't treat sparse arrays as dense.
@@ -1818,11 +2163,40 @@
     }
     var result = [];
     for (var key in Object(object)) {
-      if (hasOwnProperty$1.call(object, key) && key != 'constructor') {
+      if (hasOwnProperty$2.call(object, key) && key != 'constructor') {
         result.push(key);
       }
     }
     return result;
+  }
+
+  /**
+   * Checks if `value` is array-like. A value is considered array-like if it's
+   * not a function and has a `value.length` that's an integer greater than or
+   * equal to `0` and less than or equal to `Number.MAX_SAFE_INTEGER`.
+   *
+   * @static
+   * @memberOf _
+   * @since 4.0.0
+   * @category Lang
+   * @param {*} value The value to check.
+   * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
+   * @example
+   *
+   * _.isArrayLike([1, 2, 3]);
+   * // => true
+   *
+   * _.isArrayLike(document.body.children);
+   * // => true
+   *
+   * _.isArrayLike('abc');
+   * // => true
+   *
+   * _.isArrayLike(_.noop);
+   * // => false
+   */
+  function isArrayLike(value) {
+    return value != null && isLength(value.length) && !isFunction(value);
   }
 
   /**
@@ -1868,6 +2242,79 @@
    */
   function baseAssign(object, source) {
     return object && copyObject(source, keys(source), object);
+  }
+
+  /**
+   * This function is like
+   * [`Object.keys`](http://ecma-international.org/ecma-262/7.0/#sec-object.keys)
+   * except that it includes inherited enumerable properties.
+   *
+   * @private
+   * @param {Object} object The object to query.
+   * @returns {Array} Returns the array of property names.
+   */
+  function nativeKeysIn(object) {
+    var result = [];
+    if (object != null) {
+      for (var key in Object(object)) {
+        result.push(key);
+      }
+    }
+    return result;
+  }
+
+  /** Used for built-in method references. */
+  var objectProto$2 = Object.prototype;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty$1 = objectProto$2.hasOwnProperty;
+
+  /**
+   * The base implementation of `_.keysIn` which doesn't treat sparse arrays as dense.
+   *
+   * @private
+   * @param {Object} object The object to query.
+   * @returns {Array} Returns the array of property names.
+   */
+  function baseKeysIn(object) {
+    if (!isObject(object)) {
+      return nativeKeysIn(object);
+    }
+    var isProto = isPrototype(object),
+      result = [];
+    for (var key in object) {
+      if (!(key == 'constructor' && (isProto || !hasOwnProperty$1.call(object, key)))) {
+        result.push(key);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Creates an array of the own and inherited enumerable property names of `object`.
+   *
+   * **Note:** Non-object values are coerced to objects.
+   *
+   * @static
+   * @memberOf _
+   * @since 3.0.0
+   * @category Object
+   * @param {Object} object The object to query.
+   * @returns {Array} Returns the array of property names.
+   * @example
+   *
+   * function Foo() {
+   *   this.a = 1;
+   *   this.b = 2;
+   * }
+   *
+   * Foo.prototype.c = 3;
+   *
+   * _.keysIn(new Foo);
+   * // => ['a', 'b', 'c'] (iteration order is not guaranteed)
+   */
+  function keysIn(object) {
+    return isArrayLike(object) ? arrayLikeKeys(object, true) : baseKeysIn(object);
   }
 
   /**
@@ -2117,7 +2564,7 @@
   var Set = getNative(root, 'Set');
 
   /* Built-in method references that are verified to be native. */
-  var WeakMap = getNative(root, 'WeakMap');
+  var WeakMap$1 = getNative(root, 'WeakMap');
 
   /** `Object#toString` result references. */
   var mapTag$3 = '[object Map]',
@@ -2132,7 +2579,7 @@
     mapCtorString = toSource(Map),
     promiseCtorString = toSource(Promise$1),
     setCtorString = toSource(Set),
-    weakMapCtorString = toSource(WeakMap);
+    weakMapCtorString = toSource(WeakMap$1);
 
   /**
    * Gets the `toStringTag` of `value`.
@@ -2144,7 +2591,7 @@
   var getTag = baseGetTag;
 
   // Fallback for data views, maps, sets, and weak maps in IE 11 and promises in Node.js < 6.
-  if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag$2 || Map && getTag(new Map()) != mapTag$3 || Promise$1 && getTag(Promise$1.resolve()) != promiseTag || Set && getTag(new Set()) != setTag$3 || WeakMap && getTag(new WeakMap()) != weakMapTag$1) {
+  if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag$2 || Map && getTag(new Map()) != mapTag$3 || Promise$1 && getTag(Promise$1.resolve()) != promiseTag || Set && getTag(new Set()) != setTag$3 || WeakMap$1 && getTag(new WeakMap$1()) != weakMapTag$1) {
     getTag = function getTag(value) {
       var result = baseGetTag(value),
         Ctor = result == objectTag$1 ? value.constructor : undefined,
@@ -2194,7 +2641,7 @@
   }
 
   /** Built-in value references. */
-  var Uint8Array = root.Uint8Array;
+  var Uint8Array$1 = root.Uint8Array;
 
   /**
    * Creates a clone of `arrayBuffer`.
@@ -2205,7 +2652,7 @@
    */
   function cloneArrayBuffer(arrayBuffer) {
     var result = new arrayBuffer.constructor(arrayBuffer.byteLength);
-    new Uint8Array(result).set(new Uint8Array(arrayBuffer));
+    new Uint8Array$1(result).set(new Uint8Array$1(arrayBuffer));
     return result;
   }
 
@@ -2239,7 +2686,7 @@
   }
 
   /** Used to convert symbols to primitives and strings. */
-  var symbolProto = _Symbol ? _Symbol.prototype : undefined,
+  var symbolProto = Symbol$1 ? Symbol$1.prototype : undefined,
     symbolValueOf = symbolProto ? symbolProto.valueOf : undefined;
 
   /**
@@ -2591,46 +3038,11 @@
   }
 
   /**
-   * 路径变换
-   * @param path 路径
-   * @param options 变换配置
-   */
-  var transformPath = function transformPath(instructions, transform) {
-    var translate = transform.translate,
-      scale = transform.scale,
-      rotate = transform.rotate;
-    var _instructions = cloneDeep(instructions);
-    _instructions === null || _instructions === void 0 ? void 0 : _instructions.forEach(function (item, pathIdx) {
-      var _item = _toArray(item),
-        croods = _item.slice(1);
-      for (var i = 0; i < croods.length; i += 2) {
-        var x = _instructions[pathIdx][i + 1];
-        var y = _instructions[pathIdx][i + 2];
-        if (scale !== undefined) {
-          x *= scale.x;
-          y *= scale.y;
-        }
-        if (rotate !== undefined) {
-          x = Math.cos(rotate * Math.PI / 180) * x - Math.sin(rotate * Math.PI / 180) * y;
-          y = Math.sin(rotate * Math.PI / 180) * x + Math.cos(rotate * Math.PI / 180) * y;
-        }
-        if (translate !== undefined) {
-          x += translate.x;
-          y += translate.y;
-        }
-        _instructions[pathIdx][i + 1] = x;
-        _instructions[pathIdx][i + 2] = y;
-      }
-    });
-    return _instructions;
-  };
-
-  /**
    * 获取二阶曲线的三阶表现
    */
   var getCubicFromQuadratic = function getCubicFromQuadratic(p0, instruction) {
     // 如果不是二阶直接返回
-    if (instruction[0] !== InstructionType.QUADRATIC_CURCE) return cloneDeep(instruction);
+    if (instruction[0] !== 'Q') return cloneDeep(instruction);
     // 解析输入字符串
     var points = Array.from({
       length: 2
@@ -2655,37 +3067,69 @@
     };
     var q3 = p2;
     // 创建三阶贝塞尔曲线指令
-    return [InstructionType.BEZIER_CURVE, q1.x, q1.y, q2.x, q2.y, q3.x, q3.y];
+    return ['C', q1.x, q1.y, q2.x, q2.y, q3.x, q3.y];
   };
 
-  /** 指令类型 */
-  var InstructionType;
-  (function (InstructionType) {
-    InstructionType["START"] = "M";
-    InstructionType["LINE"] = "L";
-    InstructionType["QUADRATIC_CURCE"] = "Q";
-    InstructionType["BEZIER_CURVE"] = "C";
-    InstructionType["CLOSE"] = "z";
-  })(InstructionType || (InstructionType = {}));
+  /**
+   * 变换
+   * @param crood 路径
+   * @param process 变换流程
+   */
+  var transform = function transform(crood, process) {
+    var x = crood.x,
+      y = crood.y;
+    process.forEach(function (item) {
+      var translate = item.translate,
+        scale = item.scale,
+        rotate = item.rotate;
+      if (scale !== undefined) {
+        x *= scale.x;
+        y *= scale.y;
+      }
+      if (rotate !== undefined) {
+        x = Math.cos(rotate * Math.PI / 180) * x - Math.sin(rotate * Math.PI / 180) * y;
+        y = Math.sin(rotate * Math.PI / 180) * x + Math.cos(rotate * Math.PI / 180) * y;
+      }
+      if (translate !== undefined) {
+        x += translate.x;
+        y += translate.y;
+      }
+    });
+    return {
+      x: x,
+      y: y
+    };
+  };
+
+  /**
+   * 注册响应式
+   */
+  var observe = function observe(point, keys, callback) {
+    var data = {};
+    var properties = {};
+    keys.forEach(function (key) {
+      data[key] = point[key];
+      properties[key] = {
+        get: function get() {
+          return data[key];
+        },
+        set: function set(value) {
+          if (data[key] === value) return;
+          var oldValue = cloneDeep(data);
+          data[key] = value;
+          callback(data, oldValue);
+        }
+      };
+    });
+    Object.defineProperties(point, properties);
+  };
+
   /**
    * VizPath (Visualization Path，可视化路径)
    */
   var VizPath = /*#__PURE__*/function () {
-    /**
-     * 构造函数
-     * @param options 更多配置
-     */
-    function VizPath() {
-      var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    function VizPath(context) {
       _classCallCheck(this, VizPath);
-      /**
-       * 交互所在fabric画布
-       */
-      this._canvas = null;
-      /**
-       * 编辑器配置
-       */
-      this._options = {};
       /**
        * 可视化路径
        */
@@ -2694,7 +3138,15 @@
        * 路径信息（包含路径分段、路径指令、关键点及控制点信息）
        */
       this.pathway = [];
-      this._options = defaults(options, this._options);
+      /**
+       * 路径信息映射
+       */
+      this.pathwayMap = new WeakMap([]);
+      /**
+       * 监听事件
+       */
+      this.events = {};
+      this.context = context;
     }
     /**
      * 获取指令中的关键节点
@@ -2702,7 +3154,7 @@
      * @note 闭合指令无关键节点
      */
     return _createClass(VizPath, [{
-      key: "_toBindCrood",
+      key: "_toResponsiveCrood",
       value:
       /**
        * 转化为响应式更改的点对象
@@ -2710,38 +3162,85 @@
        * @param callback 响应式更改回调
        * @returns
        */
-      function _toBindCrood(crood, callback) {
+      function _toResponsiveCrood(crood) {
+        var _this = this;
+        var observes = [];
+        var temporaryIgnoreIds = [];
         var proxy = new Proxy(crood, {
-          set: function set(target, p, newValue, receiver) {
-            callback[p](newValue);
-            return Reflect.set(target, p, newValue, receiver);
+          set: function set(target, p, value, receiver) {
+            if (p === 'x' || p === 'y') {
+              var oldValue = target[p];
+              var newValue = round(value, 4);
+              var result = Reflect.set(target, p, newValue, receiver);
+              if (oldValue !== newValue) {
+                var x = p === 'x' ? newValue : target.x;
+                var y = p === 'y' ? newValue : target.y;
+                observes.forEach(function (item) {
+                  if (item.id && temporaryIgnoreIds.length && temporaryIgnoreIds.includes(item.id)) return;
+                  item.handler(x, y);
+                });
+                _this._fire('update');
+              }
+              return result;
+            } else {
+              return Reflect.set(target, p, value, receiver);
+            }
           }
         });
+        proxy.set = function (crood) {
+          var skipObserverIDs = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+          if (_typeof(crood) !== 'object') return;
+          if (Array.isArray(skipObserverIDs)) {
+            temporaryIgnoreIds = skipObserverIDs.filter(Boolean);
+          }
+          if (crood.x) proxy.x = crood.x;
+          if (crood.y) proxy.y = crood.y;
+          temporaryIgnoreIds = [];
+        };
+        proxy.observe = function (handler) {
+          var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+          var immediate = options.immediate,
+            id = options.id;
+          if (immediate) handler(crood.x, crood.y);
+          observes.push({
+            handler: handler,
+            id: id
+          });
+        };
+        proxy.unobserve = function (id) {
+          if (!id) {
+            observes.length = 0;
+            return;
+          }
+          observes = observes.filter(function (i) {
+            return i.id !== id;
+          });
+        };
         return proxy;
       }
       /**
-       * 写入路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
+       * 绘制路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
        * @param pathway 路径信息
        */
     }, {
-      key: "write",
-      value: function write(pathway) {
-        var _this = this;
-        var _pathway = pathway.map(function (section) {
-          return section.map(function (item, idx) {
+      key: "draw",
+      value: function draw(pathway) {
+        var _this2 = this;
+        pathway.forEach(function (section) {
+          var _section = [];
+          section.forEach(function (item, idx) {
             var proxyItem = {
+              section: _section,
               instruction: item.instruction
             };
             if (item.node) {
-              var node = _this._toBindCrood(item.node, {
-                x: function x(val) {
-                  return item.instruction[item.instruction.length - 2] = val;
-                },
-                y: function y(val) {
-                  return item.instruction[item.instruction.length - 1] = val;
-                }
+              var node = _this2._toResponsiveCrood(item.node);
+              node.observe(function (x, y) {
+                item.instruction[item.instruction.length - 2] = x;
+                item.instruction[item.instruction.length - 1] = y;
               });
               proxyItem.node = node;
+              _this2.pathwayMap.set(proxyItem.node, proxyItem);
             }
             if (item.controllers) {
               var controllers = Object.assign({}, item.controllers);
@@ -2749,31 +3248,61 @@
               var pre = controllers.pre,
                 next = controllers.next;
               if (pre) {
-                controllers.pre = _this._toBindCrood(pre, {
-                  x: function x(val) {
-                    return item.instruction[3] = val;
-                  },
-                  y: function y(val) {
-                    return item.instruction[4] = val;
-                  }
+                controllers.pre = _this2._toResponsiveCrood(pre);
+                controllers.pre.observe(function (x, y) {
+                  item.instruction[3] = x;
+                  item.instruction[4] = y;
                 });
               }
               if (next && nextInstruction) {
-                controllers.next = _this._toBindCrood(next, {
-                  x: function x(val) {
-                    return nextInstruction.instruction[1] = val;
-                  },
-                  y: function y(val) {
-                    return nextInstruction.instruction[2] = val;
-                  }
+                controllers.next = _this2._toResponsiveCrood(next);
+                controllers.next.observe(function (x, y) {
+                  nextInstruction.instruction[1] = x;
+                  nextInstruction.instruction[2] = y;
                 });
               }
               proxyItem.controllers = controllers;
             }
-            return proxyItem;
+            _section.push(proxyItem);
+          });
+          _this2.pathway.push(_section);
+        });
+        this._fire('draw');
+      }
+      /**
+       * 清除所有路径
+       */
+    }, {
+      key: "clean",
+      value: function clean() {
+        this.pathway.forEach(function (section) {
+          section.forEach(function (_ref) {
+            var node = _ref.node;
+            node === null || node === void 0 ? void 0 : node.unobserve();
           });
         });
-        this.pathway = _pathway;
+        this.pathway = [];
+        this.pathwayMap = new WeakMap([]);
+        this._fire('draw');
+        this._fire('clean');
+      }
+    }, {
+      key: "on",
+      value: function on(eventName, callback) {
+        var _a;
+        this.events[eventName] = (_a = this.events[eventName]) !== null && _a !== void 0 ? _a : [];
+        this.events[eventName].push(callback);
+      }
+      /**
+       * 触发编辑器事件
+       */
+    }, {
+      key: "_fire",
+      value: function _fire(eventName) {
+        var _a;
+        (_a = this.events[eventName]) === null || _a === void 0 ? void 0 : _a.forEach(function (callback) {
+          callback();
+        });
       }
       /**
        * 移动控制点
@@ -2781,6 +3310,7 @@
     }, {
       key: "move",
       value: function move(target, crood) {
+        if (target.x === crood.x && target.y === crood.y) return;
         target.x = crood.x;
         target.y = crood.y;
       }
@@ -2788,13 +3318,14 @@
        * 输出路径
        */
     }, {
-      key: "toPath",
-      value: function toPath() {
-        return this.pathway.map(function (section) {
+      key: "toPaths",
+      value: function toPaths() {
+        var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
+        return pathway.map(function (section) {
           return section.map(function (i) {
             return i.instruction;
           });
-        }).flat(1);
+        });
       }
       /**
        * 输出路径指令
@@ -2802,7 +3333,8 @@
     }, {
       key: "toPathD",
       value: function toPathD() {
-        return fabric.fabric.util.joinPath(this.toPath());
+        var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
+        return fabric.fabric.util.joinPath(this.toPaths(pathway));
       }
     }], [{
       key: "getInstructionNodeCrood",
@@ -2830,22 +3362,144 @@
         }, [[]]);
         return sections;
       }
+    }]);
+  }();
+  /** 指令类型 */
+  var InstructionType;
+  (function (InstructionType) {
+    InstructionType["START"] = "M";
+    InstructionType["LINE"] = "L";
+    InstructionType["QUADRATIC_CURCE"] = "Q";
+    InstructionType["BEZIER_CURVE"] = "C";
+    InstructionType["CLOSE"] = "z";
+  })(InstructionType || (InstructionType = {}));
+  /**
+   * VizPath
+   */
+  var VizPathContext = /*#__PURE__*/function () {
+    function VizPathContext() {
+      _classCallCheck(this, VizPathContext);
       /**
-       * 通过fabric.Path对象获取VizPath路径信息
-       *
-       * @param path farbic路径对象
-       * @example
-       *
-       * const pathway = getPathwayFromObject(new fabric.Path());
+       * 增强模块列表
+       */
+      this._modules = [];
+    }
+    /**
+     * 通过fabric.Path对象获取Editor路径信息
+     *
+     * @param path farbic路径对象
+     * @example
+     *
+     * const pathway = getPathwayFromObject(new fabric.Path());
+     */
+    return _createClass(VizPathContext, [{
+      key: "use",
+      value:
+      /**
+       * 添加拓展模块
+       */
+      function use(module) {
+        var index = this._modules.findIndex(function (item) {
+          return item.constructor.ID === module.constructor.ID;
+        });
+        if (index !== -1) {
+          this._modules.splice(index, 1);
+        }
+        this._modules.push(module);
+        return this;
+      }
+      /**
+       * 查找模块
        */
     }, {
+      key: "find",
+      value: function find(moduleConstructor) {
+        return this._modules.find(function (module) {
+          return module.constructor.ID === moduleConstructor.ID;
+        });
+      }
+      /**
+       * 初始可视路径编辑器
+       */
+    }, {
+      key: "initialize",
+      value: (function () {
+        var _initialize = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
+          var _this3 = this;
+          var vizPath;
+          return _regeneratorRuntime().wrap(function _callee2$(_context2) {
+            while (1) switch (_context2.prev = _context2.next) {
+              case 0:
+                vizPath = new VizPath(this);
+                return _context2.abrupt("return", new Promise(function (resolve) {
+                  var next = 0;
+                  var loadModule = /*#__PURE__*/function () {
+                    var _ref2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee() {
+                      var module;
+                      return _regeneratorRuntime().wrap(function _callee$(_context) {
+                        while (1) switch (_context.prev = _context.next) {
+                          case 0:
+                            module = _this3._modules[next];
+                            if (module) {
+                              _context.next = 4;
+                              break;
+                            }
+                            resolve(vizPath);
+                            return _context.abrupt("return");
+                          case 4:
+                            _context.next = 6;
+                            return module.prepare();
+                          case 6:
+                            _context.next = 8;
+                            return Promise.resolve(module.load(vizPath));
+                          case 8:
+                            next++;
+                            loadModule();
+                          case 10:
+                          case "end":
+                            return _context.stop();
+                        }
+                      }, _callee);
+                    }));
+                    return function loadModule() {
+                      return _ref2.apply(this, arguments);
+                    };
+                  }();
+                  loadModule();
+                }));
+              case 2:
+              case "end":
+                return _context2.stop();
+            }
+          }, _callee2, this);
+        }));
+        function initialize() {
+          return _initialize.apply(this, arguments);
+        }
+        return initialize;
+      }())
+    }], [{
       key: "getPathwayFromObject",
       value: function getPathwayFromObject(path) {
         // ① 清除路径自带偏移，如果不消除，后续的所有关键点、控制点的编辑都要额外处理路径自身的偏移
-        var instructions = transformPath(path.path, {
-          translate: {
-            x: -path.pathOffset.x,
-            y: -path.pathOffset.y
+        var instructions = cloneDeep(path.path);
+        instructions.forEach(function (item, pathIdx) {
+          var _item = _toArray(item),
+            croods = _item.slice(1);
+          for (var i = 0; i < croods.length; i += 2) {
+            var _transform = transform({
+                x: instructions[pathIdx][i + 1],
+                y: instructions[pathIdx][i + 2]
+              }, [{
+                translate: {
+                  x: -path.pathOffset.x,
+                  y: -path.pathOffset.y
+                }
+              }]),
+              x = _transform.x,
+              y = _transform.y;
+            instructions[pathIdx][i + 1] = x;
+            instructions[pathIdx][i + 2] = y;
           }
         });
         // ② 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
@@ -2887,10 +3541,12 @@
           _iterator.f();
         }
         var pathway = sections.map(function (section) {
-          return section.map(function (instruction, idx) {
+          var _section = [];
+          section.forEach(function (instruction, idx) {
             var node = VizPath.getInstructionNodeCrood(instruction);
             var nextInstruction = section[idx + 1];
-            return {
+            _section.push({
+              section: _section,
               instruction: instruction,
               node: node,
               controllers: node ? {
@@ -2899,17 +3555,18 @@
                   y: instruction[4]
                 } : undefined,
                 next: (nextInstruction === null || nextInstruction === void 0 ? void 0 : nextInstruction[0]) === InstructionType.BEZIER_CURVE ? {
-                  x: instruction[1],
-                  y: instruction[2]
+                  x: nextInstruction[1],
+                  y: nextInstruction[2]
                 } : undefined
               } : undefined
-            };
+            });
           });
+          return _section;
         });
         return pathway;
       }
       /**
-       * 通过路径指令获取VizPath路径信息
+       * 通过路径指令获取Editor路径信息
        *
        * @param d 路径指令信息
        * @example
@@ -2924,22 +3581,823 @@
       }
     }]);
   }();
+  var EditorModule = /*#__PURE__*/function () {
+    function EditorModule() {
+      _classCallCheck(this, EditorModule);
+    }
+    return _createClass(EditorModule, [{
+      key: "prepare",
+      value: function () {
+        var _prepare = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
+          return _regeneratorRuntime().wrap(function _callee3$(_context3) {
+            while (1) switch (_context3.prev = _context3.next) {
+              case 0:
+              case "end":
+                return _context3.stop();
+            }
+          }, _callee3);
+        }));
+        function prepare() {
+          return _prepare.apply(this, arguments);
+        }
+        return prepare;
+      }()
+    }, {
+      key: "load",
+      value: function load(vizPath) {}
+    }]);
+  }();
+  var Editor = /*#__PURE__*/function (_EditorModule) {
+    /**
+     * 构造函数
+     * @param options 更多配置
+     */
+    function Editor(canvas) {
+      var _this4;
+      _classCallCheck(this, Editor);
+      _this4 = _callSuper(this, Editor);
+      /**
+       * 交互所在fabric画布
+       */
+      _this4.canvas = null;
+      /**
+       * 监听事件
+       */
+      _this4.listeners = [];
+      _this4._mountCanvas = canvas;
+      return _this4;
+    }
+    /**
+     * 基于挂载画布构建编辑器画布
+     */
+    _inherits(Editor, _EditorModule);
+    return _createClass(Editor, [{
+      key: "_createEditorCanvas",
+      value: function _createEditorCanvas(canvas) {
+        var _a;
+        if (!(canvas instanceof fabric.fabric.Canvas)) {
+          throw new TypeError('Please use fabric.Canvas instead of fabric.StaticCanvas.');
+        }
+        var container = canvas.getElement().parentNode;
+        if (!container) {
+          throw new TypeError('Please use fabric.Canvas which is mounted into the document.');
+        }
+        var editorCanvas = document.createElement('canvas');
+        container.appendChild(editorCanvas);
+        var editorFabricCanvas = new fabric.fabric.Canvas(editorCanvas, {
+          width: container.clientWidth,
+          height: container.clientHeight,
+          selection: true,
+          preserveObjectStacking: true,
+          selectionColor: canvas.selectionColor,
+          selectionBorderColor: canvas.selectionBorderColor,
+          selectionDashArray: canvas.selectionDashArray,
+          selectionLineWidth: canvas.selectionLineWidth
+        });
+        editorFabricCanvas.setViewportTransform((_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0]);
+        return editorFabricCanvas;
+      }
+      /**
+       * 添加事件监听
+       */
+    }, {
+      key: "on",
+      value: function on(type, eventName, handler) {
+        if (!this.canvas) return;
+        if (type === 'global') {
+          window.addEventListener(eventName, handler);
+        }
+        if (type === 'canvas') {
+          this.canvas.on(eventName, handler);
+        }
+        this.listeners.push({
+          type: type,
+          eventName: eventName,
+          handler: handler
+        });
+      }
+      /**
+       * 移除事件监听
+       */
+    }, {
+      key: "off",
+      value: function off(type, eventName, handler) {
+        var canvas = this.canvas;
+        if (!canvas) return;
+        this.listeners = this.listeners.filter(function (listener) {
+          if (handler && handler !== listener.handler) return true;
+          if (eventName === listener.eventName) {
+            if (type === 'global') {
+              window.removeEventListener(listener.eventName, listener.handler);
+            }
+            if (type === 'canvas') {
+              canvas.off(listener.eventName, listener.handler);
+            }
+            return false;
+          }
+          return true;
+        });
+      }
+    }, {
+      key: "load",
+      value: function load(editor) {
+        this.canvas = this._createEditorCanvas(this._mountCanvas);
+      }
+    }]);
+  }(EditorModule);
+  Editor.ID = Symbol('editor');
+  var EditorBackground = /*#__PURE__*/function (_EditorModule2) {
+    function EditorBackground() {
+      _classCallCheck(this, EditorBackground);
+      return _callSuper(this, EditorBackground, arguments);
+    }
+    _inherits(EditorBackground, _EditorModule2);
+    return _createClass(EditorBackground, [{
+      key: "load",
+      value: function load(vizPath) {
+        var editor = vizPath.context.find(Editor);
+        if (!editor) {
+          return;
+        }
+        var canvas = editor.canvas;
+        if (!canvas) {
+          return;
+        }
+        var size = 50;
+        var grid = new fabric.fabric.Rect({
+          width: size,
+          height: size,
+          fill: 'transparent',
+          stroke: '#f1f1f1',
+          strokeWidth: 1,
+          strokeDashArray: [4, 2]
+        });
+        return new Promise(function (resolve) {
+          var image = new Image();
+          image.onload = function () {
+            canvas.setBackgroundColor(new fabric.fabric.Pattern({
+              source: image,
+              repeat: 'repeat',
+              offsetX: -(canvas.getWidth() % size) / 2,
+              offsetY: -(canvas.getHeight() % size) / 2
+            }), function () {
+              canvas.renderAll();
+              resolve();
+            });
+          };
+          image.src = grid.toDataURL({});
+        });
+      }
+    }]);
+  }(EditorModule);
+  EditorBackground.ID = Symbol('editor-background');
+  var EditorPath = /*#__PURE__*/function (_EditorModule3) {
+    function EditorPath(originPath) {
+      var _this5;
+      _classCallCheck(this, EditorPath);
+      _this5 = _callSuper(this, EditorPath);
+      _this5.paths = [];
+      /**
+       * 视图变换
+       */
+      _this5.editorTransformMatrix = [1, 0, 0, 1, 0, 0];
+      _this5.originPath = originPath;
+      return _this5;
+    }
+    /**
+     * 将相对坐标点转化为带元素本身变换的偏移位置
+     */
+    _inherits(EditorPath, _EditorModule3);
+    return _createClass(EditorPath, [{
+      key: "calcAbsolutePosition",
+      value: function calcAbsolutePosition(crood) {
+        var matrix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : this.editorTransformMatrix;
+        var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(crood.x, crood.y), matrix);
+        return {
+          left: point.x,
+          top: point.y
+        };
+      }
+      /**
+       * 移除元素本身变换，将实际偏移转化为路径相对坐标
+       */
+    }, {
+      key: "calcRelativeCrood",
+      value: function calcRelativeCrood(position) {
+        var matrix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : this.editorTransformMatrix;
+        var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(position.left, position.top), fabric.fabric.util.invertTransform(matrix));
+        return {
+          x: round(point.x, 4),
+          y: round(point.y, 4)
+        };
+      }
+      /**
+       * 重新修正路径的尺寸和位置
+       *
+       * @param path 路径对象
+       *
+       * @note
+       *
+       * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
+       * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
+       */
+    }, {
+      key: "reinitializePath",
+      value: function reinitializePath(path) {
+        // 记录旧的路径信息
+        var oldInfo = {
+          left: path.left,
+          top: path.top,
+          width: path.width,
+          height: path.height,
+          pathOffset: Object.assign({}, path.pathOffset)
+        };
+        // 持有旧的指令后恢复避免丢失引用
+        var instructions = path.path;
+        // 更新路径尺寸
+        path.initialize(fabric.fabric.util.joinPath(instructions));
+        path.path = instructions;
+        // 计算路径偏移差值
+        var matrix = _toConsumableArray(this.editorTransformMatrix);
+        matrix[4] = 0;
+        matrix[5] = 0;
+        var distance = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - (path.width - oldInfo.width) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - (path.height - oldInfo.height) / 2 - oldInfo.pathOffset.y), matrix);
+        // 设置回正确的偏移位置
+        path.set({
+          left: oldInfo.left + distance.x,
+          top: oldInfo.top + distance.y
+        });
+        path.setCoords();
+      }
+    }, {
+      key: "load",
+      value: function load(vizPath) {
+        var _this6 = this;
+        var editor = vizPath.context.find(Editor);
+        if (!editor) {
+          return;
+        }
+        var canvas = editor.canvas;
+        if (!canvas) {
+          return;
+        }
+        vizPath.on('draw', /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
+          var _a, paths, _ref4, _ref4$originX, originX, _ref4$originY, originY, _ref4$left, left, _ref4$top, top, _ref4$angle, angle, _ref4$scaleX, scaleX, _ref4$scaleY, scaleY, group;
+          return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+            while (1) switch (_context4.prev = _context4.next) {
+              case 0:
+                paths = vizPath.pathway.map(function (section) {
+                  var path = new fabric.fabric.Path(vizPath.toPathD([section]));
+                  path.path = vizPath.toPaths([section]).flat(1);
+                  path.set({
+                    // left: -path.pathOffset.x,
+                    // top: -path.pathOffset.y,
+                    stroke: 'red',
+                    strokeWidth: 2,
+                    fill: 'transparent',
+                    // 路径本身不可选中，后续通过操纵点和线条来更改路径
+                    selectable: false,
+                    // 不触发事件
+                    evented: false,
+                    // 防止因为缓存没有显示正确的路径
+                    objectCaching: false,
+                    // DEBUG
+                    backgroundColor: 'pink'
+                  });
+                  return path;
+                });
+                _ref4 = (_a = _this6.originPath) !== null && _a !== void 0 ? _a : {}, _ref4$originX = _ref4.originX, originX = _ref4$originX === void 0 ? 'center' : _ref4$originX, _ref4$originY = _ref4.originY, originY = _ref4$originY === void 0 ? 'center' : _ref4$originY, _ref4$left = _ref4.left, left = _ref4$left === void 0 ? canvas.getWidth() / 2 : _ref4$left, _ref4$top = _ref4.top, top = _ref4$top === void 0 ? canvas.getHeight() / 2 : _ref4$top, _ref4$angle = _ref4.angle, angle = _ref4$angle === void 0 ? 0 : _ref4$angle, _ref4$scaleX = _ref4.scaleX, scaleX = _ref4$scaleX === void 0 ? 1 : _ref4$scaleX, _ref4$scaleY = _ref4.scaleY, scaleY = _ref4$scaleY === void 0 ? 1 : _ref4$scaleY;
+                group = new fabric.fabric.Group(paths, {
+                  originX: originX,
+                  originY: originY,
+                  left: left,
+                  top: top,
+                  angle: angle,
+                  scaleX: scaleX,
+                  scaleY: scaleY
+                }); // 记录路径在编辑器中的变换值
+                _this6.editorTransformMatrix = group.calcOwnMatrix();
+                group.destroy();
+                // 移除旧的路径对象并添加新的路径对象
+                canvas.renderOnAddRemove = true;
+                canvas.remove.apply(canvas, _toConsumableArray(_this6.paths));
+                canvas.add.apply(canvas, _toConsumableArray(paths));
+                canvas.renderOnAddRemove = false;
+                canvas.renderAll();
+                _this6.paths = paths;
+              case 11:
+              case "end":
+                return _context4.stop();
+            }
+          }, _callee4);
+        })));
+        vizPath.on('update', function () {
+          _this6.paths.forEach(function (path, index) {
+            _this6.reinitializePath(path);
+          });
+        });
+      }
+    }]);
+  }(EditorModule);
+  EditorPath.ID = Symbol('editor-path');
 
-  // 单路径
-  // const d = 'M 50 50z';
-  // const d = 'M26.7846 -47 L109.923 97';
-  // const d = 'M26.7846 -47L109.923 97H-56.3538z';
-  // const d = 'M 26.7846 -47 Q 88.3538 5 109.923 97';
-  // const d = 'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z';
-  // const d = 'M 91 26.5 C 91 62.1223 62.1223 91 26.5 91 C -9.122300000000003 91 -38 62.1223 -38 26.5 C -38 -9.122300000000003 -9.1223 -38 26.5 -38 C 62.122299999999996 -38 91 -9.1223 91 26.5 z';
-  const d = 'M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z';
-  // 复合路径
-  // const d = 'L-188.7846 -47L-100.923 97H-256.3538 z M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z';
-  // const d = 'L-188.7846 -47L-100.923 97H-256.3538 M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5';
-  // const d = 'M 50 50 L 100 100 Q 150 50 100 0 Q 0 0 50 50'
-  // const d = 'M 50 50 L 100 100 Q 150 50 100 0 C 80 -50 0 0 50 50z'
-  // const d = 'M 50 50 L 100 100 L 100 0 C 80 -50 0 0 50 50z'
-  (() => {
+  // Unique ID creation requires a high quality random # generator. In the browser we therefore
+  // require the crypto API and do not support built-in fallback to lower quality random number
+  // generators (like Math.random()).
+  var getRandomValues;
+  var rnds8 = new Uint8Array(16);
+  function rng() {
+    // lazy load so that environments that need to polyfill have a chance to do so
+    if (!getRandomValues) {
+      // getRandomValues needs to be invoked in a context where "this" is a Crypto implementation.
+      getRandomValues = typeof crypto !== 'undefined' && crypto.getRandomValues && crypto.getRandomValues.bind(crypto);
+      if (!getRandomValues) {
+        throw new Error('crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported');
+      }
+    }
+    return getRandomValues(rnds8);
+  }
+
+  /**
+   * Convert array of 16 byte values to UUID string format of the form:
+   * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+   */
+
+  var byteToHex = [];
+  for (var i = 0; i < 256; ++i) {
+    byteToHex.push((i + 0x100).toString(16).slice(1));
+  }
+  function unsafeStringify(arr) {
+    var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    // Note: Be careful editing this code!  It's been tuned for performance
+    // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
+    return byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]];
+  }
+  var randomUUID = typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID.bind(crypto);
+  var _native = {
+    randomUUID: randomUUID
+  };
+  function v4(options, buf, offset) {
+    if (_native.randomUUID && !buf && !options) {
+      return _native.randomUUID();
+    }
+    options = options || {};
+    var rnds = options.random || (options.rng || rng)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
+
+    rnds[6] = rnds[6] & 0x0f | 0x40;
+    rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
+
+    if (buf) {
+      offset = offset || 0;
+      for (var _i = 0; _i < 16; ++_i) {
+        buf[offset + _i] = rnds[_i];
+      }
+      return buf;
+    }
+    return unsafeStringify(rnds);
+  }
+
+  /** 创建默认控制点 */
+  var CREATE_DEFAULT_POINTER = function CREATE_DEFAULT_POINTER() {
+    var object = new fabric.fabric.Circle({
+      strokeWidth: 4,
+      radius: 6,
+      fill: '#ffffff',
+      stroke: '#4b4b4b',
+      originX: 'center',
+      originY: 'center'
+    });
+    return object;
+  };
+  /** 创建默认线条 */
+  var CREATE_DEFAULT_LINE = function CREATE_DEFAULT_LINE() {
+    return new fabric.fabric.Line([0, 0, 0, 0], {
+      // stroke: '#bebebe',
+      stroke: '#f00',
+      strokeWidth: 1,
+      strokeDashArray: [4, 3],
+      strokeUniform: true,
+      selectable: false,
+      evented: false,
+      originX: 'center',
+      originY: 'center'
+    });
+  };
+  /** 创建默认默认左右侧拓展点 */
+  var CREATE_DEFAULT_TRIGGER = function CREATE_DEFAULT_TRIGGER() {
+    var object = new fabric.fabric.Circle({
+      radius: 4,
+      stroke: '#bebebe',
+      strokeWidth: 2,
+      fill: '#bebebe',
+      originX: 'center',
+      originY: 'center'
+    });
+    return object;
+  };
+  var EditorNode = /*#__PURE__*/function (_EditorModule4) {
+    function EditorNode() {
+      var _this7;
+      _classCallCheck(this, EditorNode);
+      _this7 = _callSuper(this, EditorNode, arguments);
+      _this7.vizPath = null;
+      _this7.editor = null;
+      _this7.nodes = [];
+      _this7.controllers = {
+        points: [],
+        lines: []
+      };
+      _this7.nodeMap = new WeakMap([]);
+      _this7._cancelSelectEvent = false;
+      return _this7;
+    }
+    _inherits(EditorNode, _EditorModule4);
+    return _createClass(EditorNode, [{
+      key: "_initPathNodes",
+      value: function _initPathNodes(vizPath) {
+        var _this8 = this;
+        var editorPath = vizPath.context.find(EditorPath);
+        if (!editorPath) return [];
+        var nodes = [];
+        // 创建路径关键点的操作点（即实际路径上的节点，而非曲线上的虚拟点）
+        vizPath.pathway.forEach(function (section) {
+          section.forEach(function (item, index) {
+            var _a, _b;
+            var node = item.node;
+            if (!node) return;
+            // 如果下一个指令是闭合点，则不添加关键点
+            // 因为路径补丁的时候遇到闭合点会添加一条到起始点的路径，所以当前关键点正好和起始点一致
+            if (((_b = (_a = section[index + 1]) === null || _a === void 0 ? void 0 : _a.instruction) === null || _b === void 0 ? void 0 : _b[0]) === InstructionType.CLOSE) return;
+            var object = new fabric.fabric.Group([CREATE_DEFAULT_POINTER()], {
+              name: v4(),
+              originX: 'center',
+              originY: 'center',
+              // 选中时不出现选中框
+              hasBorders: false,
+              hasControls: false
+            });
+            // 响应指令的直接修改
+            node.observe(function (x, y) {
+              var position = editorPath.calcAbsolutePosition({
+                x: x,
+                y: y
+              });
+              if (object.group) {
+                var relativePosition = editorPath.calcRelativeCrood(position, object.group.calcTransformMatrix());
+                object.set({
+                  left: relativePosition.x,
+                  top: relativePosition.y
+                }).setCoords();
+                object.group.addWithUpdate();
+              } else {
+                object.set(position).setCoords();
+              }
+            }, {
+              id: object.name,
+              immediate: true
+            });
+            var position = editorPath.calcAbsolutePosition(node);
+            object.set(position).setCoords();
+            nodes.push(object);
+            _this8.nodeMap.set(object, item);
+          });
+        });
+        return nodes;
+      }
+    }, {
+      key: "_initPathControllers",
+      value: function _initPathControllers() {
+        var _a, _b;
+        var lines = [];
+        var points = [];
+        var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath);
+        var pathway = (_b = this.vizPath) === null || _b === void 0 ? void 0 : _b.pathway;
+        if (editorPath && pathway) {
+          pathway.forEach(function (section) {
+            section.forEach(function (item) {
+              var node = item.node,
+                _item$controllers = item.controllers,
+                controllers = _item$controllers === void 0 ? {} : _item$controllers;
+              if (!node) return;
+              var pre = controllers.pre,
+                next = controllers.next;
+              [pre, next].forEach(function (controller) {
+                if (!controller) return;
+                /**
+                 * 创建指令控制点
+                 */
+                var object = new fabric.fabric.Group([CREATE_DEFAULT_TRIGGER()], {
+                  name: v4(),
+                  originX: 'center',
+                  originY: 'center',
+                  // 选中时不出现选中框
+                  hasBorders: false,
+                  hasControls: false
+                });
+                // 建立相互响应，指令的数据和元素的位置更改会相互同步
+                controller.observe(function (x, y) {
+                  var _a;
+                  if (((_a = object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === object) return;
+                  var position = editorPath.calcAbsolutePosition({
+                    x: x,
+                    y: y
+                  });
+                  object.set(position).setCoords();
+                }, {
+                  immediate: true,
+                  id: object.name
+                });
+                observe(object, ['left', 'top'], function (_ref5) {
+                  var left = _ref5.left,
+                    top = _ref5.top;
+                  var _a;
+                  if (((_a = object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) !== object) return;
+                  var crood = editorPath.calcRelativeCrood({
+                    left: left,
+                    top: top
+                  });
+                  controller.set(crood, [object.name]);
+                });
+                /**
+                 * 创建控制点和节点的连线
+                 */
+                var line = CREATE_DEFAULT_LINE();
+                line.set({
+                  name: v4()
+                });
+                // 建立响应式，让连线随时跟随指令的值进行变化
+                node.observe(function (x, y) {
+                  var position = editorPath.calcAbsolutePosition({
+                    x: x,
+                    y: y
+                  });
+                  line.set({
+                    x1: position.left,
+                    y1: position.top
+                  });
+                }, {
+                  immediate: true,
+                  id: line.name
+                });
+                controller.observe(function (x, y) {
+                  var position = editorPath.calcAbsolutePosition({
+                    x: x,
+                    y: y
+                  });
+                  line.set({
+                    x2: position.left,
+                    y2: position.top
+                  });
+                }, {
+                  immediate: true,
+                  id: line.name
+                });
+                points.push(object);
+                lines.push(line);
+              });
+            });
+          });
+        }
+        return {
+          points: points,
+          lines: lines
+        };
+      }
+    }, {
+      key: "_initSelectEvents",
+      value: function _initSelectEvents() {
+        var _this9 = this;
+        if (!this.editor) return;
+        this.editor.on('canvas', 'selection:created', function (e) {
+          if (_this9._cancelSelectEvent) return;
+          _this9.focus.apply(_this9, _toConsumableArray(e.selected));
+        });
+        this.editor.on('canvas', 'selection:updated', function (e) {
+          if (_this9._cancelSelectEvent) return;
+          _this9.focus.apply(_this9, _toConsumableArray(e.selected));
+        });
+        this.editor.on('canvas', 'selection:cleared', function () {
+          if (_this9._cancelSelectEvent) return;
+          _this9.focus();
+        });
+      }
+    }, {
+      key: "move",
+      value: function move(object, position) {
+        var _a, _b, _c, _d;
+        var pathwayNode = this.nodeMap.get(object);
+        if (!pathwayNode) return;
+        var node = pathwayNode.node,
+          section = pathwayNode.section,
+          _pathwayNode$controll = pathwayNode.controllers,
+          controllers = _pathwayNode$controll === void 0 ? {} : _pathwayNode$controll;
+        var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath);
+        if (!editorPath) return [];
+        var selectionGroup = object.group;
+        var _object$scaleX = object.scaleX,
+          preScaleX = _object$scaleX === void 0 ? 1 : _object$scaleX,
+          _object$scaleY = object.scaleY,
+          preScaleY = _object$scaleY === void 0 ? 1 : _object$scaleY,
+          _object$angle = object.angle,
+          preAngle = _object$angle === void 0 ? 0 : _object$angle;
+        var _ref6 = selectionGroup ? {
+            scaleX: 1 / selectionGroup.scaleX,
+            scaleY: 1 / selectionGroup.scaleY,
+            angle: -selectionGroup.angle
+          } : {
+            scaleX: 1,
+            scaleY: 1,
+            angle: 0
+          },
+          newScaleX = _ref6.scaleX,
+          newScaleY = _ref6.scaleY,
+          newAngle = _ref6.angle;
+        object.set({
+          scaleX: newScaleX,
+          scaleY: newScaleY,
+          angle: newAngle
+        }).setCoords();
+        var newCrood = editorPath.calcRelativeCrood(position);
+        // 需要跟随变化的曲线控制点
+        var followCroods = [];
+        var followTransform = {
+          translate: {
+            x: newCrood.x - node.x,
+            y: newCrood.y - node.y
+          },
+          rotate: preAngle - newAngle,
+          scale: {
+            x: preScaleX / newScaleX,
+            y: preScaleY / newScaleY
+          }
+        };
+        node.set(newCrood, [object === null || object === void 0 ? void 0 : object.name]);
+        if (controllers.pre) followCroods.push(controllers.pre);
+        if (controllers.next) followCroods.push(controllers.next);
+        // 如果『路径自动闭合（带有z指令）』，首尾两个节点需要同步操作
+        if (((_c = (_b = section[section.length - 1]) === null || _b === void 0 ? void 0 : _b.instruction) === null || _c === void 0 ? void 0 : _c[0]) === InstructionType.CLOSE && section.length > 2) {
+          if (section[0].node === node) {
+            var _section2 = section[section.length - 2],
+              _node = _section2.node,
+              _section2$controllers = _section2.controllers,
+              _controllers = _section2$controllers === void 0 ? {} : _section2$controllers;
+            _node.set(newCrood);
+            if (_controllers.pre) followCroods.push(_controllers.pre);
+            if (_controllers.next) followCroods.push(_controllers.next);
+          }
+          // 闭合节点不可能存在可视操作节点
+          // if (section[section.length - 2].node === node) {}
+        }
+        // 控制点跟随
+        followCroods.forEach(function (controller) {
+          if (!controller) return;
+          var _followTransform$tran = followTransform.translate,
+            translate = _followTransform$tran === void 0 ? {
+              x: 0,
+              y: 0
+            } : _followTransform$tran,
+            _followTransform$scal = followTransform.scale,
+            scale = _followTransform$scal === void 0 ? {
+              x: 1,
+              y: 1
+            } : _followTransform$scal,
+            _followTransform$rota = followTransform.rotate,
+            rotate = _followTransform$rota === void 0 ? 0 : _followTransform$rota;
+          var relativeDiff = transform({
+            x: controller.x - newCrood.x,
+            y: controller.y - newCrood.y
+          }, [{
+            translate: translate
+          }, {
+            scale: scale
+          }, {
+            rotate: rotate
+          }]);
+          controller.x = newCrood.x + relativeDiff.x;
+          controller.y = newCrood.y + relativeDiff.y;
+        });
+        (_d = object.canvas) === null || _d === void 0 ? void 0 : _d.renderAll();
+      }
+    }, {
+      key: "focus",
+      value: function focus() {
+        var _this10 = this;
+        var _a;
+        var canvas = (_a = this.editor) === null || _a === void 0 ? void 0 : _a.canvas;
+        if (!canvas) return;
+        for (var _len = arguments.length, selectedNodes = new Array(_len), _key = 0; _key < _len; _key++) {
+          selectedNodes[_key] = arguments[_key];
+        }
+        var focusNodes = selectedNodes.filter(function (i) {
+          return _this10.nodes.includes(i);
+        });
+        var focusControllerPoints = selectedNodes.filter(function (i) {
+          return _this10.controllers.points.includes(i);
+        });
+        if (focusNodes.length === 0 && focusControllerPoints.length == 0) return;
+        this._cancelSelectEvent = true;
+        // 添加活跃组的响应式变化
+        var addActiveSelectionObserve = function addActiveSelectionObserve(group) {
+          observe(group, ['left', 'top', 'angle'], function () {
+            group._objects.forEach(function (object) {
+              if (!_this10.nodes.includes(object)) return;
+              var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix());
+              var left = decomposeMatrix.translateX;
+              var top = decomposeMatrix.translateY;
+              _this10.move(object, {
+                left: left,
+                top: top
+              });
+            });
+          });
+        };
+        // 添加单个活跃对象的响应式变化
+        var addActivePointObserve = function addActivePointObserve(object) {
+          observe(object, ['left', 'top'], function (_ref7) {
+            var left = _ref7.left,
+              top = _ref7.top;
+            if (object.group) return;
+            _this10.move(object, {
+              left: left,
+              top: top
+            });
+          });
+        };
+        if (focusNodes.length) {
+          // 取消画布选中重新构造选中对象
+          canvas.discardActiveObject();
+          if (focusNodes.length > 1) {
+            var activeSelection = new fabric.fabric.ActiveSelection(focusNodes, {
+              canvas: canvas,
+              lockScalingFlip: true,
+              // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
+              lockRotation: true,
+              originX: 'center',
+              originY: 'center'
+            });
+            activeSelection.setControlVisible('mtr', false);
+            canvas.setActiveObject(activeSelection);
+            addActiveSelectionObserve(activeSelection);
+          } else {
+            canvas.setActiveObject(focusNodes[0]);
+            addActivePointObserve(focusNodes[0]);
+          }
+        }
+        canvas.renderAll();
+        this._cancelSelectEvent = false;
+      }
+    }, {
+      key: "load",
+      value: function load(vizPath) {
+        var _this11 = this;
+        this.vizPath = vizPath;
+        var editor = vizPath.context.find(Editor);
+        if (!editor) return;
+        var editorPath = vizPath.context.find(EditorPath);
+        if (!editorPath) return;
+        this.editor = editor;
+        this._initSelectEvents();
+        vizPath.on('draw', /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
+          var canvas;
+          return _regeneratorRuntime().wrap(function _callee5$(_context5) {
+            while (1) switch (_context5.prev = _context5.next) {
+              case 0:
+                canvas = editor.canvas;
+                if (canvas) {
+                  _context5.next = 3;
+                  break;
+                }
+                return _context5.abrupt("return");
+              case 3:
+                // 由于需要多次添加关键点和控制点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
+                canvas.renderOnAddRemove = false;
+                // 移除旧对象
+                canvas.remove.apply(canvas, _toConsumableArray(_this11.controllers.lines).concat(_toConsumableArray(_this11.controllers.points), _toConsumableArray(_this11.nodes)));
+                // 初始路径关键点
+                _this11.nodes = _this11._initPathNodes(vizPath);
+                // 初始路径控制点
+                _this11.controllers = _this11._initPathControllers();
+                // 添加新对象
+                canvas.add.apply(canvas, _toConsumableArray(_this11.controllers.lines).concat(_toConsumableArray(_this11.controllers.points), _toConsumableArray(_this11.nodes)));
+                canvas.renderOnAddRemove = true;
+                canvas.renderAll();
+              case 10:
+              case "end":
+                return _context5.stop();
+            }
+          }, _callee5);
+        })));
+      }
+    }]);
+  }(EditorModule);
+  EditorNode.ID = Symbol('editor-node');
+
+  const EXAMPLE_PATH_D = {
+      circle: 'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
+      bubble: 'M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z',
+      shapes: 'L-188.7846 -47L-100.923 97H-256.3538 z M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z'
+  };
+  (async () => {
       // 取得容器节点
       const container = document.getElementById('container');
       if (!container)
@@ -2956,27 +4414,43 @@
           fabricCanvas.renderAll();
       }).observe(container);
       // 创建fabric画布
-      const fabricCanvas = new fabric.fabric.StaticCanvas(canvas, {
+      const fabricCanvas = new fabric.fabric.Canvas(canvas, {
           width: container.clientWidth,
           height: container.clientHeight,
+          selectionBorderColor: '#ccc',
+          selectionColor: 'rgba(150, 150, 150, 0.3)',
           // selection: false,
       });
-      const path = new fabric.fabric.Path(d, {
-          originX: 'center',
-          originY: 'center',
-          left: fabricCanvas.getWidth() / 2,
-          top: fabricCanvas.getHeight() / 2,
-          objectCaching: false,
-          noScaleCache: false,
-          fill: 'transparent',
-          stroke: '#333',
-          strokeWidth: 2,
-      });
-      fabricCanvas.add(path);
-      fabricCanvas.renderAll();
-      // 添加可视化路径
-      const vizPath = new VizPath();
-      vizPath.write(VizPath.getPathwayFromObject(path));
+      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      // const path = new fabric.Path(EXAMPLE_PATH_D.bubble, {
+      //   originX: 'center',
+      //   originY: 'center',
+      //   left: 100,
+      //   top: 100,
+      //   objectCaching: false,
+      //   noScaleCache: false,
+      //   fill: 'transparent',
+      //   stroke: '#333',
+      //   strokeWidth: 2,
+      //   // angle: 60,
+      //   // scaleX: 1.5,
+      //   // scaleY: 1.5
+      // });
+      // fabricCanvas.add(path);
+      // fabricCanvas.renderAll();
+      const vizPath = new VizPathContext();
+      const operator = await vizPath
+          .use(new Editor(fabricCanvas))
+          .use(new EditorBackground())
+          .use(new EditorPath())
+          .use(new EditorNode())
+          .initialize();
+      // operator.draw(VizPath.getPathwayFromObject(path));
+      operator.draw(VizPathContext.getPathwayFromPathD(EXAMPLE_PATH_D.bubble));
+      // operator.clean();
+      // operator.move(operator.pathway[0][0].node, { x: 200, y: 200 })
+      // editor.draw(VizPath.getPathwayFromObject(path));
+      // vizPath.
       // path.path = vizPath.toPath() as unknown as fabric.Point[];
       // fabricCanvas.renderAll();
       // console.log(vizPath.toPathD())

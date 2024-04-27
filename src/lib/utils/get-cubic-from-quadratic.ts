@@ -1,13 +1,12 @@
 import cloneDeep from 'lodash-es/cloneDeep';
-import { Instruction, InstructionType } from '..';
+import type { Instruction } from '..';
 
 /**
  * 获取二阶曲线的三阶表现
  */
 const getCubicFromQuadratic = (p0: Crood, instruction: Instruction) => {
   // 如果不是二阶直接返回
-  if (instruction[0] !== InstructionType.QUADRATIC_CURCE)
-    return cloneDeep(instruction);
+  if (instruction[0] !== 'Q') return cloneDeep(instruction);
 
   // 解析输入字符串
   const points = Array.from({ length: 2 }).map((_, i) => ({
@@ -30,15 +29,7 @@ const getCubicFromQuadratic = (p0: Crood, instruction: Instruction) => {
   const q3 = p2;
 
   // 创建三阶贝塞尔曲线指令
-  return [
-    InstructionType.BEZIER_CURVE,
-    q1.x,
-    q1.y,
-    q2.x,
-    q2.y,
-    q3.x,
-    q3.y,
-  ] as Instruction;
+  return ['C', q1.x, q1.y, q2.x, q2.y, q3.x, q3.y] as Instruction;
 };
 
 export default getCubicFromQuadratic;

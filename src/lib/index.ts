@@ -1,7 +1,8 @@
 import { fabric } from 'fabric';
-import defaults from 'lodash-es/defaults';
-import transformPath from './utils/transform-path';
-import { getCubicFromQuadratic } from './utils';
+import VizPath from './vizpath.class';
+import type EditorModule from './modules/base.class';
+import { getCubicFromQuadratic, transform } from './utils';
+import cloneDeep from 'lodash-es/cloneDeep';
 
 /** 指令类型 */
 export enum InstructionType {
@@ -14,88 +15,29 @@ export enum InstructionType {
 
 export type Instruction = [InstructionType, ...number[]];
 
-export type Pathway = {
+export type PathwayNode<Node extends Crood = Crood> = {
+  section: PathwayNode<Node>[];
   instruction: Instruction;
-  node?: Crood;
+  node?: Node;
   controllers?: Partial<{
-    pre: Crood;
-    next: Crood;
-  }>
-}[][];
+    pre: Node;
+    next: Node;
+  }>;
+};
 
-interface VizPathOptions {}
+export type Pathway<Node extends Crood = Crood> = PathwayNode<Node>[][];
 
 /**
- * VizPath (Visualization Path，可视化路径)
+ * VizPath
  */
-class VizPath {
+class VizPathContext {
   /**
-   * 交互所在fabric画布
+   * 增强模块列表
    */
-  private _canvas: fabric.Canvas | fabric.StaticCanvas | null = null;
+  private _modules: EditorModule[] = [];
 
   /**
-   * 编辑器配置
-   */
-  private _options = {};
-
-  /**
-   * 可视化路径
-   */
-  path: fabric.Path | null = null;
-
-  /**
-   * 路径信息（包含路径分段、路径指令、关键点及控制点信息）
-   */
-  pathway: Pathway = [];
-
-  /**
-   * 构造函数
-   * @param options 更多配置
-   */
-  constructor(options: VizPathOptions = {}) {
-    this._options = defaults(options, this._options);
-  }
-
-  /**
-   * 获取指令中的关键节点
-   *
-   * @note 闭合指令无关键节点
-   */
-  static getInstructionNodeCrood(instruction: Instruction) {
-    if (instruction[0] === InstructionType.CLOSE) return;
-    return {
-      x: instruction[instruction.length - 2],
-      y: instruction[instruction.length - 1],
-    } as Crood;
-  }
-
-  /**
-   * 获取路径中的路径分段
-   * @param instructions 路径指令列表
-   * @returns 路径分段
-   */
-  static getPathSections(instructions: Instruction[]) {
-    const sections = instructions.reduce(
-      (paths, instruction, idx, arr) => {
-        if (!instruction) return paths;
-        if (
-          instruction[0] === InstructionType.START &&
-          paths[paths.length - 1].length
-        )
-          paths.push([]);
-        paths[paths.length - 1].push(instruction);
-        if (instruction[0] === InstructionType.CLOSE && idx !== arr.length - 1)
-          paths.push([]);
-        return paths;
-      },
-      [[]] as Instruction[][]
-    );
-    return sections;
-  }
-
-  /**
-   * 通过fabric.Path对象获取VizPath路径信息
+   * 通过fabric.Path对象获取Editor路径信息
    *
    * @param path farbic路径对象
    * @example
@@ -104,11 +46,28 @@ class VizPath {
    */
   static getPathwayFromObject(path: fabric.Path) {
     // ① 清除路径自带偏移，如果不消除，后续的所有关键点、控制点的编辑都要额外处理路径自身的偏移
-    const instructions = transformPath(path.path as unknown as Instruction[], {
-      translate: {
-        x: -path.pathOffset.x,
-        y: -path.pathOffset.y,
-      },
+    const instructions = cloneDeep(path.path as unknown as Instruction[]);
+    instructions.forEach((item, pathIdx) => {
+      const [, ...croods] = item as unknown as [
+        type: string,
+        ...croods: number[]
+      ];
+      for (let i = 0; i < croods.length; i += 2) {
+        const { x, y } = transform(
+          {
+            x: instructions[pathIdx][i + 1] as number,
+            y: instructions[pathIdx][i + 2] as number,
+          },
+          [{
+            translate: {
+              x: -path.pathOffset.x,
+              y: -path.pathOffset.y,
+            },
+          }]
+        );
+        instructions[pathIdx][i + 1] = x;
+        instructions[pathIdx][i + 2] = y;
+      }
     });
 
     // ② 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
@@ -163,10 +122,12 @@ class VizPath {
 
     // ③ 创建pathway（包含路径分段、关键点、控制点信息的对象）
     const pathway: Pathway = sections.map((section) => {
-      return section.map((instruction, idx) => {
+      const _section: PathwayNode[] = [];
+      section.forEach((instruction, idx) => {
         const node = VizPath.getInstructionNodeCrood(instruction);
         const nextInstruction = section[idx + 1];
-        return {
+        _section.push({
+          section: _section,
           instruction,
           node,
           controllers: node
@@ -177,19 +138,23 @@ class VizPath {
                     : undefined,
                 next:
                   nextInstruction?.[0] === InstructionType.BEZIER_CURVE
-                    ? ({ x: instruction[1], y: instruction[2] } as Crood)
+                    ? ({
+                        x: nextInstruction[1],
+                        y: nextInstruction[2],
+                      } as Crood)
                     : undefined,
               }
             : undefined,
-        };
+        });
       });
+      return _section;
     });
 
     return pathway;
   }
 
   /**
-   * 通过路径指令获取VizPath路径信息
+   * 通过路径指令获取Editor路径信息
    *
    * @param d 路径指令信息
    * @example
@@ -202,89 +167,57 @@ class VizPath {
   }
 
   /**
-   * 转化为响应式更改的点对象
-   * @param crood 点
-   * @param callback 响应式更改回调
-   * @returns 
+   * 添加拓展模块
    */
-  private _toBindCrood(
-    crood: Crood,
-    callback: Record<keyof Crood, (val: number) => void>
-  ) {
-    const proxy = new Proxy(crood, {
-      set: (target: Crood, p: string, newValue: any, receiver: any) => {
-        callback[p](newValue);
-        return Reflect.set(target, p, newValue, receiver);
-      },
-    });
-    return proxy;
+  use(module: EditorModule) {
+    const index = this._modules.findIndex(
+      (item) => (item.constructor as any).ID === (module.constructor as any).ID
+    );
+    if (index !== -1) {
+      this._modules.splice(index, 1);
+    }
+
+    this._modules.push(module);
+
+    return this;
   }
 
   /**
-   * 写入路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
-   * @param pathway 路径信息
+   * 查找模块
    */
-  write(pathway: Pathway) {
-    const _pathway = pathway.map((section) => {
-      return section.map((item, idx) => {
-        const proxyItem: typeof item = {
-          instruction: item.instruction,
-        };
-        if (item.node) {
-          const node = this._toBindCrood(item.node, {
-            x: (val: number) =>
-              (item.instruction[item.instruction.length - 2] = val),
-            y: (val: number) =>
-              (item.instruction[item.instruction.length - 1] = val),
-          });
-          proxyItem.node = node;
+  find<Module extends Constructor>(moduleConstructor: Module) {
+    return this._modules.find(
+      (module) =>
+        (module.constructor as any).ID === (moduleConstructor as any).ID
+    ) as InstanceType<Module> | undefined;
+  }
+
+  /**
+   * 初始可视路径编辑器
+   */
+  async initialize() {
+    const vizPath = new VizPath(this);
+
+    return new Promise<VizPath>((resolve) => {
+      let next = 0;
+
+      const loadModule = async () => {
+        const module = this._modules[next];
+        if (!module) {
+          resolve(vizPath);
+          return;
         }
-        if (item.controllers) {
-          const controllers = { ...item.controllers };
-          const nextInstruction = section[idx + 1];
-          const { pre, next } = controllers;
-          if (pre) {
-            controllers.pre = this._toBindCrood(pre, {
-              x: (val: number) => (item.instruction[3] = val),
-              y: (val: number) => (item.instruction[4] = val),
-            });
-          }
-          if (next && nextInstruction) {
-            controllers.next = this._toBindCrood(next, {
-              x: (val: number) => (nextInstruction.instruction[1] = val),
-              y: (val: number) => (nextInstruction.instruction[2] = val),
-            });
-          }
-          proxyItem.controllers = controllers;
-        }
-        return proxyItem;
-      });
+
+        await module.prepare();
+        await Promise.resolve(module.load(vizPath));
+
+        next++;
+        loadModule();
+      };
+
+      loadModule();
     });
-
-    this.pathway = _pathway;
-  }
-
-  /**
-   * 移动控制点
-   */
-  move(target: Crood, crood: Crood) {
-    target.x = crood.x;
-    target.y = crood.y;
-  }
-
-  /**
-   * 输出路径
-   */
-  toPath() {
-    return this.pathway.map(section => section.map(i => i.instruction)).flat(1);
-  }
-
-  /**
-   * 输出路径指令
-   */
-  toPathD() {
-    return (fabric.util as any).joinPath(this.toPath());
   }
 }
 
-export default VizPath;
+export default VizPathContext;
