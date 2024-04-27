@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import VizPath from './vizpath.class';
+import VizPath, { type ResponsiveCrood } from './vizpath.class';
 import type EditorModule from './modules/base.class';
 import { getCubicFromQuadratic, transform } from './utils';
 import cloneDeep from 'lodash-es/cloneDeep';
@@ -25,7 +25,7 @@ export type PathwayNode<Node extends Crood = Crood> = {
   }>;
 };
 
-export type Pathway<Node extends Crood = Crood> = PathwayNode<Node>[][];
+export type Pathway = PathwayNode[][];
 
 /**
  * VizPath
@@ -58,12 +58,14 @@ class VizPathContext {
             x: instructions[pathIdx][i + 1] as number,
             y: instructions[pathIdx][i + 2] as number,
           },
-          [{
-            translate: {
-              x: -path.pathOffset.x,
-              y: -path.pathOffset.y,
+          [
+            {
+              translate: {
+                x: -path.pathOffset.x,
+                y: -path.pathOffset.y,
+              },
             },
-          }]
+          ]
         );
         instructions[pathIdx][i + 1] = x;
         instructions[pathIdx][i + 2] = y;

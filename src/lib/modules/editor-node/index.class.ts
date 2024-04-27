@@ -2,52 +2,12 @@ import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
-import type VizPath from '../../vizpath.class';
+import VizPath from '../../vizpath.class';
 import EditorPath from '../editor-path/index.class';
 import { InstructionType, type PathwayNode } from '../..';
 import { observe, transform } from '../../utils';
 import type { ResponsiveCrood } from '../../vizpath.class';
-
-/** 创建默认控制点 */
-export const CREATE_DEFAULT_POINTER = () => {
-  const object = new fabric.Circle({
-    strokeWidth: 4,
-    radius: 6,
-    fill: '#ffffff',
-    stroke: '#4b4b4b',
-    originX: 'center',
-    originY: 'center',
-  });
-
-  return object;
-};
-
-/** 创建默认线条 */
-export const CREATE_DEFAULT_LINE = () =>
-  new fabric.Line([0, 0, 0, 0], {
-    // stroke: '#bebebe',
-    stroke: '#f00',
-    strokeWidth: 1,
-    strokeDashArray: [4, 3],
-    strokeUniform: true,
-    selectable: false,
-    evented: false,
-    originX: 'center',
-    originY: 'center',
-  });
-
-/** 创建默认默认左右侧拓展点 */
-export const CREATE_DEFAULT_TRIGGER = () => {
-  const object = new fabric.Circle({
-    radius: 4,
-    stroke: '#bebebe',
-    strokeWidth: 2,
-    fill: '#bebebe',
-    originX: 'center',
-    originY: 'center',
-  });
-  return object;
-};
+import EditorUI from '../editor-ui/index.class';
 
 class EditorNode extends EditorModule {
   static ID = Symbol('editor-node');
@@ -66,7 +26,7 @@ class EditorNode extends EditorModule {
     lines: [],
   };
 
-  nodeMap: WeakMap<fabric.Group, PathwayNode<ResponsiveCrood>> = new WeakMap(
+  objectMap: WeakMap<fabric.Group, PathwayNode<ResponsiveCrood>> = new WeakMap(
     []
   );
 
@@ -76,10 +36,12 @@ class EditorNode extends EditorModule {
     const editorPath = vizPath.context.find(EditorPath);
     if (!editorPath) return [];
 
+    const ui = vizPath.context.find(EditorUI);
+
     const nodes: fabric.Group[] = [];
 
     // 创建路径关键点的操作点（即实际路径上的节点，而非曲线上的虚拟点）
-    vizPath.pathway.forEach((section) => {
+    vizPath.pathway.forEach(({ section }) => {
       section.forEach((item, index) => {
         const { node } = item;
         if (!node) return;
@@ -89,46 +51,54 @@ class EditorNode extends EditorModule {
         if (section[index + 1]?.instruction?.[0] === InstructionType.CLOSE)
           return;
 
-        const object = new fabric.Group([CREATE_DEFAULT_POINTER()], {
-          name: uuid(),
-          originX: 'center',
-          originY: 'center',
-          // 选中时不出现选中框
-          hasBorders: false,
-          hasControls: false,
-        });
+        const decorator = (innerObject: fabric.Object) => {
+          const _object = new fabric.Group([innerObject], {
+            name: uuid(),
+            originX: 'center',
+            originY: 'center',
+            // 选中时不出现选中框
+            hasBorders: false,
+            hasControls: false,
+          });
 
-        // 响应指令的直接修改
-        node.observe(
-          (x, y) => {
-            const position = editorPath.calcAbsolutePosition({ x, y });
-            if (object.group) {
-              const relativePosition = editorPath.calcRelativeCrood(
-                position,
-                object.group.calcTransformMatrix()
-              );
-              object
-                .set({
-                  left: relativePosition.x,
-                  top: relativePosition.y,
-                })
-                .setCoords();
-              object.group.addWithUpdate();
-            } else {
-              object.set(position).setCoords();
+          _object[VizPath.symbol] = true;
+
+          // 响应指令的直接修改
+          node.observe(
+            (x, y) => {
+              const position = editorPath.calcAbsolutePosition({ x, y });
+              if (_object.group) {
+                const relativePosition = editorPath.calcRelativeCrood(
+                  position,
+                  _object.group.calcTransformMatrix()
+                );
+                _object
+                  .set({
+                    left: relativePosition.x,
+                    top: relativePosition.y,
+                  })
+                  .setCoords();
+                _object.group.addWithUpdate();
+              } else {
+                _object.set(position).setCoords();
+              }
+            },
+            {
+              id: _object.name,
+              immediate: true,
             }
-          },
-          {
-            id: object.name,
-            immediate: true,
-          }
-        );
+          );
 
-        const position = editorPath.calcAbsolutePosition(node);
-        object.set(position).setCoords();
+          return _object;
+        }
+
+        let object = (ui?.options.node ?? EditorUI.defaultUI.node)(decorator);
+
+        if (!object[VizPath.symbol]) object = decorator(object);
+
         nodes.push(object);
 
-        this.nodeMap.set(object, item);
+        this.objectMap.set(object, item);
       });
     });
 
@@ -142,8 +112,10 @@ class EditorNode extends EditorModule {
     const editorPath = this.vizPath?.context.find(EditorPath);
     const pathway = this.vizPath?.pathway;
 
+    const ui = this.vizPath?.context.find(EditorUI);
+
     if (editorPath && pathway) {
-      pathway.forEach((section) => {
+      pathway.forEach(({ section }) => {
         section.forEach((item) => {
           const { node, controllers = {} } = item;
           if (!node) return;
@@ -156,67 +128,88 @@ class EditorNode extends EditorModule {
             /**
              * 创建指令控制点
              */
-            const object = new fabric.Group([CREATE_DEFAULT_TRIGGER()], {
-              name: uuid(),
-              originX: 'center',
-              originY: 'center',
-              // 选中时不出现选中框
-              hasBorders: false,
-              hasControls: false,
-            });
-
-            // 建立相互响应，指令的数据和元素的位置更改会相互同步
-            controller.observe(
-              (x, y) => {
-                if (object.canvas?.getActiveObject() === object) return;
-                const position = editorPath.calcAbsolutePosition({ x, y });
-                object.set(position).setCoords();
-              },
-              {
-                immediate: true,
-                id: object.name,
-              }
-            );
-
-            observe(object, ['left', 'top'], ({ left, top }) => {
-              if (object.canvas?.getActiveObject() !== object) return;
-              const crood = editorPath.calcRelativeCrood({
-                left: left!,
-                top: top!,
+            const pointDecorator = (innerObject: fabric.Object) => {
+              const _object = new fabric.Group([innerObject], {
+                name: uuid(),
+                originX: 'center',
+                originY: 'center',
+                // 选中时不出现选中框
+                hasBorders: false,
+                hasControls: false,
               });
-              controller.set(crood, [object.name]);
-            });
+
+              _object[VizPath.symbol] = true;
+
+              // 建立相互响应，指令的数据和元素的位置更改会相互同步
+              controller.observe(
+                (x, y) => {
+                  if (_object.canvas?.getActiveObject() === _object) return;
+                  const position = editorPath.calcAbsolutePosition({ x, y });
+                  _object.set(position).setCoords();
+                },
+                {
+                  immediate: true,
+                  id: _object.name,
+                }
+              );
+
+              observe(_object, ['left', 'top'], ({ left, top }) => {
+                if (_object.canvas?.getActiveObject() !== _object) return;
+                const crood = editorPath.calcRelativeCrood({
+                  left: left!,
+                  top: top!,
+                });
+                controller.set(crood, [_object.name]);
+              });
+
+              return _object;
+            };
+
+            let point = (
+              ui?.options.controllerPoint ?? EditorUI.defaultUI.controllerPoint
+            )(pointDecorator);
+
+            if (!point[VizPath.symbol]) point = pointDecorator(point);
 
             /**
              * 创建控制点和节点的连线
              */
-            const line = CREATE_DEFAULT_LINE();
+            const lineDecorator = (_line: fabric.Line) => {
+              _line.set({  name: uuid() });
 
-            line.set({ name: uuid() });
+              _line[VizPath.symbol] = true;
 
-            // 建立响应式，让连线随时跟随指令的值进行变化
-            node.observe(
-              (x, y) => {
-                const position = editorPath.calcAbsolutePosition({ x, y });
-                line.set({ x1: position.left, y1: position.top });
-              },
-              {
-                immediate: true,
-                id: line.name,
-              }
-            );
-            controller.observe(
-              (x, y) => {
-                const position = editorPath.calcAbsolutePosition({ x, y });
-                line.set({ x2: position.left, y2: position.top });
-              },
-              {
-                immediate: true,
-                id: line.name,
-              }
-            );
+              // 建立响应式，让连线随时跟随指令的值进行变化
+              node.observe(
+                (x, y) => {
+                  const position = editorPath.calcAbsolutePosition({ x, y });
+                  _line.set({ x1: position.left, y1: position.top });
+                },
+                {
+                  immediate: true,
+                  id: _line.name,
+                }
+              );
+              controller.observe(
+                (x, y) => {
+                  const position = editorPath.calcAbsolutePosition({ x, y });
+                  _line.set({ x2: position.left, y2: position.top });
+                },
+                {
+                  immediate: true,
+                  id: _line.name,
+                }
+              );
 
-            points.push(object);
+              return _line;
+            };
+            let line = (
+              ui?.options.controllerLine ?? EditorUI.defaultUI.controllerLine
+            )(lineDecorator);
+
+            if (!line[VizPath.symbol]) line = lineDecorator(line);
+
+            points.push(point);
             lines.push(line);
           });
         });
@@ -250,7 +243,7 @@ class EditorNode extends EditorModule {
       top: number;
     }
   ) {
-    const pathwayNode = this.nodeMap.get(object);
+    const pathwayNode = this.objectMap.get(object);
     if (!pathwayNode) return;
 
     const { node, section, controllers = {} } = pathwayNode;
@@ -390,11 +383,13 @@ class EditorNode extends EditorModule {
           canvas,
           lockScalingFlip: true,
           // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
-          lockRotation: true,
+          // lockRotation: true,
           originX: 'center',
           originY: 'center',
         });
-        activeSelection.setControlVisible('mtr', false);
+        if (activeSelection.lockRotation) {
+          activeSelection.setControlVisible('mtr', false);
+        }
         canvas.setActiveObject(activeSelection);
         addActiveSelectionObserve(activeSelection);
       } else {

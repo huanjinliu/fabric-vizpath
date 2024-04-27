@@ -1,9 +1,11 @@
 import { fabric } from 'fabric';
+import { v4 as uuid } from 'uuid';
 import round from 'lodash-es/round';
-import Vizpath from '../../vizpath.class';
+import VizPath from '../../vizpath.class';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import type { Instruction } from '../..';
+import EditorUI from '../editor-ui/index.class';
 
 class EditorPath extends EditorModule {
   static ID = Symbol('editor-path');
@@ -112,7 +114,7 @@ class EditorPath extends EditorModule {
     path.setCoords();
   }
 
-  load(vizPath: Vizpath) {
+  load(vizPath: VizPath) {
     const editor = vizPath.context.find(Editor);
     if (!editor) {
       return;
@@ -124,28 +126,35 @@ class EditorPath extends EditorModule {
     }
 
     vizPath.on('draw', async () => {
-      const paths = vizPath.pathway.map((section) => {
-        const path = new fabric.Path(vizPath.toPathD([section]));
+      const ui = vizPath.context.find(EditorUI);
 
-        path.path = vizPath
-          .toPaths([section])
-          .flat(1) as unknown as fabric.Point[];
+      const paths = vizPath.pathway.map(({ info }, index, arr) => {
+        const decorator = (_path: fabric.Path) => {
+          _path.initialize(vizPath.toPathD([arr[index]]));
 
-        path.set({
-          // left: -path.pathOffset.x,
-          // top: -path.pathOffset.y,
-          stroke: 'red',
-          strokeWidth: 2,
-          fill: 'transparent',
-          // 路径本身不可选中，后续通过操纵点和线条来更改路径
-          selectable: false,
-          // 不触发事件
-          evented: false,
-          // 防止因为缓存没有显示正确的路径
-          objectCaching: false,
-          // DEBUG
-          backgroundColor: 'pink',
-        });
+          _path.path = vizPath
+            .toPaths([arr[index]])
+            .flat(1) as unknown as fabric.Point[];
+
+          _path.set({
+            name: uuid(),
+            // 路径本身不可选中，后续通过操纵点和线条来更改路径
+            selectable: false,
+            // 不触发事件
+            evented: false,
+            // 防止因为缓存没有显示正确的路径
+            objectCaching: false,
+          });
+
+          _path[VizPath.symbol] = true;
+
+          return _path;
+        };
+        let path = (ui?.options.path ?? EditorUI.defaultUI.path)(
+          decorator,
+          info
+        );
+        if (!path[VizPath.symbol]) path = decorator(path);
 
         return path;
       });
@@ -175,8 +184,12 @@ class EditorPath extends EditorModule {
 
       // 移除旧的路径对象并添加新的路径对象
       canvas.renderOnAddRemove = true;
-      canvas.remove(...this.paths);
-      canvas.add(...paths);
+      this.paths.forEach((path) => {
+        canvas.remove(path);
+      });
+      paths.forEach((path) => {
+        canvas.add(path);
+      });
       canvas.renderOnAddRemove = false;
       canvas.renderAll();
 
@@ -184,7 +197,7 @@ class EditorPath extends EditorModule {
     });
 
     vizPath.on('update', () => {
-      this.paths.forEach((path, index) => {
+      this.paths.forEach((path) => {
         this.reinitializePath(path);
       });
     });

@@ -21,10 +21,19 @@ export type ResponsiveCrood = Crood & {
   unobserve: (flag?: any) => void;
 };
 
+export type ResponsivePathway = {
+  section: PathwayNode<ResponsiveCrood>[];
+  info: Record<string, any> & {
+    label?: string;
+  };
+}[];
+
 /**
  * VizPath (Visualization Path，可视化路径)
  */
 class VizPath {
+  static symbol = Symbol('vizpath');
+
   /**
    * 上下文
    */
@@ -38,7 +47,7 @@ class VizPath {
   /**
    * 路径信息（包含路径分段、路径指令、关键点及控制点信息）
    */
-  pathway: Pathway<ResponsiveCrood> = [];
+  pathway: ResponsivePathway = [];
 
   /**
    * 路径信息映射
@@ -153,7 +162,7 @@ class VizPath {
    * 绘制路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
    * @param pathway 路径信息
    */
-  draw(pathway: Pathway) {
+  draw(pathway: Pathway, pathwayInfo: Record<string, any> & { label?: string } = {}) {
     pathway.forEach((section) => {
       const _section: PathwayNode<ResponsiveCrood>[] = [];
       section.forEach((item, idx) => {
@@ -194,7 +203,10 @@ class VizPath {
         }
         _section.push(proxyItem);
       });
-      this.pathway.push(_section);
+      this.pathway.push({
+        section: _section,
+        info: pathwayInfo,
+      });
     });
 
     this._fire('draw');
@@ -204,7 +216,7 @@ class VizPath {
    * 清除所有路径
    */
   clean() {
-    this.pathway.forEach(section => {
+    this.pathway.forEach(({ section }) => {
       section.forEach(({ node }) => {
         node?.unobserve();
       })
@@ -246,14 +258,14 @@ class VizPath {
   /**
    * 输出路径
    */
-  toPaths(pathway: Pathway = this.pathway) {
-    return pathway.map((section) => section.map((i) => i.instruction));
+  toPaths(pathway: ResponsivePathway = this.pathway) {
+    return pathway.map(({ section }) => section.map((i) => i.instruction));
   }
 
   /**
    * 输出路径指令
    */
-  toPathD(pathway: Pathway = this.pathway) {
+  toPathD(pathway: ResponsivePathway = this.pathway) {
     return (fabric.util as any).joinPath(this.toPaths(pathway));
   }
 }

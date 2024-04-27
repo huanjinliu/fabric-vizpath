@@ -5,6 +5,7 @@ import {
   EditorBackground,
   EditorPath,
   EditorNode,
+  EditorUI,
 } from 'fabric-path-editor';
 
 const EXAMPLE_PATH_D = {
@@ -64,6 +65,19 @@ const EXAMPLE_PATH_D = {
 
   const operator = await vizPath
     .use(new Editor(fabricCanvas))
+    .use(new EditorUI({
+      // path: () => {
+      //   const path = new fabric.Path('');
+
+      //   path.set({
+      //     fill: 'rgba(50, 50, 50, 0.8)',
+      //     stroke: '#333',
+      //     strokeWidth: 2,
+      //   });
+
+      //   return path;
+      // }
+    }))
     .use(new EditorBackground())
     .use(new EditorPath())
     .use(new EditorNode())
@@ -71,7 +85,7 @@ const EXAMPLE_PATH_D = {
 
   // operator.draw(VizPath.getPathwayFromObject(path));
 
-  operator.draw(VizPath.getPathwayFromPathD(EXAMPLE_PATH_D.bubble));
+  operator.draw(VizPath.getPathwayFromPathD(EXAMPLE_PATH_D.bubble), { label: 'bubble' });
 
   // operator.clean();
 

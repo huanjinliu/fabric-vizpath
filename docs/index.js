@@ -623,17 +623,17 @@
   var Symbol$1 = root.Symbol;
 
   /** Used for built-in method references. */
-  var objectProto$c = Object.prototype;
+  var objectProto$d = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$9 = objectProto$c.hasOwnProperty;
+  var hasOwnProperty$a = objectProto$d.hasOwnProperty;
 
   /**
    * Used to resolve the
    * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
    * of values.
    */
-  var nativeObjectToString$1 = objectProto$c.toString;
+  var nativeObjectToString$1 = objectProto$d.toString;
 
   /** Built-in value references. */
   var symToStringTag$1 = Symbol$1 ? Symbol$1.toStringTag : undefined;
@@ -646,7 +646,7 @@
    * @returns {string} Returns the raw `toStringTag`.
    */
   function getRawTag(value) {
-    var isOwn = hasOwnProperty$9.call(value, symToStringTag$1),
+    var isOwn = hasOwnProperty$a.call(value, symToStringTag$1),
       tag = value[symToStringTag$1];
     try {
       value[symToStringTag$1] = undefined;
@@ -664,14 +664,14 @@
   }
 
   /** Used for built-in method references. */
-  var objectProto$b = Object.prototype;
+  var objectProto$c = Object.prototype;
 
   /**
    * Used to resolve the
    * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
    * of values.
    */
-  var nativeObjectToString = objectProto$b.toString;
+  var nativeObjectToString = objectProto$c.toString;
 
   /**
    * Converts `value` to a string using `Object.prototype.toString`.
@@ -1350,16 +1350,16 @@
 
   /** Used for built-in method references. */
   var funcProto = Function.prototype,
-    objectProto$a = Object.prototype;
+    objectProto$b = Object.prototype;
 
   /** Used to resolve the decompiled source of functions. */
   var funcToString = funcProto.toString;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$8 = objectProto$a.hasOwnProperty;
+  var hasOwnProperty$9 = objectProto$b.hasOwnProperty;
 
   /** Used to detect if a method is native. */
-  var reIsNative = RegExp('^' + funcToString.call(hasOwnProperty$8).replace(reRegExpChar, '\\$&').replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$');
+  var reIsNative = RegExp('^' + funcToString.call(hasOwnProperty$9).replace(reRegExpChar, '\\$&').replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$');
 
   /**
    * The base implementation of `_.isNative` without bad shim checks.
@@ -1440,10 +1440,10 @@
   var HASH_UNDEFINED$1 = '__lodash_hash_undefined__';
 
   /** Used for built-in method references. */
-  var objectProto$9 = Object.prototype;
+  var objectProto$a = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$7 = objectProto$9.hasOwnProperty;
+  var hasOwnProperty$8 = objectProto$a.hasOwnProperty;
 
   /**
    * Gets the hash value for `key`.
@@ -1460,14 +1460,14 @@
       var result = data[key];
       return result === HASH_UNDEFINED$1 ? undefined : result;
     }
-    return hasOwnProperty$7.call(data, key) ? data[key] : undefined;
+    return hasOwnProperty$8.call(data, key) ? data[key] : undefined;
   }
 
   /** Used for built-in method references. */
-  var objectProto$8 = Object.prototype;
+  var objectProto$9 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$6 = objectProto$8.hasOwnProperty;
+  var hasOwnProperty$7 = objectProto$9.hasOwnProperty;
 
   /**
    * Checks if a hash value for `key` exists.
@@ -1480,7 +1480,7 @@
    */
   function hashHas(key) {
     var data = this.__data__;
-    return nativeCreate ? data[key] !== undefined : hasOwnProperty$6.call(data, key);
+    return nativeCreate ? data[key] !== undefined : hasOwnProperty$7.call(data, key);
   }
 
   /** Used to stand-in for `undefined` hash values. */
@@ -1749,10 +1749,10 @@
   }
 
   /** Used for built-in method references. */
-  var objectProto$7 = Object.prototype;
+  var objectProto$8 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$5 = objectProto$7.hasOwnProperty;
+  var hasOwnProperty$6 = objectProto$8.hasOwnProperty;
 
   /**
    * Assigns `value` to `key` of `object` if the existing value is not equivalent
@@ -1766,7 +1766,7 @@
    */
   function assignValue(object, key, value) {
     var objValue = object[key];
-    if (!(hasOwnProperty$5.call(object, key) && eq(objValue, value)) || value === undefined && !(key in object)) {
+    if (!(hasOwnProperty$6.call(object, key) && eq(objValue, value)) || value === undefined && !(key in object)) {
       baseAssignValue(object, key, value);
     }
   }
@@ -1834,13 +1834,13 @@
   }
 
   /** Used for built-in method references. */
-  var objectProto$6 = Object.prototype;
+  var objectProto$7 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$4 = objectProto$6.hasOwnProperty;
+  var hasOwnProperty$5 = objectProto$7.hasOwnProperty;
 
   /** Built-in value references. */
-  var propertyIsEnumerable$1 = objectProto$6.propertyIsEnumerable;
+  var propertyIsEnumerable$1 = objectProto$7.propertyIsEnumerable;
 
   /**
    * Checks if `value` is likely an `arguments` object.
@@ -1863,7 +1863,7 @@
   var isArguments = baseIsArguments(function () {
     return arguments;
   }()) ? baseIsArguments : function (value) {
-    return isObjectLike(value) && hasOwnProperty$4.call(value, 'callee') && !propertyIsEnumerable$1.call(value, 'callee');
+    return isObjectLike(value) && hasOwnProperty$5.call(value, 'callee') && !propertyIsEnumerable$1.call(value, 'callee');
   };
 
   /**
@@ -2074,10 +2074,10 @@
   var isTypedArray = nodeIsTypedArray ? baseUnary(nodeIsTypedArray) : baseIsTypedArray;
 
   /** Used for built-in method references. */
-  var objectProto$5 = Object.prototype;
+  var objectProto$6 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$3 = objectProto$5.hasOwnProperty;
+  var hasOwnProperty$4 = objectProto$6.hasOwnProperty;
 
   /**
    * Creates an array of the enumerable property names of the array-like `value`.
@@ -2096,7 +2096,7 @@
       result = skipIndexes ? baseTimes(value.length, String) : [],
       length = result.length;
     for (var key in value) {
-      if ((inherited || hasOwnProperty$3.call(value, key)) && !(skipIndexes && (
+      if ((inherited || hasOwnProperty$4.call(value, key)) && !(skipIndexes && (
       // Safari 9 has enumerable `arguments.length` in strict mode.
       key == 'length' ||
       // Node.js 0.10 has enumerable non-index properties on buffers.
@@ -2112,7 +2112,7 @@
   }
 
   /** Used for built-in method references. */
-  var objectProto$4 = Object.prototype;
+  var objectProto$5 = Object.prototype;
 
   /**
    * Checks if `value` is likely a prototype object.
@@ -2123,7 +2123,7 @@
    */
   function isPrototype(value) {
     var Ctor = value && value.constructor,
-      proto = typeof Ctor == 'function' && Ctor.prototype || objectProto$4;
+      proto = typeof Ctor == 'function' && Ctor.prototype || objectProto$5;
     return value === proto;
   }
 
@@ -2145,10 +2145,10 @@
   var nativeKeys = overArg(Object.keys, Object);
 
   /** Used for built-in method references. */
-  var objectProto$3 = Object.prototype;
+  var objectProto$4 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$2 = objectProto$3.hasOwnProperty;
+  var hasOwnProperty$3 = objectProto$4.hasOwnProperty;
 
   /**
    * The base implementation of `_.keys` which doesn't treat sparse arrays as dense.
@@ -2163,7 +2163,7 @@
     }
     var result = [];
     for (var key in Object(object)) {
-      if (hasOwnProperty$2.call(object, key) && key != 'constructor') {
+      if (hasOwnProperty$3.call(object, key) && key != 'constructor') {
         result.push(key);
       }
     }
@@ -2264,10 +2264,10 @@
   }
 
   /** Used for built-in method references. */
-  var objectProto$2 = Object.prototype;
+  var objectProto$3 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty$1 = objectProto$2.hasOwnProperty;
+  var hasOwnProperty$2 = objectProto$3.hasOwnProperty;
 
   /**
    * The base implementation of `_.keysIn` which doesn't treat sparse arrays as dense.
@@ -2283,7 +2283,7 @@
     var isProto = isPrototype(object),
       result = [];
     for (var key in object) {
-      if (!(key == 'constructor' && (isProto || !hasOwnProperty$1.call(object, key)))) {
+      if (!(key == 'constructor' && (isProto || !hasOwnProperty$2.call(object, key)))) {
         result.push(key);
       }
     }
@@ -2425,10 +2425,10 @@
   }
 
   /** Used for built-in method references. */
-  var objectProto$1 = Object.prototype;
+  var objectProto$2 = Object.prototype;
 
   /** Built-in value references. */
-  var propertyIsEnumerable = objectProto$1.propertyIsEnumerable;
+  var propertyIsEnumerable = objectProto$2.propertyIsEnumerable;
 
   /* Built-in method references for those with the same name as other `lodash` methods. */
   var nativeGetSymbols$1 = Object.getOwnPropertySymbols;
@@ -2616,10 +2616,10 @@
   var getTag$1 = getTag;
 
   /** Used for built-in method references. */
-  var objectProto = Object.prototype;
+  var objectProto$1 = Object.prototype;
 
   /** Used to check objects for own properties. */
-  var hasOwnProperty = objectProto.hasOwnProperty;
+  var hasOwnProperty$1 = objectProto$1.hasOwnProperty;
 
   /**
    * Initializes an array clone.
@@ -2633,7 +2633,7 @@
       result = new array.constructor(length);
 
     // Add properties assigned by `RegExp#exec`.
-    if (length && typeof array[0] == 'string' && hasOwnProperty.call(array, 'index')) {
+    if (length && typeof array[0] == 'string' && hasOwnProperty$1.call(array, 'index')) {
       result.index = array.index;
       result.input = array.input;
     }
@@ -3226,6 +3226,7 @@
       key: "draw",
       value: function draw(pathway) {
         var _this2 = this;
+        var pathwayInfo = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
         pathway.forEach(function (section) {
           var _section = [];
           section.forEach(function (item, idx) {
@@ -3265,7 +3266,10 @@
             }
             _section.push(proxyItem);
           });
-          _this2.pathway.push(_section);
+          _this2.pathway.push({
+            section: _section,
+            info: pathwayInfo
+          });
         });
         this._fire('draw');
       }
@@ -3275,9 +3279,10 @@
     }, {
       key: "clean",
       value: function clean() {
-        this.pathway.forEach(function (section) {
-          section.forEach(function (_ref) {
-            var node = _ref.node;
+        this.pathway.forEach(function (_ref) {
+          var section = _ref.section;
+          section.forEach(function (_ref2) {
+            var node = _ref2.node;
             node === null || node === void 0 ? void 0 : node.unobserve();
           });
         });
@@ -3321,7 +3326,8 @@
       key: "toPaths",
       value: function toPaths() {
         var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
-        return pathway.map(function (section) {
+        return pathway.map(function (_ref3) {
+          var section = _ref3.section;
           return section.map(function (i) {
             return i.instruction;
           });
@@ -3364,6 +3370,8 @@
       }
     }]);
   }();
+  VizPath.symbol = Symbol('vizpath');
+
   /** 指令类型 */
   var InstructionType;
   (function (InstructionType) {
@@ -3434,7 +3442,7 @@
                 return _context2.abrupt("return", new Promise(function (resolve) {
                   var next = 0;
                   var loadModule = /*#__PURE__*/function () {
-                    var _ref2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee() {
+                    var _ref4 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee() {
                       var module;
                       return _regeneratorRuntime().wrap(function _callee$(_context) {
                         while (1) switch (_context.prev = _context.next) {
@@ -3462,7 +3470,7 @@
                       }, _callee);
                     }));
                     return function loadModule() {
-                      return _ref2.apply(this, arguments);
+                      return _ref4.apply(this, arguments);
                     };
                   }();
                   loadModule();
@@ -3751,23 +3759,435 @@
     }]);
   }(EditorModule);
   EditorBackground.ID = Symbol('editor-background');
-  var EditorPath = /*#__PURE__*/function (_EditorModule3) {
-    function EditorPath(originPath) {
+
+  // Unique ID creation requires a high quality random # generator. In the browser we therefore
+  // require the crypto API and do not support built-in fallback to lower quality random number
+  // generators (like Math.random()).
+  var getRandomValues;
+  var rnds8 = new Uint8Array(16);
+  function rng() {
+    // lazy load so that environments that need to polyfill have a chance to do so
+    if (!getRandomValues) {
+      // getRandomValues needs to be invoked in a context where "this" is a Crypto implementation.
+      getRandomValues = typeof crypto !== 'undefined' && crypto.getRandomValues && crypto.getRandomValues.bind(crypto);
+      if (!getRandomValues) {
+        throw new Error('crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported');
+      }
+    }
+    return getRandomValues(rnds8);
+  }
+
+  /**
+   * Convert array of 16 byte values to UUID string format of the form:
+   * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+   */
+
+  var byteToHex = [];
+  for (var i = 0; i < 256; ++i) {
+    byteToHex.push((i + 0x100).toString(16).slice(1));
+  }
+  function unsafeStringify(arr) {
+    var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    // Note: Be careful editing this code!  It's been tuned for performance
+    // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
+    return byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]];
+  }
+  var randomUUID = typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID.bind(crypto);
+  var _native = {
+    randomUUID: randomUUID
+  };
+  function v4(options, buf, offset) {
+    if (_native.randomUUID && !buf && !options) {
+      return _native.randomUUID();
+    }
+    options = options || {};
+    var rnds = options.random || (options.rng || rng)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
+
+    rnds[6] = rnds[6] & 0x0f | 0x40;
+    rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
+
+    if (buf) {
+      offset = offset || 0;
+      for (var _i = 0; _i < 16; ++_i) {
+        buf[offset + _i] = rnds[_i];
+      }
+      return buf;
+    }
+    return unsafeStringify(rnds);
+  }
+
+  /**
+   * This method returns the first argument it receives.
+   *
+   * @static
+   * @since 0.1.0
+   * @memberOf _
+   * @category Util
+   * @param {*} value Any value.
+   * @returns {*} Returns `value`.
+   * @example
+   *
+   * var object = { 'a': 1 };
+   *
+   * console.log(_.identity(object) === object);
+   * // => true
+   */
+  function identity(value) {
+    return value;
+  }
+
+  /**
+   * A faster alternative to `Function#apply`, this function invokes `func`
+   * with the `this` binding of `thisArg` and the arguments of `args`.
+   *
+   * @private
+   * @param {Function} func The function to invoke.
+   * @param {*} thisArg The `this` binding of `func`.
+   * @param {Array} args The arguments to invoke `func` with.
+   * @returns {*} Returns the result of `func`.
+   */
+  function apply(func, thisArg, args) {
+    switch (args.length) {
+      case 0:
+        return func.call(thisArg);
+      case 1:
+        return func.call(thisArg, args[0]);
+      case 2:
+        return func.call(thisArg, args[0], args[1]);
+      case 3:
+        return func.call(thisArg, args[0], args[1], args[2]);
+    }
+    return func.apply(thisArg, args);
+  }
+
+  /** Used to detect hot functions by number of calls within a span of milliseconds. */
+  var HOT_COUNT = 800,
+    HOT_SPAN = 16;
+
+  /* Built-in method references for those with the same name as other `lodash` methods. */
+  var nativeNow = Date.now;
+
+  /**
+   * Creates a function that'll short out and invoke `identity` instead
+   * of `func` when it's called `HOT_COUNT` or more times in `HOT_SPAN`
+   * milliseconds.
+   *
+   * @private
+   * @param {Function} func The function to restrict.
+   * @returns {Function} Returns the new shortable function.
+   */
+  function shortOut(func) {
+    var count = 0,
+      lastCalled = 0;
+    return function () {
+      var stamp = nativeNow(),
+        remaining = HOT_SPAN - (stamp - lastCalled);
+      lastCalled = stamp;
+      if (remaining > 0) {
+        if (++count >= HOT_COUNT) {
+          return arguments[0];
+        }
+      } else {
+        count = 0;
+      }
+      return func.apply(undefined, arguments);
+    };
+  }
+
+  /**
+   * Creates a function that returns `value`.
+   *
+   * @static
+   * @memberOf _
+   * @since 2.4.0
+   * @category Util
+   * @param {*} value The value to return from the new function.
+   * @returns {Function} Returns the new constant function.
+   * @example
+   *
+   * var objects = _.times(2, _.constant({ 'a': 1 }));
+   *
+   * console.log(objects);
+   * // => [{ 'a': 1 }, { 'a': 1 }]
+   *
+   * console.log(objects[0] === objects[1]);
+   * // => true
+   */
+  function constant(value) {
+    return function () {
+      return value;
+    };
+  }
+
+  /**
+   * The base implementation of `setToString` without support for hot loop shorting.
+   *
+   * @private
+   * @param {Function} func The function to modify.
+   * @param {Function} string The `toString` result.
+   * @returns {Function} Returns `func`.
+   */
+  var baseSetToString = !defineProperty ? identity : function (func, string) {
+    return defineProperty(func, 'toString', {
+      'configurable': true,
+      'enumerable': false,
+      'value': constant(string),
+      'writable': true
+    });
+  };
+  var baseSetToString$1 = baseSetToString;
+
+  /**
+   * Sets the `toString` method of `func` to return `string`.
+   *
+   * @private
+   * @param {Function} func The function to modify.
+   * @param {Function} string The `toString` result.
+   * @returns {Function} Returns `func`.
+   */
+  var setToString = shortOut(baseSetToString$1);
+
+  /* Built-in method references for those with the same name as other `lodash` methods. */
+  var nativeMax = Math.max;
+
+  /**
+   * A specialized version of `baseRest` which transforms the rest array.
+   *
+   * @private
+   * @param {Function} func The function to apply a rest parameter to.
+   * @param {number} [start=func.length-1] The start position of the rest parameter.
+   * @param {Function} transform The rest array transform.
+   * @returns {Function} Returns the new function.
+   */
+  function overRest(func, start, transform) {
+    start = nativeMax(start === undefined ? func.length - 1 : start, 0);
+    return function () {
+      var args = arguments,
+        index = -1,
+        length = nativeMax(args.length - start, 0),
+        array = Array(length);
+      while (++index < length) {
+        array[index] = args[start + index];
+      }
+      index = -1;
+      var otherArgs = Array(start + 1);
+      while (++index < start) {
+        otherArgs[index] = args[index];
+      }
+      otherArgs[start] = transform(array);
+      return apply(func, this, otherArgs);
+    };
+  }
+
+  /**
+   * The base implementation of `_.rest` which doesn't validate or coerce arguments.
+   *
+   * @private
+   * @param {Function} func The function to apply a rest parameter to.
+   * @param {number} [start=func.length-1] The start position of the rest parameter.
+   * @returns {Function} Returns the new function.
+   */
+  function baseRest(func, start) {
+    return setToString(overRest(func, start, identity), func + '');
+  }
+
+  /**
+   * Checks if the given arguments are from an iteratee call.
+   *
+   * @private
+   * @param {*} value The potential iteratee value argument.
+   * @param {*} index The potential iteratee index or key argument.
+   * @param {*} object The potential iteratee object argument.
+   * @returns {boolean} Returns `true` if the arguments are from an iteratee call,
+   *  else `false`.
+   */
+  function isIterateeCall(value, index, object) {
+    if (!isObject(object)) {
+      return false;
+    }
+    var type = _typeof(index);
+    if (type == 'number' ? isArrayLike(object) && isIndex(index, object.length) : type == 'string' && index in object) {
+      return eq(object[index], value);
+    }
+    return false;
+  }
+
+  /** Used for built-in method references. */
+  var objectProto = Object.prototype;
+
+  /** Used to check objects for own properties. */
+  var hasOwnProperty = objectProto.hasOwnProperty;
+
+  /**
+   * Assigns own and inherited enumerable string keyed properties of source
+   * objects to the destination object for all destination properties that
+   * resolve to `undefined`. Source objects are applied from left to right.
+   * Once a property is set, additional values of the same property are ignored.
+   *
+   * **Note:** This method mutates `object`.
+   *
+   * @static
+   * @since 0.1.0
+   * @memberOf _
+   * @category Object
+   * @param {Object} object The destination object.
+   * @param {...Object} [sources] The source objects.
+   * @returns {Object} Returns `object`.
+   * @see _.defaultsDeep
+   * @example
+   *
+   * _.defaults({ 'a': 1 }, { 'b': 2 }, { 'a': 3 });
+   * // => { 'a': 1, 'b': 2 }
+   */
+  var defaults = baseRest(function (object, sources) {
+    object = Object(object);
+    var index = -1;
+    var length = sources.length;
+    var guard = length > 2 ? sources[2] : undefined;
+    if (guard && isIterateeCall(sources[0], sources[1], guard)) {
+      length = 1;
+    }
+    while (++index < length) {
+      var source = sources[index];
+      var props = keysIn(source);
+      var propsIndex = -1;
+      var propsLength = props.length;
+      while (++propsIndex < propsLength) {
+        var key = props[propsIndex];
+        var value = object[key];
+        if (value === undefined || eq(value, objectProto[key]) && !hasOwnProperty.call(object, key)) {
+          object[key] = source[key];
+        }
+      }
+    }
+    return object;
+  });
+  var createDefaultPath = function createDefaultPath(decorator) {
+    var path = new fabric.fabric.Path('M 0 0');
+    path.set({
+      stroke: '#333',
+      strokeWidth: 4,
+      fill: 'transparent'
+    });
+    return decorator(path);
+  };
+  var createDefaultNode = function createDefaultNode(decorator) {
+    var object = new fabric.fabric.Circle({
+      strokeWidth: 4,
+      radius: 6,
+      fill: "#ffffff",
+      stroke: "#4b4b4b",
+      originX: "center",
+      originY: "center"
+    });
+    var group = decorator(object);
+    group.on("mouseover", function () {
+      var _a;
+      object.set({
+        fill: "#7ef4ad"
+      });
+      (_a = group.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    group.on("mouseout", function () {
+      var _a, _b;
+      object.set({
+        fill: ((_a = group.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === group ? "#29ca6e" : "#ffffff"
+      });
+      (_b = group.canvas) === null || _b === void 0 ? void 0 : _b.renderAll();
+    });
+    group.on("selected", function () {
+      var _a;
+      object.set({
+        fill: "#29ca6e"
+      });
+      (_a = group.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    group.on("deselected", function () {
+      var _a;
+      object.set({
+        fill: "#ffffff"
+      });
+      (_a = group.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    return group;
+  };
+  var createDefaultPoint = function createDefaultPoint(decorator) {
+    var circle = new fabric.fabric.Circle({
+      radius: 4,
+      fill: '#bebebe',
+      stroke: '#bebebe',
+      strokeWidth: 2,
+      originX: 'center',
+      originY: 'center'
+    });
+    var object = decorator(circle);
+    object.on('selected', function () {
+      var _a;
+      circle.set({
+        stroke: '#333'
+      });
+      (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    object.on('deselected', function () {
+      var _a;
+      circle.set({
+        stroke: '#bebebe'
+      });
+      (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+    });
+    return object;
+  };
+  var createDefaultLine = function createDefaultLine(decorator) {
+    var line = new fabric.fabric.Line([0, 0, 0, 0], {
+      stroke: '#bebebe',
+      strokeWidth: 1,
+      strokeDashArray: [4, 3],
+      strokeUniform: true,
+      selectable: false,
+      evented: false,
+      originX: 'center',
+      originY: 'center'
+    });
+    return decorator(line);
+  };
+  var defaultTheme = {
+    path: createDefaultPath,
+    node: createDefaultNode,
+    controllerPoint: createDefaultPoint,
+    controllerLine: createDefaultLine
+  };
+  var EditorUI = /*#__PURE__*/function (_EditorModule3) {
+    function EditorUI() {
       var _this5;
+      var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      _classCallCheck(this, EditorUI);
+      _this5 = _callSuper(this, EditorUI);
+      _this5.options = EditorUI.defaultUI;
+      _this5.options = defaults(options, _this5.options);
+      return _this5;
+    }
+    _inherits(EditorUI, _EditorModule3);
+    return _createClass(EditorUI);
+  }(EditorModule);
+  EditorUI.ID = Symbol('editor-ui');
+  EditorUI.defaultUI = defaultTheme;
+  var EditorPath = /*#__PURE__*/function (_EditorModule4) {
+    function EditorPath(originPath) {
+      var _this6;
       _classCallCheck(this, EditorPath);
-      _this5 = _callSuper(this, EditorPath);
-      _this5.paths = [];
+      _this6 = _callSuper(this, EditorPath);
+      _this6.paths = [];
       /**
        * 视图变换
        */
-      _this5.editorTransformMatrix = [1, 0, 0, 1, 0, 0];
-      _this5.originPath = originPath;
-      return _this5;
+      _this6.editorTransformMatrix = [1, 0, 0, 1, 0, 0];
+      _this6.originPath = originPath;
+      return _this6;
     }
     /**
      * 将相对坐标点转化为带元素本身变换的偏移位置
      */
-    _inherits(EditorPath, _EditorModule3);
+    _inherits(EditorPath, _EditorModule4);
     return _createClass(EditorPath, [{
       key: "calcAbsolutePosition",
       value: function calcAbsolutePosition(crood) {
@@ -3832,7 +4252,7 @@
     }, {
       key: "load",
       value: function load(vizPath) {
-        var _this6 = this;
+        var _this7 = this;
         var editor = vizPath.context.find(Editor);
         if (!editor) {
           return;
@@ -3842,31 +4262,34 @@
           return;
         }
         vizPath.on('draw', /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
-          var _a, paths, _ref4, _ref4$originX, originX, _ref4$originY, originY, _ref4$left, left, _ref4$top, top, _ref4$angle, angle, _ref4$scaleX, scaleX, _ref4$scaleY, scaleY, group;
+          var _a, ui, paths, _ref7, _ref7$originX, originX, _ref7$originY, originY, _ref7$left, left, _ref7$top, top, _ref7$angle, angle, _ref7$scaleX, scaleX, _ref7$scaleY, scaleY, group;
           return _regeneratorRuntime().wrap(function _callee4$(_context4) {
             while (1) switch (_context4.prev = _context4.next) {
               case 0:
-                paths = vizPath.pathway.map(function (section) {
-                  var path = new fabric.fabric.Path(vizPath.toPathD([section]));
-                  path.path = vizPath.toPaths([section]).flat(1);
-                  path.set({
-                    // left: -path.pathOffset.x,
-                    // top: -path.pathOffset.y,
-                    stroke: 'red',
-                    strokeWidth: 2,
-                    fill: 'transparent',
-                    // 路径本身不可选中，后续通过操纵点和线条来更改路径
-                    selectable: false,
-                    // 不触发事件
-                    evented: false,
-                    // 防止因为缓存没有显示正确的路径
-                    objectCaching: false,
-                    // DEBUG
-                    backgroundColor: 'pink'
-                  });
+                ui = vizPath.context.find(EditorUI);
+                paths = vizPath.pathway.map(function (_ref6, index, arr) {
+                  var info = _ref6.info;
+                  var _a;
+                  var decorator = function decorator(_path) {
+                    _path.initialize(vizPath.toPathD([arr[index]]));
+                    _path.path = vizPath.toPaths([arr[index]]).flat(1);
+                    _path.set({
+                      name: v4(),
+                      // 路径本身不可选中，后续通过操纵点和线条来更改路径
+                      selectable: false,
+                      // 不触发事件
+                      evented: false,
+                      // 防止因为缓存没有显示正确的路径
+                      objectCaching: false
+                    });
+                    _path[VizPath.symbol] = true;
+                    return _path;
+                  };
+                  var path = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.path) !== null && _a !== void 0 ? _a : EditorUI.defaultUI.path)(decorator, info);
+                  if (!path[VizPath.symbol]) path = decorator(path);
                   return path;
                 });
-                _ref4 = (_a = _this6.originPath) !== null && _a !== void 0 ? _a : {}, _ref4$originX = _ref4.originX, originX = _ref4$originX === void 0 ? 'center' : _ref4$originX, _ref4$originY = _ref4.originY, originY = _ref4$originY === void 0 ? 'center' : _ref4$originY, _ref4$left = _ref4.left, left = _ref4$left === void 0 ? canvas.getWidth() / 2 : _ref4$left, _ref4$top = _ref4.top, top = _ref4$top === void 0 ? canvas.getHeight() / 2 : _ref4$top, _ref4$angle = _ref4.angle, angle = _ref4$angle === void 0 ? 0 : _ref4$angle, _ref4$scaleX = _ref4.scaleX, scaleX = _ref4$scaleX === void 0 ? 1 : _ref4$scaleX, _ref4$scaleY = _ref4.scaleY, scaleY = _ref4$scaleY === void 0 ? 1 : _ref4$scaleY;
+                _ref7 = (_a = _this7.originPath) !== null && _a !== void 0 ? _a : {}, _ref7$originX = _ref7.originX, originX = _ref7$originX === void 0 ? 'center' : _ref7$originX, _ref7$originY = _ref7.originY, originY = _ref7$originY === void 0 ? 'center' : _ref7$originY, _ref7$left = _ref7.left, left = _ref7$left === void 0 ? canvas.getWidth() / 2 : _ref7$left, _ref7$top = _ref7.top, top = _ref7$top === void 0 ? canvas.getHeight() / 2 : _ref7$top, _ref7$angle = _ref7.angle, angle = _ref7$angle === void 0 ? 0 : _ref7$angle, _ref7$scaleX = _ref7.scaleX, scaleX = _ref7$scaleX === void 0 ? 1 : _ref7$scaleX, _ref7$scaleY = _ref7.scaleY, scaleY = _ref7$scaleY === void 0 ? 1 : _ref7$scaleY;
                 group = new fabric.fabric.Group(paths, {
                   originX: originX,
                   originY: originY,
@@ -3876,190 +4299,105 @@
                   scaleX: scaleX,
                   scaleY: scaleY
                 }); // 记录路径在编辑器中的变换值
-                _this6.editorTransformMatrix = group.calcOwnMatrix();
+                _this7.editorTransformMatrix = group.calcOwnMatrix();
                 group.destroy();
                 // 移除旧的路径对象并添加新的路径对象
                 canvas.renderOnAddRemove = true;
-                canvas.remove.apply(canvas, _toConsumableArray(_this6.paths));
-                canvas.add.apply(canvas, _toConsumableArray(paths));
+                _this7.paths.forEach(function (path) {
+                  canvas.remove(path);
+                });
+                paths.forEach(function (path) {
+                  canvas.add(path);
+                });
                 canvas.renderOnAddRemove = false;
                 canvas.renderAll();
-                _this6.paths = paths;
-              case 11:
+                _this7.paths = paths;
+              case 12:
               case "end":
                 return _context4.stop();
             }
           }, _callee4);
         })));
         vizPath.on('update', function () {
-          _this6.paths.forEach(function (path, index) {
-            _this6.reinitializePath(path);
+          _this7.paths.forEach(function (path) {
+            _this7.reinitializePath(path);
           });
         });
       }
     }]);
   }(EditorModule);
   EditorPath.ID = Symbol('editor-path');
-
-  // Unique ID creation requires a high quality random # generator. In the browser we therefore
-  // require the crypto API and do not support built-in fallback to lower quality random number
-  // generators (like Math.random()).
-  var getRandomValues;
-  var rnds8 = new Uint8Array(16);
-  function rng() {
-    // lazy load so that environments that need to polyfill have a chance to do so
-    if (!getRandomValues) {
-      // getRandomValues needs to be invoked in a context where "this" is a Crypto implementation.
-      getRandomValues = typeof crypto !== 'undefined' && crypto.getRandomValues && crypto.getRandomValues.bind(crypto);
-      if (!getRandomValues) {
-        throw new Error('crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported');
-      }
-    }
-    return getRandomValues(rnds8);
-  }
-
-  /**
-   * Convert array of 16 byte values to UUID string format of the form:
-   * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-   */
-
-  var byteToHex = [];
-  for (var i = 0; i < 256; ++i) {
-    byteToHex.push((i + 0x100).toString(16).slice(1));
-  }
-  function unsafeStringify(arr) {
-    var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-    // Note: Be careful editing this code!  It's been tuned for performance
-    // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
-    return byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]];
-  }
-  var randomUUID = typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID.bind(crypto);
-  var _native = {
-    randomUUID: randomUUID
-  };
-  function v4(options, buf, offset) {
-    if (_native.randomUUID && !buf && !options) {
-      return _native.randomUUID();
-    }
-    options = options || {};
-    var rnds = options.random || (options.rng || rng)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
-
-    rnds[6] = rnds[6] & 0x0f | 0x40;
-    rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
-
-    if (buf) {
-      offset = offset || 0;
-      for (var _i = 0; _i < 16; ++_i) {
-        buf[offset + _i] = rnds[_i];
-      }
-      return buf;
-    }
-    return unsafeStringify(rnds);
-  }
-
-  /** 创建默认控制点 */
-  var CREATE_DEFAULT_POINTER = function CREATE_DEFAULT_POINTER() {
-    var object = new fabric.fabric.Circle({
-      strokeWidth: 4,
-      radius: 6,
-      fill: '#ffffff',
-      stroke: '#4b4b4b',
-      originX: 'center',
-      originY: 'center'
-    });
-    return object;
-  };
-  /** 创建默认线条 */
-  var CREATE_DEFAULT_LINE = function CREATE_DEFAULT_LINE() {
-    return new fabric.fabric.Line([0, 0, 0, 0], {
-      // stroke: '#bebebe',
-      stroke: '#f00',
-      strokeWidth: 1,
-      strokeDashArray: [4, 3],
-      strokeUniform: true,
-      selectable: false,
-      evented: false,
-      originX: 'center',
-      originY: 'center'
-    });
-  };
-  /** 创建默认默认左右侧拓展点 */
-  var CREATE_DEFAULT_TRIGGER = function CREATE_DEFAULT_TRIGGER() {
-    var object = new fabric.fabric.Circle({
-      radius: 4,
-      stroke: '#bebebe',
-      strokeWidth: 2,
-      fill: '#bebebe',
-      originX: 'center',
-      originY: 'center'
-    });
-    return object;
-  };
-  var EditorNode = /*#__PURE__*/function (_EditorModule4) {
+  var EditorNode = /*#__PURE__*/function (_EditorModule5) {
     function EditorNode() {
-      var _this7;
+      var _this8;
       _classCallCheck(this, EditorNode);
-      _this7 = _callSuper(this, EditorNode, arguments);
-      _this7.vizPath = null;
-      _this7.editor = null;
-      _this7.nodes = [];
-      _this7.controllers = {
+      _this8 = _callSuper(this, EditorNode, arguments);
+      _this8.vizPath = null;
+      _this8.editor = null;
+      _this8.nodes = [];
+      _this8.controllers = {
         points: [],
         lines: []
       };
-      _this7.nodeMap = new WeakMap([]);
-      _this7._cancelSelectEvent = false;
-      return _this7;
+      _this8.objectMap = new WeakMap([]);
+      _this8._cancelSelectEvent = false;
+      return _this8;
     }
-    _inherits(EditorNode, _EditorModule4);
+    _inherits(EditorNode, _EditorModule5);
     return _createClass(EditorNode, [{
       key: "_initPathNodes",
       value: function _initPathNodes(vizPath) {
-        var _this8 = this;
+        var _this9 = this;
         var editorPath = vizPath.context.find(EditorPath);
         if (!editorPath) return [];
+        var ui = vizPath.context.find(EditorUI);
         var nodes = [];
         // 创建路径关键点的操作点（即实际路径上的节点，而非曲线上的虚拟点）
-        vizPath.pathway.forEach(function (section) {
+        vizPath.pathway.forEach(function (_ref8) {
+          var section = _ref8.section;
           section.forEach(function (item, index) {
-            var _a, _b;
+            var _a, _b, _c;
             var node = item.node;
             if (!node) return;
             // 如果下一个指令是闭合点，则不添加关键点
             // 因为路径补丁的时候遇到闭合点会添加一条到起始点的路径，所以当前关键点正好和起始点一致
             if (((_b = (_a = section[index + 1]) === null || _a === void 0 ? void 0 : _a.instruction) === null || _b === void 0 ? void 0 : _b[0]) === InstructionType.CLOSE) return;
-            var object = new fabric.fabric.Group([CREATE_DEFAULT_POINTER()], {
-              name: v4(),
-              originX: 'center',
-              originY: 'center',
-              // 选中时不出现选中框
-              hasBorders: false,
-              hasControls: false
-            });
-            // 响应指令的直接修改
-            node.observe(function (x, y) {
-              var position = editorPath.calcAbsolutePosition({
-                x: x,
-                y: y
+            var decorator = function decorator(innerObject) {
+              var _object = new fabric.fabric.Group([innerObject], {
+                name: v4(),
+                originX: 'center',
+                originY: 'center',
+                // 选中时不出现选中框
+                hasBorders: false,
+                hasControls: false
               });
-              if (object.group) {
-                var relativePosition = editorPath.calcRelativeCrood(position, object.group.calcTransformMatrix());
-                object.set({
-                  left: relativePosition.x,
-                  top: relativePosition.y
-                }).setCoords();
-                object.group.addWithUpdate();
-              } else {
-                object.set(position).setCoords();
-              }
-            }, {
-              id: object.name,
-              immediate: true
-            });
-            var position = editorPath.calcAbsolutePosition(node);
-            object.set(position).setCoords();
+              _object[VizPath.symbol] = true;
+              // 响应指令的直接修改
+              node.observe(function (x, y) {
+                var position = editorPath.calcAbsolutePosition({
+                  x: x,
+                  y: y
+                });
+                if (_object.group) {
+                  var relativePosition = editorPath.calcRelativeCrood(position, _object.group.calcTransformMatrix());
+                  _object.set({
+                    left: relativePosition.x,
+                    top: relativePosition.y
+                  }).setCoords();
+                  _object.group.addWithUpdate();
+                } else {
+                  _object.set(position).setCoords();
+                }
+              }, {
+                id: _object.name,
+                immediate: true
+              });
+              return _object;
+            };
+            var object = ((_c = ui === null || ui === void 0 ? void 0 : ui.options.node) !== null && _c !== void 0 ? _c : EditorUI.defaultUI.node)(decorator);
+            if (!object[VizPath.symbol]) object = decorator(object);
             nodes.push(object);
-            _this8.nodeMap.set(object, item);
+            _this9.objectMap.set(object, item);
           });
         });
         return nodes;
@@ -4067,13 +4405,15 @@
     }, {
       key: "_initPathControllers",
       value: function _initPathControllers() {
-        var _a, _b;
+        var _a, _b, _c;
         var lines = [];
         var points = [];
         var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath);
         var pathway = (_b = this.vizPath) === null || _b === void 0 ? void 0 : _b.pathway;
+        var ui = (_c = this.vizPath) === null || _c === void 0 ? void 0 : _c.context.find(EditorUI);
         if (editorPath && pathway) {
-          pathway.forEach(function (section) {
+          pathway.forEach(function (_ref9) {
+            var section = _ref9.section;
             section.forEach(function (item) {
               var node = item.node,
                 _item$controllers = item.controllers,
@@ -4082,77 +4422,89 @@
               var pre = controllers.pre,
                 next = controllers.next;
               [pre, next].forEach(function (controller) {
+                var _a, _b;
                 if (!controller) return;
                 /**
                  * 创建指令控制点
                  */
-                var object = new fabric.fabric.Group([CREATE_DEFAULT_TRIGGER()], {
-                  name: v4(),
-                  originX: 'center',
-                  originY: 'center',
-                  // 选中时不出现选中框
-                  hasBorders: false,
-                  hasControls: false
-                });
-                // 建立相互响应，指令的数据和元素的位置更改会相互同步
-                controller.observe(function (x, y) {
-                  var _a;
-                  if (((_a = object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === object) return;
-                  var position = editorPath.calcAbsolutePosition({
-                    x: x,
-                    y: y
+                var pointDecorator = function pointDecorator(innerObject) {
+                  var _object = new fabric.fabric.Group([innerObject], {
+                    name: v4(),
+                    originX: 'center',
+                    originY: 'center',
+                    // 选中时不出现选中框
+                    hasBorders: false,
+                    hasControls: false
                   });
-                  object.set(position).setCoords();
-                }, {
-                  immediate: true,
-                  id: object.name
-                });
-                observe(object, ['left', 'top'], function (_ref5) {
-                  var left = _ref5.left,
-                    top = _ref5.top;
-                  var _a;
-                  if (((_a = object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) !== object) return;
-                  var crood = editorPath.calcRelativeCrood({
-                    left: left,
-                    top: top
+                  _object[VizPath.symbol] = true;
+                  // 建立相互响应，指令的数据和元素的位置更改会相互同步
+                  controller.observe(function (x, y) {
+                    var _a;
+                    if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === _object) return;
+                    var position = editorPath.calcAbsolutePosition({
+                      x: x,
+                      y: y
+                    });
+                    _object.set(position).setCoords();
+                  }, {
+                    immediate: true,
+                    id: _object.name
                   });
-                  controller.set(crood, [object.name]);
-                });
+                  observe(_object, ['left', 'top'], function (_ref10) {
+                    var left = _ref10.left,
+                      top = _ref10.top;
+                    var _a;
+                    if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) !== _object) return;
+                    var crood = editorPath.calcRelativeCrood({
+                      left: left,
+                      top: top
+                    });
+                    controller.set(crood, [_object.name]);
+                  });
+                  return _object;
+                };
+                var point = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.controllerPoint) !== null && _a !== void 0 ? _a : EditorUI.defaultUI.controllerPoint)(pointDecorator);
+                if (!point[VizPath.symbol]) point = pointDecorator(point);
                 /**
                  * 创建控制点和节点的连线
                  */
-                var line = CREATE_DEFAULT_LINE();
-                line.set({
-                  name: v4()
-                });
-                // 建立响应式，让连线随时跟随指令的值进行变化
-                node.observe(function (x, y) {
-                  var position = editorPath.calcAbsolutePosition({
-                    x: x,
-                    y: y
+                var lineDecorator = function lineDecorator(_line) {
+                  _line.set({
+                    name: v4()
                   });
-                  line.set({
-                    x1: position.left,
-                    y1: position.top
+                  _line[VizPath.symbol] = true;
+                  // 建立响应式，让连线随时跟随指令的值进行变化
+                  node.observe(function (x, y) {
+                    var position = editorPath.calcAbsolutePosition({
+                      x: x,
+                      y: y
+                    });
+                    _line.set({
+                      x1: position.left,
+                      y1: position.top
+                    });
+                  }, {
+                    immediate: true,
+                    id: _line.name
                   });
-                }, {
-                  immediate: true,
-                  id: line.name
-                });
-                controller.observe(function (x, y) {
-                  var position = editorPath.calcAbsolutePosition({
-                    x: x,
-                    y: y
+                  controller.observe(function (x, y) {
+                    var position = editorPath.calcAbsolutePosition({
+                      x: x,
+                      y: y
+                    });
+                    _line.set({
+                      x2: position.left,
+                      y2: position.top
+                    });
+                  }, {
+                    immediate: true,
+                    id: _line.name
                   });
-                  line.set({
-                    x2: position.left,
-                    y2: position.top
-                  });
-                }, {
-                  immediate: true,
-                  id: line.name
-                });
-                points.push(object);
+                  return _line;
+                };
+                var line = ((_b = ui === null || ui === void 0 ? void 0 : ui.options.controllerLine) !== null && _b !== void 0 ? _b : EditorUI.defaultUI.controllerLine)(lineDecorator);
+                if (!line[VizPath.symbol]) line = lineDecorator(line);
+                points.push(point);
                 lines.push(line);
               });
             });
@@ -4166,26 +4518,26 @@
     }, {
       key: "_initSelectEvents",
       value: function _initSelectEvents() {
-        var _this9 = this;
+        var _this10 = this;
         if (!this.editor) return;
         this.editor.on('canvas', 'selection:created', function (e) {
-          if (_this9._cancelSelectEvent) return;
-          _this9.focus.apply(_this9, _toConsumableArray(e.selected));
+          if (_this10._cancelSelectEvent) return;
+          _this10.focus.apply(_this10, _toConsumableArray(e.selected));
         });
         this.editor.on('canvas', 'selection:updated', function (e) {
-          if (_this9._cancelSelectEvent) return;
-          _this9.focus.apply(_this9, _toConsumableArray(e.selected));
+          if (_this10._cancelSelectEvent) return;
+          _this10.focus.apply(_this10, _toConsumableArray(e.selected));
         });
         this.editor.on('canvas', 'selection:cleared', function () {
-          if (_this9._cancelSelectEvent) return;
-          _this9.focus();
+          if (_this10._cancelSelectEvent) return;
+          _this10.focus();
         });
       }
     }, {
       key: "move",
       value: function move(object, position) {
         var _a, _b, _c, _d;
-        var pathwayNode = this.nodeMap.get(object);
+        var pathwayNode = this.objectMap.get(object);
         if (!pathwayNode) return;
         var node = pathwayNode.node,
           section = pathwayNode.section,
@@ -4200,7 +4552,7 @@
           preScaleY = _object$scaleY === void 0 ? 1 : _object$scaleY,
           _object$angle = object.angle,
           preAngle = _object$angle === void 0 ? 0 : _object$angle;
-        var _ref6 = selectionGroup ? {
+        var _ref11 = selectionGroup ? {
             scaleX: 1 / selectionGroup.scaleX,
             scaleY: 1 / selectionGroup.scaleY,
             angle: -selectionGroup.angle
@@ -4209,9 +4561,9 @@
             scaleY: 1,
             angle: 0
           },
-          newScaleX = _ref6.scaleX,
-          newScaleY = _ref6.scaleY,
-          newAngle = _ref6.angle;
+          newScaleX = _ref11.scaleX,
+          newScaleY = _ref11.scaleY,
+          newAngle = _ref11.angle;
         object.set({
           scaleX: newScaleX,
           scaleY: newScaleY,
@@ -4281,7 +4633,7 @@
     }, {
       key: "focus",
       value: function focus() {
-        var _this10 = this;
+        var _this11 = this;
         var _a;
         var canvas = (_a = this.editor) === null || _a === void 0 ? void 0 : _a.canvas;
         if (!canvas) return;
@@ -4289,10 +4641,10 @@
           selectedNodes[_key] = arguments[_key];
         }
         var focusNodes = selectedNodes.filter(function (i) {
-          return _this10.nodes.includes(i);
+          return _this11.nodes.includes(i);
         });
         var focusControllerPoints = selectedNodes.filter(function (i) {
-          return _this10.controllers.points.includes(i);
+          return _this11.controllers.points.includes(i);
         });
         if (focusNodes.length === 0 && focusControllerPoints.length == 0) return;
         this._cancelSelectEvent = true;
@@ -4300,11 +4652,11 @@
         var addActiveSelectionObserve = function addActiveSelectionObserve(group) {
           observe(group, ['left', 'top', 'angle'], function () {
             group._objects.forEach(function (object) {
-              if (!_this10.nodes.includes(object)) return;
+              if (!_this11.nodes.includes(object)) return;
               var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix());
               var left = decomposeMatrix.translateX;
               var top = decomposeMatrix.translateY;
-              _this10.move(object, {
+              _this11.move(object, {
                 left: left,
                 top: top
               });
@@ -4313,11 +4665,11 @@
         };
         // 添加单个活跃对象的响应式变化
         var addActivePointObserve = function addActivePointObserve(object) {
-          observe(object, ['left', 'top'], function (_ref7) {
-            var left = _ref7.left,
-              top = _ref7.top;
+          observe(object, ['left', 'top'], function (_ref12) {
+            var left = _ref12.left,
+              top = _ref12.top;
             if (object.group) return;
-            _this10.move(object, {
+            _this11.move(object, {
               left: left,
               top: top
             });
@@ -4331,11 +4683,13 @@
               canvas: canvas,
               lockScalingFlip: true,
               // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
-              lockRotation: true,
+              // lockRotation: true,
               originX: 'center',
               originY: 'center'
             });
-            activeSelection.setControlVisible('mtr', false);
+            if (activeSelection.lockRotation) {
+              activeSelection.setControlVisible('mtr', false);
+            }
             canvas.setActiveObject(activeSelection);
             addActiveSelectionObserve(activeSelection);
           } else {
@@ -4349,7 +4703,7 @@
     }, {
       key: "load",
       value: function load(vizPath) {
-        var _this11 = this;
+        var _this12 = this;
         this.vizPath = vizPath;
         var editor = vizPath.context.find(Editor);
         if (!editor) return;
@@ -4372,13 +4726,13 @@
                 // 由于需要多次添加关键点和控制点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
                 canvas.renderOnAddRemove = false;
                 // 移除旧对象
-                canvas.remove.apply(canvas, _toConsumableArray(_this11.controllers.lines).concat(_toConsumableArray(_this11.controllers.points), _toConsumableArray(_this11.nodes)));
+                canvas.remove.apply(canvas, _toConsumableArray(_this12.controllers.lines).concat(_toConsumableArray(_this12.controllers.points), _toConsumableArray(_this12.nodes)));
                 // 初始路径关键点
-                _this11.nodes = _this11._initPathNodes(vizPath);
+                _this12.nodes = _this12._initPathNodes(vizPath);
                 // 初始路径控制点
-                _this11.controllers = _this11._initPathControllers();
+                _this12.controllers = _this12._initPathControllers();
                 // 添加新对象
-                canvas.add.apply(canvas, _toConsumableArray(_this11.controllers.lines).concat(_toConsumableArray(_this11.controllers.points), _toConsumableArray(_this11.nodes)));
+                canvas.add.apply(canvas, _toConsumableArray(_this12.controllers.lines).concat(_toConsumableArray(_this12.controllers.points), _toConsumableArray(_this12.nodes)));
                 canvas.renderOnAddRemove = true;
                 canvas.renderAll();
               case 10:
@@ -4441,12 +4795,23 @@
       const vizPath = new VizPathContext();
       const operator = await vizPath
           .use(new Editor(fabricCanvas))
+          .use(new EditorUI({
+      // path: () => {
+      //   const path = new fabric.Path('');
+      //   path.set({
+      //     fill: 'rgba(50, 50, 50, 0.8)',
+      //     stroke: '#333',
+      //     strokeWidth: 2,
+      //   });
+      //   return path;
+      // }
+      }))
           .use(new EditorBackground())
           .use(new EditorPath())
           .use(new EditorNode())
           .initialize();
       // operator.draw(VizPath.getPathwayFromObject(path));
-      operator.draw(VizPathContext.getPathwayFromPathD(EXAMPLE_PATH_D.bubble));
+      operator.draw(VizPathContext.getPathwayFromPathD(EXAMPLE_PATH_D.bubble), { label: 'bubble' });
       // operator.clean();
       // operator.move(operator.pathway[0][0].node, { x: 200, y: 200 })
       // editor.draw(VizPath.getPathwayFromObject(path));
