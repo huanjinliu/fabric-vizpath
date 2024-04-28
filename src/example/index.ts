@@ -78,22 +78,24 @@ const EXAMPLE_PATH_D = {
     //   })
     // )
     .use(new EditorBackground())
-    .use(new EditorPath())
+    .use(new EditorPath({
+      updateTriggerTime: 'auto'
+    }))
     .use(new EditorNode())
     .initialize();
 
   // ① 通过路径指令直接绘制
-  // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
+  // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
   //   left: fabricCanvas.getWidth() / 2,
   //   top: fabricCanvas.getHeight() / 2,
   //   originX: 'center',
   //   originY: 'center',
   // });
-  // operator.draw(pathway);
+  // operator.draw(pathway1);
 
   // ② 通过路径对象绘制
-  // const pathway = VizPath.parsePathFromObject(path);
-  // operator.draw(pathway);
+  // const pathway2 = VizPath.parsePathFromObject(path);
+  // operator.draw(pathway2);
 
   // ③ 通过URL绘制
   const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';

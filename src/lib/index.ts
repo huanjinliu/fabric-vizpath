@@ -6,6 +6,7 @@ import type EditorModule from './modules/base.class';
 import {
   getCubicFromQuadratic,
   loadSVGToPathFromURL,
+  parsePathJSON,
   transform,
 } from '@utils';
 
@@ -53,37 +54,58 @@ class VizPathContext {
    * const pathway = getPathwayFromObject(new fabric.Path());
    */
   static parsePathFromObject(path: fabric.Path) {
-    // ① 清除路径自带偏移，如果不消除，后续的所有关键点、控制点的编辑都要额外处理路径自身的偏移
-    const instructions = cloneDeep(path.path as unknown as Instruction[]);
-    instructions.forEach((item, pathIdx) => {
-      const [, ...croods] = item as unknown as [
-        type: string,
-        ...croods: number[]
-      ];
-      for (let i = 0; i < croods.length; i += 2) {
-        const { x, y } = transform(
-          {
-            x: instructions[pathIdx][i + 1] as number,
-            y: instructions[pathIdx][i + 2] as number,
-          },
-          [
-            {
-              translate: {
-                x: -path.pathOffset.x,
-                y: -path.pathOffset.y,
-              },
-            },
-          ]
-        );
-        instructions[pathIdx][i + 1] = x;
-        instructions[pathIdx][i + 2] = y;
-      }
-    });
+    const { layout, styles } = parsePathJSON(path);
 
-    // ② 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
-    const sections = VizPath.getPathSections(instructions);
-    for (const section of sections) {
-      // 修正头指令，头指令必须是M开始指令，其他的也没效果
+    /**
+     * 第一步：拆分组合路径， 如 new fabric.Path('M 0 0 L 10 10 z M 20 20 L 40 40 z')
+     */
+    const instructions = cloneDeep(path.path as unknown as Instruction[]);
+    const sections = VizPath.getPathSections(instructions).map(section => {
+      // 为每个子路径分配新建的路径对象
+      const originPath = new fabric.Path(
+        (fabric.util as any).joinPath(section)
+      );
+      originPath.path = section as unknown as fabric.Point[];
+      originPath.set(styles);
+
+      return { section, originPath };
+    })
+
+    // 建立组并销毁组是为了保持子路径对象的正确尺寸和位置
+    new fabric.Group(sections.map(i => i.originPath), layout).destroy();
+
+    /**
+     * 第二步：组合pathway
+     */
+    const pathway: Pathway = sections.map(({ section, originPath }) => {
+      // ① 清除路径自带偏移，如果不消除，后续的所有关键点、控制点的编辑都要额外处理路径自身的偏移
+      section.forEach((item, pathIdx) => {
+        const [, ...croods] = item as unknown as [
+          type: string,
+          ...croods: number[]
+        ];
+        for (let i = 0; i < croods.length; i += 2) {
+          const { x, y } = transform(
+            {
+              x: section[pathIdx][i + 1] as number,
+              y: section[pathIdx][i + 2] as number,
+            },
+            [
+              {
+                translate: {
+                  x: -originPath.pathOffset.x,
+                  y: -originPath.pathOffset.y,
+                },
+              },
+            ]
+          );
+          section[pathIdx][i + 1] = x;
+          section[pathIdx][i + 2] = y;
+        }
+      });
+      originPath.pathOffset = new fabric.Point(0, 0);
+
+      // ② 修正头指令，头指令必须是M开始指令，其他的也没效果
       if (section[0][0] !== InstructionType.START) {
         section[0] = [
           InstructionType.START,
@@ -91,7 +113,7 @@ class VizPathContext {
         ] as Instruction;
       }
 
-      // 如果是二阶曲线全部升级为三阶曲线便于处理
+      // ③ 如果是二阶曲线全部升级为三阶曲线便于后续处理
       for (let i = 1; i < section.length; i++) {
         const instruction = section[i];
         const preInstruction = section[i - 1];
@@ -107,6 +129,7 @@ class VizPathContext {
         }
       }
 
+      // ④ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
       const isAutoClose =
         section[section.length - 1][0] === InstructionType.CLOSE;
       if (isAutoClose) {
@@ -128,10 +151,8 @@ class VizPathContext {
           ] as Instruction);
         }
       }
-    }
 
-    // ③ 创建pathway（包含路径分段、关键点、控制点信息的对象）
-    const pathway: Pathway = sections.map((section) => {
+      // ⑤ 创建pathway（包含路径分段、关键点、控制点信息的对象）
       const _section: PathwayNode[] = [];
       section.forEach((instruction, idx) => {
         const node = VizPath.getInstructionNodeCrood(instruction);
@@ -142,25 +163,26 @@ class VizPathContext {
           node,
           controllers: node
             ? {
-              pre:
-                instruction[0] === InstructionType.BEZIER_CURVE
-                  ? ({ x: instruction[3], y: instruction[4] } as Crood)
-                  : undefined,
-              next:
-                nextInstruction?.[0] === InstructionType.BEZIER_CURVE
-                  ? ({
-                    x: nextInstruction[1],
-                    y: nextInstruction[2],
-                  } as Crood)
-                  : undefined,
-            }
+                pre:
+                  instruction[0] === InstructionType.BEZIER_CURVE
+                    ? ({ x: instruction[3], y: instruction[4] } as Crood)
+                    : undefined,
+                next:
+                  nextInstruction?.[0] === InstructionType.BEZIER_CURVE
+                    ? ({
+                        x: nextInstruction[1],
+                        y: nextInstruction[2],
+                      } as Crood)
+                    : undefined,
+              }
             : undefined,
         });
       });
+
       return {
         section: _section,
-        originPath: path,
-      };
+        originPath
+      }
     });
 
     return pathway;

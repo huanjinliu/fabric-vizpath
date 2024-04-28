@@ -12,24 +12,24 @@ const createDefaultNode: Theme['node'] = (decorator) => {
   const group = decorator(object);
   group.on("mouseover", () => {
     object.set({ fill: "#7ef4ad" });
-    group.canvas?.renderAll();
+    group.canvas?.requestRenderAll();
   });
 
   group.on("mouseout", () => {
     object.set({
       fill: group.canvas?.getActiveObject() === group ? "#29ca6e" : "#ffffff"
     });
-    group.canvas?.renderAll();
+    group.canvas?.requestRenderAll();
   });
 
   group.on("selected", () => {
     object.set({ fill: "#29ca6e" });
-    group.canvas?.renderAll();
+    group.canvas?.requestRenderAll();
   });
 
   group.on("deselected", () => {
     object.set({ fill: "#ffffff" });
-    group.canvas?.renderAll();
+    group.canvas?.requestRenderAll();
   });
 
   return group;

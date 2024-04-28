@@ -15,14 +15,14 @@ const createDefaultNode: Theme['node'] = (decorator) => {
     rect.set({
       fill: '#1884ec',
     });
-    object.canvas?.renderAll();
+    object.canvas?.requestRenderAll();
   });
 
   object.on('deselected', () => {
     rect.set({
       fill: '#ffffff',
     });
-    object.canvas?.renderAll();
+    object.canvas?.requestRenderAll();
   });
 
   return object;

@@ -1,29 +1,41 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
 import round from 'lodash-es/round';
-import VizPath from '../../vizpath.class';
+import defaults from 'lodash-es/defaults';
+import VizPath, { type ResponsiveCrood } from '../../vizpath.class';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
-import type { Instruction } from '../..';
+import type { Instruction, PathwayNode } from '../..';
 import EditorUI from '../editor-ui/index.class';
+import { parsePathJSON } from '@utils';
+
+type EditorPathOptions = {
+  /**
+   * 触发路径更新状态的时机
+   * @default 'defer' 延迟自动更新，比auto性能好，但是状态不完全同步
+   */
+  updateTriggerTime?: 'auto' | 'manual' | 'defer';
+};
 
 class EditorPath extends EditorModule {
   static ID = Symbol('editor-path');
 
+  options: Required<EditorPathOptions> = {
+    updateTriggerTime: 'defer',
+  };
+
   paths: {
     path: fabric.Path;
+    section: PathwayNode<ResponsiveCrood>[];
     matrix: number[];
   }[] = [];
 
-  /**
-   * 获取指令所在路径信息
-   * @param instruction 指令
-   * @returns 路径信息
-   */
-  getPath(instruction: Instruction) {
-    return this.paths.find(({ path }) =>
-      path.path?.includes(instruction as unknown as fabric.Point)
-    );
+  nodePathMap = new WeakMap<ResponsiveCrood, (typeof this.paths)[number]>([]);
+
+  constructor(options: EditorPathOptions = {}) {
+    super();
+
+    this.options = defaults(options, this.options);
   }
 
   /**
@@ -63,7 +75,10 @@ class EditorPath extends EditorModule {
    * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
    * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
    */
-  reinitializePath(path: fabric.Path, matrix: number[]) {
+  updatePathStatus(path: fabric.Path) {
+    const { matrix } = this.paths.find(i => i.path === path) ?? {};
+    if (!matrix) return;
+
     // 记录旧的路径信息
     const oldInfo = {
       left: path.left!,
@@ -75,10 +90,12 @@ class EditorPath extends EditorModule {
 
     // 持有旧的指令后恢复避免丢失引用
     const instructions = path.path;
-    // 更新路径尺寸
-    path.initialize(
-      (fabric.util as any).joinPath(instructions as unknown as Instruction[])
+    const d = (fabric.util as any).joinPath(
+      instructions as unknown as Instruction[]
     );
+
+    // 更新路径尺寸
+    path.initialize(d);
     path.path = instructions;
 
     // 计算路径偏移差值
@@ -91,7 +108,7 @@ class EditorPath extends EditorModule {
           (path.height! - oldInfo.height) / 2 -
           oldInfo.pathOffset.y
       ),
-      matrix
+      [...matrix.slice(0, 4), 0, 0]
     );
 
     // 设置回正确的偏移位置
@@ -101,9 +118,14 @@ class EditorPath extends EditorModule {
     });
 
     path.setCoords();
+
+    path.canvas?.requestRenderAll();
   }
 
-  load(vizPath: VizPath) {
+  /**
+   * 初始化路径绘制监听
+   */
+  private _initDrawListener(vizPath: VizPath) {
     const editor = vizPath.context.find(Editor);
     if (!editor) {
       return;
@@ -117,12 +139,13 @@ class EditorPath extends EditorModule {
     vizPath.on('draw', async () => {
       const ui = vizPath.context.find(EditorUI);
 
-      const paths = vizPath.pathway.map(({ originPath }, index, arr) => {
+      const paths = vizPath.pathway.map(({ section, originPath }) => {
         const decorator = (customPath: fabric.Path) => {
-          const _path = new fabric.Path();
+          const { layout, styles } = parsePathJSON(customPath);
+          const _path = originPath;
 
-          _path.set((customPath.toJSON()) as any);
-
+          _path.set(layout);
+          _path.set(styles);
           _path.set({
             name: uuid(),
             // 路径本身不可选中，后续通过操纵点和线条来更改路径
@@ -135,12 +158,6 @@ class EditorPath extends EditorModule {
 
           _path[VizPath.symbol] = true;
 
-          _path.path = vizPath
-            .toPaths([arr[index]])
-            .flat(1) as unknown as fabric.Point[];
-
-          _path.pathOffset = new fabric.Point(0, 0);
-
           return _path;
         };
         let path = (ui?.options.path ?? EditorUI.noneUI.path)(
@@ -149,9 +166,9 @@ class EditorPath extends EditorModule {
         );
         if (!path[VizPath.symbol]) path = decorator(path);
 
-        const matrix = path.calcOwnMatrix() as number[];
+        const matrix = [...(path.calcOwnMatrix() as number[])];
 
-        return { path, matrix };
+        return { path, section, matrix };
       });
 
       // 移除旧的路径对象并添加新的路径对象
@@ -166,13 +183,54 @@ class EditorPath extends EditorModule {
       canvas.renderAll();
 
       this.paths = paths;
-    });
 
-    vizPath.on('update', () => {
-      this.paths.forEach(({ path, matrix }) => {
-        this.reinitializePath(path, [...matrix.slice(0, 4), 0, 0] as number[]);
+      // 建立映射关系，便于减少后续计算
+      this.paths.forEach((item) => {
+        item.section.forEach(({ node }) => {
+          if (node) this.nodePathMap.set(node, item);
+        });
       });
     });
+  }
+
+  /**
+   * 初始化路径更新监听
+   */
+  private _initPathListener(vizPath: VizPath) {
+    const debounceWeakMap = new WeakMap<(typeof this.paths)[number], number>(
+      []
+    );
+    vizPath.on('update', (crood) => {
+      const { updateTriggerTime } = this.options;
+      if (updateTriggerTime === 'manual') return;
+
+      const path = this.nodePathMap.get(crood);
+      if (!path) return;
+      
+      if (updateTriggerTime === 'auto') {
+        const matrix = path.matrix.slice(0, 4);
+        matrix.push(0, 0);
+        this.updatePathStatus(path.path);
+      } else {
+        const timeout = debounceWeakMap.get(path);
+        if (timeout) clearTimeout(timeout);
+  
+        debounceWeakMap.set(
+          path,
+          setTimeout(() => {
+            const matrix = path.matrix.slice(0, 4);
+            matrix.push(0, 0);
+            this.updatePathStatus(path.path);
+            debounceWeakMap.delete(path);
+          }, 60)
+        );
+      }
+    });
+  }
+
+  load(vizPath: VizPath) {
+    this._initDrawListener(vizPath);
+    this._initPathListener(vizPath);
   }
 }
 

@@ -25,6 +25,12 @@ export type ResponsivePathway = {
   originPath: fabric.Path;
 }[];
 
+export type VizPathEvent = {
+  update: (crood: ResponsiveCrood) => void;
+  draw: () => void;
+  clean: () => void;
+}
+
 /**
  * VizPath (Visualization Path，可视化路径)
  */
@@ -55,7 +61,7 @@ class VizPath {
   /**
    * 监听事件
    */
-  events: Record<string, (() => void)[]> = {};
+  events: Partial<Record<keyof VizPathEvent, ((...args: any[]) => void)[]>> = {};
 
   constructor(context: VizPathContext) {
     this.context = context;
@@ -111,7 +117,7 @@ class VizPath {
     }[] = [];
     let temporaryIgnoreIds: string[] = [];
     const proxy = new Proxy(crood, {
-      set: (target: Crood, p: string, value: any, receiver: any) => {
+      set: (target: ResponsiveCrood, p: string, value: any, receiver: any) => {
         if (p === 'x' || p === 'y') {
           const oldValue = target[p];
           const newValue = round(value, 4);
@@ -119,16 +125,16 @@ class VizPath {
           if (oldValue !== newValue) {
             const x = p === 'x' ? newValue : target.x;
             const y = p === 'y' ? newValue : target.y;
-            observes.forEach((item) => {
+            for (let observe of observes) {
               if (
-                item.id &&
+                observe.id &&
                 temporaryIgnoreIds.length &&
-                temporaryIgnoreIds.includes(item.id)
+                temporaryIgnoreIds.indexOf(observe.id) !== -1
               )
-                return;
-              item.handler(x, y);
-            });
-            this._fire('update');
+                continue;
+              observe.handler(x, y);
+            }
+            this._fire('update', proxy);
           }
           return result;
         } else {
@@ -232,18 +238,38 @@ class VizPath {
     this._fire('clean');
   }
 
-  on(eventName: string, callback: () => void) {
+  /**
+   * 监听事件
+   * @param eventName 事件名
+   * @param callback 回调
+   */
+  on<Event extends keyof VizPathEvent>(eventName: Event, callback: VizPathEvent[Event]) {
     this.events[eventName] = this.events[eventName] ?? [];
-    this.events[eventName].push(callback);
+    this.events[eventName]!.push(callback);
+  }
+
+  /**
+   * 取消监听事件
+   * @param eventName 事件名
+   * @param callback 回调
+   */
+  off<Event extends keyof VizPathEvent>(eventName: Event, callback?: VizPathEvent[Event]) {
+    if (!callback) delete this.events[eventName];
+
+    const handlers = this.events[eventName];
+    if (!handlers) return;
+
+    const index = handlers.indexOf(callback as typeof handlers[number]);
+    if (index !== -1) handlers.splice(index, 1);
   }
 
   /**
    * 触发编辑器事件
    */
-  private _fire(eventName: string) {
-    this.events[eventName]?.forEach((callback) => {
-      callback();
-    });
+  private _fire<Event extends keyof VizPathEvent>(eventName: Event, ...data: Parameters<VizPathEvent[Event]>) {
+    const handlers = this.events[eventName];
+    if (!handlers) return;
+    for (let callback of handlers) (callback)(...data);
   }
 
   /**

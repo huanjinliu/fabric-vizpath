@@ -14,14 +14,14 @@ const createDefaultPoint: Theme['controllerPoint'] = (decorator) => {
     circle.set({
       stroke: '#333',
     });
-    object.canvas?.renderAll();
+    object.canvas?.requestRenderAll();
   });
 
   object.on('deselected', () => {
     circle.set({
       stroke: '#bebebe',
     });
-    object.canvas?.renderAll();
+    object.canvas?.requestRenderAll();
   });
 
   return object;

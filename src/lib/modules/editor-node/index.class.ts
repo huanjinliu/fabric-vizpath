@@ -1,11 +1,11 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
+import { observe, transform } from '@utils';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import VizPath from '../../vizpath.class';
 import EditorPath from '../editor-path/index.class';
 import { InstructionType, type PathwayNode } from '../..';
-import { observe, transform } from '@utils';
 import type { ResponsiveCrood } from '../../vizpath.class';
 import EditorUI from '../editor-ui/index.class';
 
@@ -43,7 +43,7 @@ class EditorNode extends EditorModule {
     // 创建路径关键点的操作点（即实际路径上的节点，而非曲线上的虚拟点）
     vizPath.pathway.forEach(({ section }) => {
       section.forEach((item, index) => {
-        const { node, instruction } = item;
+        const { node } = item;
         if (!node) return;
 
         // 如果下一个指令是闭合点，则不添加关键点
@@ -69,7 +69,7 @@ class EditorNode extends EditorModule {
             (x, y) => {
               const position = editorPath.calcAbsolutePosition(
                 { x, y },
-                editorPath.getPath(instruction)!.matrix
+                editorPath.nodePathMap.get(node)!.matrix
               );
               if (_object.group) {
                 const relativePosition = editorPath.calcRelativeCrood(
@@ -123,7 +123,7 @@ class EditorNode extends EditorModule {
     if (editorPath && pathway) {
       pathway.forEach(({ section }) => {
         section.forEach((item) => {
-          const { node, instruction, controllers = {} } = item;
+          const { node, controllers = {} } = item;
           if (!node) return;
 
           const { pre, next } = controllers;
@@ -153,7 +153,7 @@ class EditorNode extends EditorModule {
                   if (_object.canvas?.getActiveObject() === _object) return;
                   const position = editorPath.calcAbsolutePosition(
                     { x, y },
-                    editorPath.getPath(instruction)!.matrix
+                    editorPath.nodePathMap.get(node)!.matrix
                   );
                   _object.set(position).setCoords();
                 },
@@ -170,7 +170,7 @@ class EditorNode extends EditorModule {
                     left: left!,
                     top: top!,
                   },
-                  editorPath.getPath(instruction)!.matrix
+                  editorPath.nodePathMap.get(node)!.matrix
                 );
                 controller.set(crood, [_object.name]);
               });
@@ -207,7 +207,7 @@ class EditorNode extends EditorModule {
                 (x, y) => {
                   const position = editorPath.calcAbsolutePosition(
                     { x, y },
-                    editorPath.getPath(instruction)!.matrix
+                    editorPath.nodePathMap.get(node)!.matrix
                   );
                   _line.set({ x1: position.left, y1: position.top });
                 },
@@ -220,7 +220,7 @@ class EditorNode extends EditorModule {
                 (x, y) => {
                   const position = editorPath.calcAbsolutePosition(
                     { x, y },
-                    editorPath.getPath(instruction)!.matrix
+                    editorPath.nodePathMap.get(node)!.matrix
                   );
                   _line.set({ x2: position.left, y2: position.top });
                 },
@@ -275,7 +275,7 @@ class EditorNode extends EditorModule {
     const pathwayNode = this.objectMap.get(object);
     if (!pathwayNode) return;
 
-    const { node, section, instruction, controllers = {} } = pathwayNode;
+    const { node, section, controllers = {} } = pathwayNode;
 
     const editorPath = this.vizPath?.context.find(EditorPath);
     if (!editorPath) return [];
@@ -309,7 +309,7 @@ class EditorNode extends EditorModule {
 
     const newCrood = editorPath.calcRelativeCrood(
       position,
-      editorPath.getPath(instruction)!.matrix
+      editorPath.nodePathMap.get(node!)!.matrix
     );
     // 需要跟随变化的曲线控制点
     const followCroods: ResponsiveCrood[] = [];
@@ -363,7 +363,7 @@ class EditorNode extends EditorModule {
       controller.y = newCrood.y + relativeDiff.y;
     });
 
-    object.canvas?.renderAll();
+    object.canvas?.requestRenderAll();
   }
 
   focus(...selectedNodes: fabric.Group[]) {
@@ -384,8 +384,8 @@ class EditorNode extends EditorModule {
     // 添加活跃组的响应式变化
     const addActiveSelectionObserve = (group: fabric.ActiveSelection) => {
       observe(group, ['left', 'top', 'angle'], () => {
-        (group._objects as fabric.Group[]).forEach((object: fabric.Group) => {
-          if (!this.nodes.includes(object)) return;
+        for (const object of group._objects as fabric.Group[]) {
+          if (!this.nodes.includes(object)) continue;
 
           const decomposeMatrix = fabric.util.qrDecompose(
             object.calcTransformMatrix()
@@ -394,7 +394,7 @@ class EditorNode extends EditorModule {
           const top = decomposeMatrix.translateY;
 
           this.move(object, { left, top });
-        });
+        }
       });
     };
 
@@ -402,7 +402,6 @@ class EditorNode extends EditorModule {
     const addActivePointObserve = (object: fabric.Group) => {
       observe(object, ['left', 'top'], ({ left, top }) => {
         if (object.group) return;
-
         this.move(object, { left: left!, top: top! });
       });
     };
@@ -430,7 +429,7 @@ class EditorNode extends EditorModule {
       }
     }
 
-    canvas.renderAll();
+    canvas.requestRenderAll();
 
     this._cancelSelectEvent = false;
   }
