@@ -7,7 +7,7 @@ import {
   getCubicFromQuadratic,
   loadSVGToPathFromURL,
   transform,
-} from './utils';
+} from '@utils';
 
 /** 指令类型 */
 export enum InstructionType {
@@ -142,18 +142,18 @@ class VizPathContext {
           node,
           controllers: node
             ? {
-                pre:
-                  instruction[0] === InstructionType.BEZIER_CURVE
-                    ? ({ x: instruction[3], y: instruction[4] } as Crood)
-                    : undefined,
-                next:
-                  nextInstruction?.[0] === InstructionType.BEZIER_CURVE
-                    ? ({
-                        x: nextInstruction[1],
-                        y: nextInstruction[2],
-                      } as Crood)
-                    : undefined,
-              }
+              pre:
+                instruction[0] === InstructionType.BEZIER_CURVE
+                  ? ({ x: instruction[3], y: instruction[4] } as Crood)
+                  : undefined,
+              next:
+                nextInstruction?.[0] === InstructionType.BEZIER_CURVE
+                  ? ({
+                    x: nextInstruction[1],
+                    y: nextInstruction[2],
+                  } as Crood)
+                  : undefined,
+            }
             : undefined,
         });
       });

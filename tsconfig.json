@@ -14,6 +14,12 @@
     "noImplicitAny": false,
     "noImplicitThis": false,
     "skipLibCheck": false,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@": ["src"],
+      "@utils": ["src/lib/utils"],
+      "@themes": ["src/themes"]
+    }
   }
 }

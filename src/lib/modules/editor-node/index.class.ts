@@ -5,7 +5,7 @@ import Editor from '../editor/index.class';
 import VizPath from '../../vizpath.class';
 import EditorPath from '../editor-path/index.class';
 import { InstructionType, type PathwayNode } from '../..';
-import { observe, transform } from '../../utils';
+import { observe, transform } from '@utils';
 import type { ResponsiveCrood } from '../../vizpath.class';
 import EditorUI from '../editor-ui/index.class';
 
@@ -22,9 +22,9 @@ class EditorNode extends EditorModule {
     points: fabric.Group[];
     lines: fabric.Line[];
   } = {
-    points: [],
-    lines: [],
-  };
+      points: [],
+      lines: [],
+    };
 
   objectMap: WeakMap<fabric.Group, PathwayNode<ResponsiveCrood>> = new WeakMap(
     []
@@ -292,12 +292,12 @@ class EditorNode extends EditorModule {
       scaleY: newScaleY,
       angle: newAngle,
     } = selectionGroup
-      ? {
+        ? {
           scaleX: 1 / selectionGroup.scaleX!,
           scaleY: 1 / selectionGroup.scaleY!,
           angle: -selectionGroup.angle!,
         }
-      : { scaleX: 1, scaleY: 1, angle: 0 };
+        : { scaleX: 1, scaleY: 1, angle: 0 };
 
     object
       .set({

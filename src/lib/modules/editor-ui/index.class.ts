@@ -1,7 +1,7 @@
 import { defaults } from 'lodash-es';
 import EditorModule from '../base.class';
-import { defaultTheme, noneTheme } from '../../themes';
-import type { Theme } from '../../themes';
+import { defaultTheme, noneTheme } from '@themes';
+import type { Theme } from '@themes';
 
 class EditorUI extends EditorModule {
   static ID = Symbol('editor-ui');

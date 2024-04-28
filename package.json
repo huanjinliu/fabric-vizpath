@@ -1,7 +1,8 @@
 {
   "name": "fabric-path-editor",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "An editor of path for Fabric.js(http://fabricjs.com)",
+  "homepage": "https://huanjinliu.github.io/fabric-path-editor",
   "main": "dist/index.js",
   "module": "dist/index.es.js",
   "types": "dist/index.d.ts",
@@ -11,15 +12,14 @@
     "build:docs": "rollup --config --environment ENV:dev",
     "build": "rollup --config"
   },
+  "author": "Hain <huanjin.liu@foxmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/huanjinliu/fabric-path-editor.git"
+    "url": "https://github.com/huanjinliu/fabric-path-editor.git"
   },
-  "author": "huanjin.liu@foxmail.com",
   "bugs": {
     "url": "https://github.com/huanjinliu/fabric-path-editor/issues"
   },
-  "homepage": "https://github.com/huanjinliu/fabric-path-editor#readme",
   "devDependencies": {
     "@babel/core": "^7.23.9",
     "@babel/preset-env": "^7.24.4",
