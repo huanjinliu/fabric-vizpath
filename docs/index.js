@@ -3301,7 +3301,7 @@
       /**
        * 路径信息映射
        */
-      this.pathwayMap = new WeakMap([]);
+      this.pathwayNodeMap = new WeakMap([]);
       /**
        * 监听事件
        */
@@ -3314,7 +3314,7 @@
      * @note 闭合指令无关键节点
      */
     return _createClass(VizPath, [{
-      key: "_toResponsiveCrood",
+      key: "_toResponsive",
       value:
       /**
        * 转化为响应式更改的点对象
@@ -3322,7 +3322,7 @@
        * @param callback 响应式更改回调
        * @returns
        */
-      function _toResponsiveCrood(crood) {
+      function _toResponsive(crood) {
         var _this = this;
         var observes = [];
         var temporaryIgnoreIds = [];
@@ -3388,6 +3388,40 @@
         return proxy;
       }
       /**
+       * 是否是闭合路径段
+       * @param section 路径段
+       */
+    }, {
+      key: "isClosePath",
+      value: function isClosePath(section) {
+        var _a;
+        return ((_a = section[section.length - 1]) === null || _a === void 0 ? void 0 : _a.instruction[0]) === InstructionType.CLOSE;
+      }
+      /**
+       * 获取前后的指令节点信息
+       */
+    }, {
+      key: "getAroundPathwayNodes",
+      value: function getAroundPathwayNodes(pathwayNode) {
+        var section = pathwayNode.section;
+        var index = section.indexOf(pathwayNode);
+        var pre = section[index - 1];
+        var next = section[index + 1];
+        // 如果没有上一个指令，则判断是否是闭合路径，如果是闭合路径则倒数第二个指令视为上一个指令
+        var isClosePath = section[section.length - 1].instruction[0] === InstructionType.CLOSE;
+        if (isClosePath && !pre) {
+          pre = section[section.length - 2];
+        }
+        // 如果有下一个指令且下一个指令是闭合指令，则指向起始指令
+        if (next && next.instruction[0] === InstructionType.CLOSE) {
+          next = section[0];
+        }
+        return {
+          pre: pre,
+          next: next
+        };
+      }
+      /**
        * 绘制路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
        * @param pathway 路径信息
        */
@@ -3399,41 +3433,55 @@
           var section = _ref.section,
             originPath = _ref.originPath;
           var _section = [];
-          section.forEach(function (item, idx) {
+          section.forEach(function (item) {
+            var _a, _b, _c;
+            var instruction = item.instruction;
             var proxyItem = {
               section: _section,
-              instruction: item.instruction
+              instruction: instruction
             };
-            if (item.node) {
-              var node = _this2._toResponsiveCrood(item.node);
-              node.observe(function (x, y) {
-                item.instruction[item.instruction.length - 2] = x;
-                item.instruction[item.instruction.length - 1] = y;
+            // 关键点
+            var node = VizPath.getInstructionNodeCrood(instruction);
+            if (node) {
+              var responsiveNode = _this2._toResponsive(node);
+              responsiveNode.observe(function (x, y) {
+                instruction[instruction.length - 2] = x;
+                instruction[instruction.length - 1] = y;
               });
-              proxyItem.node = node;
-              _this2.pathwayMap.set(proxyItem.node, proxyItem);
+              proxyItem.node = responsiveNode;
+              _this2.pathwayNodeMap.set(proxyItem.node, proxyItem);
             }
-            if (item.controllers) {
-              var controllers = Object.assign({}, item.controllers);
-              var nextInstruction = section[idx + 1];
-              var pre = controllers.pre,
-                next = controllers.next;
-              if (pre) {
-                controllers.pre = _this2._toResponsiveCrood(pre);
-                controllers.pre.observe(function (x, y) {
-                  item.instruction[3] = x;
-                  item.instruction[4] = y;
-                });
-              }
-              if (next && nextInstruction) {
-                controllers.next = _this2._toResponsiveCrood(next);
-                controllers.next.observe(function (x, y) {
-                  nextInstruction.instruction[1] = x;
-                  nextInstruction.instruction[2] = y;
-                });
-              }
-              proxyItem.controllers = controllers;
+            // 指令控制点
+            var _this2$getAroundPathw = _this2.getAroundPathwayNodes(item),
+              pre = _this2$getAroundPathw.pre,
+              next = _this2$getAroundPathw.next;
+            var controllers = {};
+            var instructions = {
+              // 如果是起始指令且为自动闭合路径，则前一个控制点来自前一个指令
+              pre: (_a = instruction[0] === InstructionType.START && pre ? pre : item) === null || _a === void 0 ? void 0 : _a.instruction,
+              next: next === null || next === void 0 ? void 0 : next.instruction
+            };
+            if (((_b = instructions.pre) === null || _b === void 0 ? void 0 : _b[0]) === InstructionType.BEZIER_CURVE) {
+              controllers.pre = _this2._toResponsive({
+                x: instructions.pre[3],
+                y: instructions.pre[4]
+              });
+              controllers.pre.observe(function (x, y) {
+                instructions.pre[3] = x;
+                instructions.pre[4] = y;
+              });
             }
+            if (((_c = instructions.next) === null || _c === void 0 ? void 0 : _c[0]) === InstructionType.BEZIER_CURVE) {
+              controllers.next = _this2._toResponsive({
+                x: instructions.next[1],
+                y: instructions.next[2]
+              });
+              controllers.next.observe(function (x, y) {
+                instructions.next[1] = x;
+                instructions.next[2] = y;
+              });
+            }
+            proxyItem.controllers = controllers;
             _section.push(proxyItem);
           });
           _this2.pathway.push({
@@ -3457,7 +3505,7 @@
           });
         });
         this.pathway = [];
-        this.pathwayMap = new WeakMap([]);
+        this.pathwayNodeMap = new WeakMap([]);
         this._fire('draw');
         this._fire('clean');
       }
@@ -4123,25 +4171,12 @@
               section.splice(section.length - 1, 0, [InstructionType.LINE, startPoint[0], startPoint[1]]);
             }
           }
-          // ⑤ 创建pathway（包含路径分段、关键点、控制点信息的对象）
+          // ⑤ 创建pathway
           var _section = [];
-          section.forEach(function (instruction, idx) {
-            var node = VizPath.getInstructionNodeCrood(instruction);
-            var nextInstruction = section[idx + 1];
+          section.forEach(function (instruction) {
             _section.push({
               section: _section,
-              instruction: instruction,
-              node: node,
-              controllers: node ? {
-                pre: instruction[0] === InstructionType.BEZIER_CURVE ? {
-                  x: instruction[3],
-                  y: instruction[4]
-                } : undefined,
-                next: (nextInstruction === null || nextInstruction === void 0 ? void 0 : nextInstruction[0]) === InstructionType.BEZIER_CURVE ? {
-                  x: nextInstruction[1],
-                  y: nextInstruction[2]
-                } : undefined
-              } : undefined
+              instruction: instruction
             });
           });
           return {
@@ -4882,25 +4917,31 @@
                 originY: 'center'
               });
               _object[VizPath.symbol] = true;
-              // 响应指令的直接修改
-              node.observe(function (x, y) {
-                var position = editorPath.calcAbsolutePosition({
-                  x: x,
-                  y: y
-                }, editorPath.nodePathMap.get(node).matrix);
-                if (_object.group) {
-                  var relativePosition = editorPath.calcRelativeCrood(position, _object.group.calcTransformMatrix());
-                  _object.set({
-                    left: relativePosition.x,
-                    top: relativePosition.y
-                  }).setCoords();
-                  _object.group.addWithUpdate();
-                } else {
-                  _object.set(position).setCoords();
-                }
-              }, {
-                id: _object.name,
-                immediate: true
+              // 加入画布时添加自动响应
+              _object.on('added', function () {
+                node.observe(function (x, y) {
+                  var position = editorPath.calcAbsolutePosition({
+                    x: x,
+                    y: y
+                  }, editorPath.nodePathMap.get(node).matrix);
+                  if (_object.group) {
+                    var relativePosition = editorPath.calcRelativeCrood(position, _object.group.calcTransformMatrix());
+                    _object.set({
+                      left: relativePosition.x,
+                      top: relativePosition.y
+                    }).setCoords();
+                    _object.group.addWithUpdate();
+                  } else {
+                    _object.set(position).setCoords();
+                  }
+                }, {
+                  id: _object.name,
+                  immediate: true
+                });
+              });
+              // 移除时结束自动响应
+              _object.on('removed', function () {
+                return node.unobserve(_object);
               });
               return _object;
             };
@@ -4912,144 +4953,215 @@
         });
         return nodes;
       }
+      // 添加活跃组的响应式变化
     }, {
-      key: "_initPathControllers",
-      value: function _initPathControllers() {
-        var _a, _b, _c;
+      key: "_addActiveSelectionObserve",
+      value: function _addActiveSelectionObserve(group) {
+        var _this11 = this;
+        observe(group, ['left', 'top', 'angle'], function () {
+          var _iterator3 = _createForOfIteratorHelper(group._objects),
+            _step3;
+          try {
+            for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
+              var object = _step3.value;
+              if (!_this11.nodes.includes(object)) continue;
+              var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix());
+              var left = decomposeMatrix.translateX;
+              var top = decomposeMatrix.translateY;
+              _this11.move(object, {
+                left: left,
+                top: top
+              });
+            }
+          } catch (err) {
+            _iterator3.e(err);
+          } finally {
+            _iterator3.f();
+          }
+        });
+      }
+      // 添加单个活跃对象的响应式变化
+    }, {
+      key: "_addActivePointObserve",
+      value: function _addActivePointObserve(object) {
+        var _this12 = this;
+        observe(object, ['left', 'top'], function (_ref16) {
+          var left = _ref16.left,
+            top = _ref16.top;
+          if (object.group) return;
+          _this12.move(object, {
+            left: left,
+            top: top
+          });
+        });
+      }
+      // 添加活跃节点的周围控制点
+    }, {
+      key: "_addActivePointControllers",
+      value: function _addActivePointControllers(nodeObject) {
+        var _a, _b, _c, _d, _e;
+        var canvas = nodeObject.canvas;
+        if (!canvas) return;
+        if (!this.vizPath) return;
+        var pathwayNode = this.objectMap.get(nodeObject);
+        if (!pathwayNode) return;
+        var editorPath = this.vizPath.context.find(EditorPath);
+        if (!editorPath) return;
+        var ui = this.vizPath.context.find(EditorUI);
+        if (!pathwayNode.node) return;
         var lines = [];
         var points = [];
-        var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath);
-        var pathway = (_b = this.vizPath) === null || _b === void 0 ? void 0 : _b.pathway;
-        var ui = (_c = this.vizPath) === null || _c === void 0 ? void 0 : _c.context.find(EditorUI);
-        if (editorPath && pathway) {
-          pathway.forEach(function (_ref16) {
-            var section = _ref16.section;
-            section.forEach(function (item) {
-              var node = item.node,
-                _item$controllers = item.controllers,
-                controllers = _item$controllers === void 0 ? {} : _item$controllers;
-              if (!node) return;
-              var pre = controllers.pre,
-                next = controllers.next;
-              [pre, next].forEach(function (controller) {
-                var _a, _b;
-                if (!controller) return;
-                /**
-                 * 创建指令控制点
-                 */
-                var pointDecorator = function pointDecorator(innerObject) {
-                  var _object = new fabric.fabric.Group([innerObject], {
-                    name: v4(),
-                    // 选中时不出现选中框
-                    hasBorders: false,
-                    hasControls: false,
-                    // 保持居中
-                    originX: 'center',
-                    originY: 'center'
-                  });
-                  _object[VizPath.symbol] = true;
-                  // 建立相互响应，指令的数据和元素的位置更改会相互同步
-                  controller.observe(function (x, y) {
-                    var _a;
-                    if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === _object) return;
-                    var position = editorPath.calcAbsolutePosition({
-                      x: x,
-                      y: y
-                    }, editorPath.nodePathMap.get(node).matrix);
-                    _object.set(position).setCoords();
-                  }, {
-                    immediate: true,
-                    id: _object.name
-                  });
-                  observe(_object, ['left', 'top'], function (_ref17) {
-                    var left = _ref17.left,
-                      top = _ref17.top;
-                    var _a;
-                    if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) !== _object) return;
-                    var crood = editorPath.calcRelativeCrood({
-                      left: left,
-                      top: top
-                    }, editorPath.nodePathMap.get(node).matrix);
-                    controller.set(crood, [_object.name]);
-                  });
-                  return _object;
-                };
-                var point = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.controllerPoint) !== null && _a !== void 0 ? _a : EditorUI.noneUI.controllerPoint)(pointDecorator);
-                if (!point[VizPath.symbol]) point = pointDecorator(point);
-                /**
-                 * 创建控制点和节点的连线
-                 */
-                var lineDecorator = function lineDecorator(_line) {
-                  _line.set({
-                    name: v4(),
-                    // 保持比例
-                    strokeUniform: true,
-                    // 不允许选中
-                    selectable: false,
-                    evented: false,
-                    // 保持居中
-                    originX: 'center',
-                    originY: 'center'
-                  });
-                  _line[VizPath.symbol] = true;
-                  // 建立响应式，让连线随时跟随指令的值进行变化
-                  node.observe(function (x, y) {
-                    var position = editorPath.calcAbsolutePosition({
-                      x: x,
-                      y: y
-                    }, editorPath.nodePathMap.get(node).matrix);
-                    _line.set({
-                      x1: position.left,
-                      y1: position.top
-                    });
-                  }, {
-                    immediate: true,
-                    id: _line.name
-                  });
-                  controller.observe(function (x, y) {
-                    var position = editorPath.calcAbsolutePosition({
-                      x: x,
-                      y: y
-                    }, editorPath.nodePathMap.get(node).matrix);
-                    _line.set({
-                      x2: position.left,
-                      y2: position.top
-                    });
-                  }, {
-                    immediate: true,
-                    id: _line.name
-                  });
-                  return _line;
-                };
-                var line = ((_b = ui === null || ui === void 0 ? void 0 : ui.options.controllerLine) !== null && _b !== void 0 ? _b : EditorUI.noneUI.controllerLine)(lineDecorator);
-                if (!line[VizPath.symbol]) line = lineDecorator(line);
-                points.push(point);
-                lines.push(line);
+        var cur = pathwayNode;
+        var _this$vizPath$getArou = this.vizPath.getAroundPathwayNodes(pathwayNode),
+          pre = _this$vizPath$getArou.pre,
+          next = _this$vizPath$getArou.next;
+        var controllers = [[pre === null || pre === void 0 ? void 0 : pre.node, (_a = pre === null || pre === void 0 ? void 0 : pre.controllers) === null || _a === void 0 ? void 0 : _a.next], [cur === null || cur === void 0 ? void 0 : cur.node, (_b = cur.controllers) === null || _b === void 0 ? void 0 : _b.pre], [cur === null || cur === void 0 ? void 0 : cur.node, (_c = cur.controllers) === null || _c === void 0 ? void 0 : _c.next], [next === null || next === void 0 ? void 0 : next.node, (_d = next === null || next === void 0 ? void 0 : next.controllers) === null || _d === void 0 ? void 0 : _d.pre]];
+        // 如果是开始指令且闭合需要特殊处理
+        if (cur.instruction[0] === InstructionType.START && this.vizPath.isClosePath(cur.section) && pre) {
+          var _this$vizPath$getArou2 = this.vizPath.getAroundPathwayNodes(pre),
+            prePre = _this$vizPath$getArou2.pre;
+          controllers.unshift([prePre === null || prePre === void 0 ? void 0 : prePre.node, (_e = prePre === null || prePre === void 0 ? void 0 : prePre.controllers) === null || _e === void 0 ? void 0 : _e.next]);
+        }
+        controllers.filter(function (i) {
+          return i.every(Boolean);
+        }).forEach(function (_ref17) {
+          var _ref18 = _slicedToArray(_ref17, 2),
+            node = _ref18[0],
+            controller = _ref18[1];
+          var _a, _b;
+          /**
+           * 创建指令控制点
+           */
+          var pointDecorator = function pointDecorator(innerObject) {
+            var _object = new fabric.fabric.Group([innerObject], {
+              name: v4(),
+              // 选中时不出现选中框
+              hasBorders: false,
+              hasControls: false,
+              // 保持居中
+              originX: 'center',
+              originY: 'center'
+            });
+            _object[VizPath.symbol] = true;
+            // 建立相互响应，指令的数据和元素的位置更改会相互同步
+            _object.on('added', function () {
+              controller.observe(function (x, y) {
+                var _a;
+                if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === _object) return;
+                var position = editorPath.calcAbsolutePosition({
+                  x: x,
+                  y: y
+                }, editorPath.nodePathMap.get(node).matrix);
+                _object.set(position).setCoords();
+              }, {
+                immediate: true,
+                id: _object.name
               });
             });
-          });
-        }
-        return {
+            _object.on('removed', function () {
+              return controller.unobserve(_object);
+            });
+            observe(_object, ['left', 'top'], function (_ref19) {
+              var left = _ref19.left,
+                top = _ref19.top;
+              var _a;
+              if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) !== _object) return;
+              var crood = editorPath.calcRelativeCrood({
+                left: left,
+                top: top
+              }, editorPath.nodePathMap.get(node).matrix);
+              controller.set(crood, [_object.name]);
+            });
+            return _object;
+          };
+          var point = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.controllerPoint) !== null && _a !== void 0 ? _a : EditorUI.noneUI.controllerPoint)(pointDecorator);
+          if (!point[VizPath.symbol]) point = pointDecorator(point);
+          /**
+           * 创建控制点和节点的连线
+           */
+          var lineDecorator = function lineDecorator(_line) {
+            _line.set({
+              name: v4(),
+              // 保持比例
+              strokeUniform: true,
+              // 不允许选中
+              selectable: false,
+              evented: false,
+              // 保持居中
+              originX: 'center',
+              originY: 'center'
+            });
+            _line[VizPath.symbol] = true;
+            // 建立响应式，让连线随时跟随指令的值进行变化
+            _line.on('added', function () {
+              node.observe(function (x, y) {
+                var position = editorPath.calcAbsolutePosition({
+                  x: x,
+                  y: y
+                }, editorPath.nodePathMap.get(node).matrix);
+                _line.set({
+                  x1: position.left,
+                  y1: position.top
+                });
+              }, {
+                immediate: true,
+                id: _line.name
+              });
+              controller.observe(function (x, y) {
+                var position = editorPath.calcAbsolutePosition({
+                  x: x,
+                  y: y
+                }, editorPath.nodePathMap.get(node).matrix);
+                _line.set({
+                  x2: position.left,
+                  y2: position.top
+                });
+              }, {
+                immediate: true,
+                id: _line.name
+              });
+            });
+            _line.on('removed', function () {
+              node.unobserve(_line);
+              controller.unobserve(_line);
+            });
+            return _line;
+          };
+          var line = ((_b = ui === null || ui === void 0 ? void 0 : ui.options.controllerLine) !== null && _b !== void 0 ? _b : EditorUI.noneUI.controllerLine)(lineDecorator);
+          if (!line[VizPath.symbol]) line = lineDecorator(line);
+          points.push(point);
+          lines.push(line);
+        });
+        // 由于需要多次添加关键点和控制点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
+        canvas.renderOnAddRemove = false;
+        // 移除旧对象
+        canvas.remove.apply(canvas, _toConsumableArray(this.controllers.lines).concat(_toConsumableArray(this.controllers.points)));
+        // 初始路径控制点
+        this.controllers = {
           points: points,
           lines: lines
         };
+        // 移除旧对象
+        canvas.add.apply(canvas, _toConsumableArray(this.controllers.lines).concat(_toConsumableArray(this.controllers.points)));
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
       }
     }, {
       key: "_initSelectEvents",
       value: function _initSelectEvents() {
-        var _this11 = this;
+        var _this13 = this;
         if (!this.editor) return;
         this.editor.on('canvas', 'selection:created', function (e) {
-          if (_this11._cancelSelectEvent) return;
-          _this11.focus.apply(_this11, _toConsumableArray(e.selected));
+          if (_this13._cancelSelectEvent) return;
+          _this13.focus.apply(_this13, _toConsumableArray(e.selected));
         });
         this.editor.on('canvas', 'selection:updated', function (e) {
-          if (_this11._cancelSelectEvent) return;
-          _this11.focus.apply(_this11, _toConsumableArray(e.selected));
+          if (_this13._cancelSelectEvent) return;
+          _this13.focus.apply(_this13, _toConsumableArray(e.selected));
         });
         this.editor.on('canvas', 'selection:cleared', function () {
-          if (_this11._cancelSelectEvent) return;
-          _this11.focus();
+          if (_this13._cancelSelectEvent) return;
+          _this13.focus();
         });
       }
     }, {
@@ -5071,7 +5183,7 @@
           preScaleY = _object$scaleY === void 0 ? 1 : _object$scaleY,
           _object$angle = object.angle,
           preAngle = _object$angle === void 0 ? 0 : _object$angle;
-        var _ref18 = selectionGroup ? {
+        var _ref20 = selectionGroup ? {
             scaleX: 1 / selectionGroup.scaleX,
             scaleY: 1 / selectionGroup.scaleY,
             angle: -selectionGroup.angle
@@ -5080,9 +5192,9 @@
             scaleY: 1,
             angle: 0
           },
-          newScaleX = _ref18.scaleX,
-          newScaleY = _ref18.scaleY,
-          newAngle = _ref18.angle;
+          newScaleX = _ref20.scaleX,
+          newScaleY = _ref20.scaleY,
+          newAngle = _ref20.angle;
         object.set({
           scaleX: newScaleX,
           scaleY: newScaleY,
@@ -5152,7 +5264,7 @@
     }, {
       key: "focus",
       value: function focus() {
-        var _this12 = this;
+        var _this14 = this;
         var _a;
         var canvas = (_a = this.editor) === null || _a === void 0 ? void 0 : _a.canvas;
         if (!canvas) return;
@@ -5160,58 +5272,28 @@
           selectedNodes[_key2] = arguments[_key2];
         }
         var focusNodes = selectedNodes.filter(function (i) {
-          return _this12.nodes.includes(i);
+          return _this14.nodes.includes(i);
         });
         var focusControllerPoints = selectedNodes.filter(function (i) {
-          return _this12.controllers.points.includes(i);
+          return _this14.controllers.points.includes(i);
         });
         if (focusNodes.length === 0 && focusControllerPoints.length == 0) return;
         this._cancelSelectEvent = true;
-        // 添加活跃组的响应式变化
-        var addActiveSelectionObserve = function addActiveSelectionObserve(group) {
-          observe(group, ['left', 'top', 'angle'], function () {
-            var _iterator3 = _createForOfIteratorHelper(group._objects),
-              _step3;
-            try {
-              for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
-                var object = _step3.value;
-                if (!_this12.nodes.includes(object)) continue;
-                var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix());
-                var left = decomposeMatrix.translateX;
-                var top = decomposeMatrix.translateY;
-                _this12.move(object, {
-                  left: left,
-                  top: top
-                });
-              }
-            } catch (err) {
-              _iterator3.e(err);
-            } finally {
-              _iterator3.f();
-            }
-          });
-        };
-        // 添加单个活跃对象的响应式变化
-        var addActivePointObserve = function addActivePointObserve(object) {
-          observe(object, ['left', 'top'], function (_ref19) {
-            var left = _ref19.left,
-              top = _ref19.top;
-            if (object.group) return;
-            _this12.move(object, {
-              left: left,
-              top: top
-            });
-          });
-        };
+        // 选中对象中包含关键点则特殊处理
         if (focusNodes.length) {
-          // 取消画布选中重新构造选中对象
+          // 取消画布选中重新构造只包含关键点的选中框对象
           canvas.discardActiveObject();
-          if (focusNodes.length > 1) {
+          if (focusNodes.length === 1) {
+            var focusNode = focusNodes[0];
+            canvas.setActiveObject(focusNode);
+            this._addActivePointObserve(focusNode);
+            this._addActivePointControllers(focusNode);
+          } else {
             var activeSelection = new fabric.fabric.ActiveSelection(focusNodes, {
               canvas: canvas,
               lockScalingFlip: true,
               // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
-              // lockRotation: true,
+              lockRotation: true,
               originX: 'center',
               originY: 'center'
             });
@@ -5219,19 +5301,22 @@
               activeSelection.setControlVisible('mtr', false);
             }
             canvas.setActiveObject(activeSelection);
-            addActiveSelectionObserve(activeSelection);
-          } else {
-            canvas.setActiveObject(focusNodes[0]);
-            addActivePointObserve(focusNodes[0]);
+            this._addActiveSelectionObserve(activeSelection);
           }
         }
+        // 不允许同时选中多个曲线控制点
+        else if (focusControllerPoints.length > 1) {
+          canvas.discardActiveObject();
+        }
+        // 选中曲线控制点
+        else if (focusControllerPoints.length === 1) ;
         canvas.requestRenderAll();
         this._cancelSelectEvent = false;
       }
     }, {
       key: "load",
       value: function load(vizPath) {
-        var _this13 = this;
+        var _this15 = this;
         this.vizPath = vizPath;
         var editor = vizPath.context.find(Editor);
         if (!editor) return;
@@ -5251,16 +5336,16 @@
                 }
                 return _context7.abrupt("return");
               case 3:
+                // 失去当前选中状态
+                canvas.discardActiveObject();
                 // 由于需要多次添加关键点和控制点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
                 canvas.renderOnAddRemove = false;
                 // 移除旧对象
-                canvas.remove.apply(canvas, _toConsumableArray(_this13.controllers.lines).concat(_toConsumableArray(_this13.controllers.points), _toConsumableArray(_this13.nodes)));
+                canvas.remove.apply(canvas, _toConsumableArray(_this15.controllers.lines).concat(_toConsumableArray(_this15.controllers.points), _toConsumableArray(_this15.nodes)));
                 // 初始路径关键点
-                _this13.nodes = _this13._initPathNodes(vizPath);
-                // 初始路径控制点
-                _this13.controllers = _this13._initPathControllers();
+                _this15.nodes = _this15._initPathNodes(vizPath);
                 // 添加新对象
-                canvas.add.apply(canvas, _toConsumableArray(_this13.controllers.lines).concat(_toConsumableArray(_this13.controllers.points), _toConsumableArray(_this13.nodes)));
+                canvas.add.apply(canvas, _toConsumableArray(_this15.nodes));
                 canvas.renderOnAddRemove = true;
                 canvas.renderAll();
               case 10:
@@ -5269,6 +5354,11 @@
             }
           }, _callee7);
         })));
+        vizPath.on('clean', function () {
+          var canvas = editor.canvas;
+          if (!canvas) return;
+          canvas.remove.apply(canvas, _toConsumableArray(_this15.controllers.lines).concat(_toConsumableArray(_this15.controllers.points), _toConsumableArray(_this15.nodes)));
+        });
       }
     }]);
   }(EditorModule);
@@ -5337,29 +5427,29 @@
           .use(new EditorNode())
           .initialize();
       // ① 通过路径指令直接绘制
-      // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
-      //   left: fabricCanvas.getWidth() / 2,
-      //   top: fabricCanvas.getHeight() / 2,
-      //   originX: 'center',
-      //   originY: 'center',
-      // });
-      // operator.draw(pathway1);
-      // ② 通过路径对象绘制
-      // const pathway2 = VizPath.parsePathFromObject(path);
-      // operator.draw(pathway2);
-      // ③ 通过URL绘制
-      const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
-      const pathways = await VizPathContext.parsePathFromURL(svgURL, {
+      const pathway1 = VizPathContext.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
           left: fabricCanvas.getWidth() / 2,
           top: fabricCanvas.getHeight() / 2,
           originX: 'center',
           originY: 'center',
-          scaleX: 2,
-          scaleY: 2
       });
-      pathways === null || pathways === void 0 ? void 0 : pathways.forEach((pathway) => {
-          operator.draw(pathway);
-      });
+      operator.draw(pathway1);
+      // ② 通过路径对象绘制
+      // const pathway2 = VizPath.parsePathFromObject(path);
+      // operator.draw(pathway2);
+      // ③ 通过URL绘制
+      // const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
+      // const pathways = await VizPath.parsePathFromURL(svgURL, {
+      //   left: fabricCanvas.getWidth() / 2,
+      //   top: fabricCanvas.getHeight() / 2,
+      //   originX: 'center',
+      //   originY: 'center',
+      //   scaleX: 2,
+      //   scaleY: 2
+      // });
+      // pathways?.forEach((pathway) => {
+      //   operator.draw(pathway);
+      // })
       // ④ 快速使用
       // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.bubble, {
       //   left: fabricCanvas.getWidth() / 2,

@@ -21,13 +21,13 @@ export enum InstructionType {
 
 export type Instruction = [InstructionType, ...number[]];
 
-export type PathwayNode<Node extends Crood = Crood> = {
-  section: PathwayNode<Node>[];
+export type PathwayNode<T extends Crood = Crood> = {
+  section: PathwayNode<T>[];
   instruction: Instruction;
-  node?: Node;
+  node?: T;
   controllers?: Partial<{
-    pre: Node;
-    next: Node;
+    pre: T;
+    next: T;
   }>;
 };
 
@@ -60,7 +60,7 @@ class VizPathContext {
      * 第一步：拆分组合路径， 如 new fabric.Path('M 0 0 L 10 10 z M 20 20 L 40 40 z')
      */
     const instructions = cloneDeep(path.path as unknown as Instruction[]);
-    const sections = VizPath.getPathSections(instructions).map(section => {
+    const sections = VizPath.getPathSections(instructions).map((section) => {
       // 为每个子路径分配新建的路径对象
       const originPath = new fabric.Path(
         (fabric.util as any).joinPath(section)
@@ -69,10 +69,13 @@ class VizPathContext {
       originPath.set(styles);
 
       return { section, originPath };
-    })
+    });
 
     // 建立组并销毁组是为了保持子路径对象的正确尺寸和位置
-    new fabric.Group(sections.map(i => i.originPath), layout).destroy();
+    new fabric.Group(
+      sections.map((i) => i.originPath),
+      layout
+    ).destroy();
 
     /**
      * 第二步：组合pathway
@@ -152,37 +155,19 @@ class VizPathContext {
         }
       }
 
-      // ⑤ 创建pathway（包含路径分段、关键点、控制点信息的对象）
+      // ⑤ 创建pathway
       const _section: PathwayNode[] = [];
-      section.forEach((instruction, idx) => {
-        const node = VizPath.getInstructionNodeCrood(instruction);
-        const nextInstruction = section[idx + 1];
+      section.forEach((instruction) => {
         _section.push({
           section: _section,
           instruction,
-          node,
-          controllers: node
-            ? {
-                pre:
-                  instruction[0] === InstructionType.BEZIER_CURVE
-                    ? ({ x: instruction[3], y: instruction[4] } as Crood)
-                    : undefined,
-                next:
-                  nextInstruction?.[0] === InstructionType.BEZIER_CURVE
-                    ? ({
-                        x: nextInstruction[1],
-                        y: nextInstruction[2],
-                      } as Crood)
-                    : undefined,
-              }
-            : undefined,
         });
       });
 
       return {
         section: _section,
-        originPath
-      }
+        originPath,
+      };
     });
 
     return pathway;

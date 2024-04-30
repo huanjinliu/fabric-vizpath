@@ -29,7 +29,7 @@ export type VizPathEvent = {
   update: (crood: ResponsiveCrood) => void;
   draw: () => void;
   clean: () => void;
-}
+};
 
 /**
  * VizPath (Visualization Path，可视化路径)
@@ -55,13 +55,14 @@ class VizPath {
   /**
    * 路径信息映射
    */
-  pathwayMap: WeakMap<ResponsiveCrood, PathwayNode<ResponsiveCrood>> =
+  pathwayNodeMap: WeakMap<ResponsiveCrood, PathwayNode<ResponsiveCrood>> =
     new WeakMap([]);
 
   /**
    * 监听事件
    */
-  events: Partial<Record<keyof VizPathEvent, ((...args: any[]) => void)[]>> = {};
+  events: Partial<Record<keyof VizPathEvent, ((...args: any[]) => void)[]>> =
+    {};
 
   constructor(context: VizPathContext) {
     this.context = context;
@@ -110,7 +111,7 @@ class VizPath {
    * @param callback 响应式更改回调
    * @returns
    */
-  private _toResponsiveCrood(crood: Crood) {
+  private _toResponsive(crood: Crood) {
     let observes: {
       handler: (newX: number, newY: number) => void;
       id?: string;
@@ -167,50 +168,104 @@ class VizPath {
   }
 
   /**
+   * 是否是闭合路径段
+   * @param section 路径段
+   */
+  isClosePath(section: PathwayNode[]) {
+    return section[section.length - 1]?.instruction[0] === InstructionType.CLOSE;
+  }
+
+  /**
+   * 获取前后的指令节点信息
+   */
+  getAroundPathwayNodes<T extends Crood>(pathwayNode: PathwayNode<T>) {
+    const { section } = pathwayNode;
+    const index = section.indexOf(pathwayNode);
+
+    let pre = section[index - 1];
+    let next = section[index + 1];
+
+    // 如果没有上一个指令，则判断是否是闭合路径，如果是闭合路径则倒数第二个指令视为上一个指令
+    const isClosePath =
+      section[section.length - 1].instruction[0] === InstructionType.CLOSE;
+    if (isClosePath && !pre) {
+      pre = section[section.length - 2];
+    }
+
+    // 如果有下一个指令且下一个指令是闭合指令，则指向起始指令
+    if (next && next.instruction[0] === InstructionType.CLOSE) {
+      next = section[0];
+    }
+
+    return { pre, next } as Partial<{
+      pre: PathwayNode<T>;
+      next: PathwayNode<T>;
+    }>;
+  }
+
+  /**
    * 绘制路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
    * @param pathway 路径信息
    */
-  draw(
-    pathway: Pathway
-  ) {
+  draw(pathway: Pathway) {
     pathway.forEach(({ section, originPath }) => {
       const _section: PathwayNode<ResponsiveCrood>[] = [];
-      section.forEach((item, idx) => {
+      section.forEach((item) => {
+        const { instruction } = item;
+
         const proxyItem: PathwayNode<ResponsiveCrood> = {
           section: _section,
-          instruction: item.instruction,
+          instruction,
         };
-        if (item.node) {
-          const node = this._toResponsiveCrood(item.node);
-          node.observe((x, y) => {
-            item.instruction[item.instruction.length - 2] = x;
-            item.instruction[item.instruction.length - 1] = y;
+
+        // 关键点
+        const node = VizPath.getInstructionNodeCrood(instruction);
+        if (node) {
+          const responsiveNode = this._toResponsive(node);
+          responsiveNode.observe((x, y) => {
+            instruction[instruction.length - 2] = x;
+            instruction[instruction.length - 1] = y;
           });
-          proxyItem.node = node;
-          this.pathwayMap.set(proxyItem.node, proxyItem);
+          proxyItem.node = responsiveNode;
+          this.pathwayNodeMap.set(proxyItem.node, proxyItem);
         }
-        if (item.controllers) {
-          const controllers = { ...item.controllers } as NonNullable<
-            PathwayNode<ResponsiveCrood>['controllers']
-          >;
-          const nextInstruction = section[idx + 1];
-          const { pre, next } = controllers;
-          if (pre) {
-            controllers.pre = this._toResponsiveCrood(pre);
-            controllers.pre.observe((x, y) => {
-              item.instruction[3] = x;
-              item.instruction[4] = y;
-            });
-          }
-          if (next && nextInstruction) {
-            controllers.next = this._toResponsiveCrood(next);
-            controllers.next.observe((x, y) => {
-              nextInstruction.instruction[1] = x;
-              nextInstruction.instruction[2] = y;
-            });
-          }
-          proxyItem.controllers = controllers;
+
+        // 指令控制点
+        const { pre, next } = this.getAroundPathwayNodes(item);
+        const controllers = {} as NonNullable<
+          PathwayNode<ResponsiveCrood>['controllers']
+        >;
+        const instructions = {
+          // 如果是起始指令且为自动闭合路径，则前一个控制点来自前一个指令
+          pre: (instruction[0] === InstructionType.START && pre ? pre : item)
+            ?.instruction,
+          next: next?.instruction,
+        };
+
+        if (instructions.pre?.[0] === InstructionType.BEZIER_CURVE) {
+          controllers.pre = this._toResponsive({
+            x: instructions.pre[3],
+            y: instructions.pre[4],
+          });
+          controllers.pre.observe((x, y) => {
+            instructions.pre[3] = x;
+            instructions.pre[4] = y;
+          });
         }
+
+        if (instructions.next?.[0] === InstructionType.BEZIER_CURVE) {
+          controllers.next = this._toResponsive({
+            x: instructions.next[1],
+            y: instructions.next[2],
+          });
+          controllers.next.observe((x, y) => {
+            instructions.next![1] = x;
+            instructions.next![2] = y;
+          });
+        }
+
+        proxyItem.controllers = controllers;
+
         _section.push(proxyItem);
       });
       this.pathway.push({
@@ -232,7 +287,7 @@ class VizPath {
       });
     });
     this.pathway = [];
-    this.pathwayMap = new WeakMap([]);
+    this.pathwayNodeMap = new WeakMap([]);
 
     this._fire('draw');
     this._fire('clean');
@@ -243,7 +298,10 @@ class VizPath {
    * @param eventName 事件名
    * @param callback 回调
    */
-  on<Event extends keyof VizPathEvent>(eventName: Event, callback: VizPathEvent[Event]) {
+  on<Event extends keyof VizPathEvent>(
+    eventName: Event,
+    callback: VizPathEvent[Event]
+  ) {
     this.events[eventName] = this.events[eventName] ?? [];
     this.events[eventName]!.push(callback);
   }
@@ -253,23 +311,29 @@ class VizPath {
    * @param eventName 事件名
    * @param callback 回调
    */
-  off<Event extends keyof VizPathEvent>(eventName: Event, callback?: VizPathEvent[Event]) {
+  off<Event extends keyof VizPathEvent>(
+    eventName: Event,
+    callback?: VizPathEvent[Event]
+  ) {
     if (!callback) delete this.events[eventName];
 
     const handlers = this.events[eventName];
     if (!handlers) return;
 
-    const index = handlers.indexOf(callback as typeof handlers[number]);
+    const index = handlers.indexOf(callback as (typeof handlers)[number]);
     if (index !== -1) handlers.splice(index, 1);
   }
 
   /**
    * 触发编辑器事件
    */
-  private _fire<Event extends keyof VizPathEvent>(eventName: Event, ...data: Parameters<VizPathEvent[Event]>) {
+  private _fire<Event extends keyof VizPathEvent>(
+    eventName: Event,
+    ...data: Parameters<VizPathEvent[Event]>
+  ) {
     const handlers = this.events[eventName];
     if (!handlers) return;
-    for (let callback of handlers) (callback)(...data);
+    for (let callback of handlers) callback(...data);
   }
 
   /**
