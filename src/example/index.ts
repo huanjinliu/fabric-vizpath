@@ -78,9 +78,7 @@ const EXAMPLE_PATH_D = {
     //   })
     // )
     .use(new EditorBackground())
-    .use(new EditorPath({
-      updateTriggerTime: 'auto'
-    }))
+    .use(new EditorPath())
     .use(new EditorNode())
     .initialize();
 

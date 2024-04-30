@@ -148,8 +148,8 @@ class VizPath {
       if (Array.isArray(skipObserverIDs)) {
         temporaryIgnoreIds = skipObserverIDs.filter(Boolean) as string[];
       }
-      if (crood.x) proxy.x = crood.x;
-      if (crood.y) proxy.y = crood.y;
+      proxy.x = crood.x;
+      proxy.y = crood.y;
       temporaryIgnoreIds = [];
     };
     proxy.observe = (handler, options = {}) => {

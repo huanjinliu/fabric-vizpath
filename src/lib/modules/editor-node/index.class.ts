@@ -19,16 +19,17 @@ class EditorNode extends EditorModule {
   nodes: fabric.Group[] = [];
 
   controllers: {
-    points: fabric.Group[];
-    lines: fabric.Line[];
-  } = {
-    points: [],
-    lines: [],
-  };
+    type: 'pre' | 'next';
+    point: fabric.Group;
+    line: fabric.Line;
+    node: fabric.Group;
+  }[] = [];
 
-  objectMap: WeakMap<fabric.Group, PathwayNode<ResponsiveCrood>> = new WeakMap(
-    []
-  );
+  objectNodeMap: WeakMap<fabric.Group, PathwayNode<ResponsiveCrood>> =
+    new WeakMap([]);
+
+  nodeObjectMap: WeakMap<PathwayNode<ResponsiveCrood>, fabric.Group> =
+    new WeakMap([]);
 
   private _cancelSelectEvent = false;
 
@@ -108,7 +109,8 @@ class EditorNode extends EditorModule {
 
         nodes.push(object);
 
-        this.objectMap.set(object, item);
+        this.objectNodeMap.set(object, item);
+        this.nodeObjectMap.set(item, object);
       });
     });
 
@@ -119,10 +121,8 @@ class EditorNode extends EditorModule {
   private _addActiveSelectionObserve(group: fabric.ActiveSelection) {
     observe(group, ['left', 'top', 'angle'], () => {
       for (const object of group._objects as fabric.Group[]) {
-        if (!this.nodes.includes(object)) continue;
-
         const decomposeMatrix = fabric.util.qrDecompose(
-          object.calcTransformMatrix()
+          object.calcTransformMatrix(false)
         );
         const left = decomposeMatrix.translateX;
         const top = decomposeMatrix.translateY;
@@ -140,6 +140,14 @@ class EditorNode extends EditorModule {
     });
   }
 
+  // 移除当前控制点
+  private _removeCurrentControllers() {
+    const editor = this.vizPath?.context.find(Editor);
+    editor?.canvas?.remove(
+      ...this.controllers.map((i) => [i.point, i.line]).flat(1)
+    );
+  }
+
   // 添加活跃节点的周围控制点
   private _addActivePointControllers(nodeObject: fabric.Group) {
     const canvas = nodeObject.canvas;
@@ -147,7 +155,7 @@ class EditorNode extends EditorModule {
 
     if (!this.vizPath) return;
 
-    const pathwayNode = this.objectMap.get(nodeObject);
+    const pathwayNode = this.objectNodeMap.get(nodeObject);
     if (!pathwayNode) return;
 
     const editorPath = this.vizPath.context.find(EditorPath);
@@ -157,18 +165,17 @@ class EditorNode extends EditorModule {
 
     if (!pathwayNode.node) return;
 
-    const lines: fabric.Line[] = [];
-    const points: fabric.Group[] = [];
+    const controllers: typeof this.controllers = [];
 
     const cur = pathwayNode;
     const { pre, next } = this.vizPath.getAroundPathwayNodes(pathwayNode);
 
-    const controllers = [
-      [pre?.node, pre?.controllers?.next],
-      [cur?.node, cur.controllers?.pre],
-      [cur?.node, cur.controllers?.next],
-      [next?.node, next?.controllers?.pre],
-    ];
+    const list: [PathwayNode<ResponsiveCrood>, 'pre' | 'next'][] = [];
+
+    if (pre?.controllers?.next) list.push([pre, 'next']);
+    if (cur.controllers?.pre) list.push([cur, 'pre']);
+    if (cur.controllers?.next) list.push([cur, 'next']);
+    if (next?.controllers?.pre) list.push([next, 'pre']);
 
     // 如果是开始指令且闭合需要特殊处理
     if (
@@ -177,15 +184,24 @@ class EditorNode extends EditorModule {
       pre
     ) {
       const { pre: prePre } = this.vizPath.getAroundPathwayNodes(pre);
-      controllers.unshift([prePre?.node, prePre?.controllers?.next])
+      if (prePre?.controllers?.next) list.unshift([prePre, 'next']);
     }
 
-    (
-      controllers.filter((i) => i.every(Boolean)) as [
-        ResponsiveCrood,
-        ResponsiveCrood
-      ][]
-    ).forEach(([node, controller]) => {
+    list.forEach(([pathwayNode, controllerPos]) => {
+      // 已存在的节点直接复用
+      const existIdx = this.controllers.findIndex(
+        (i) =>
+          this.objectNodeMap.get(i.node) === pathwayNode &&
+          i.type === controllerPos
+      );
+      if (existIdx !== -1) {
+        controllers.push(this.controllers[existIdx]);
+        return;
+      }
+
+      const node = pathwayNode.node!;
+      const controller = pathwayNode.controllers![controllerPos]!;
+
       /**
        * 创建指令控制点
        */
@@ -302,21 +318,28 @@ class EditorNode extends EditorModule {
 
       if (!line[VizPath.symbol]) line = lineDecorator(line);
 
-      points.push(point);
-      lines.push(line);
+      controllers.push({
+        type: controllerPos,
+        node: this.nodeObjectMap.get(pathwayNode)!,
+        point,
+        line,
+      });
     });
 
     // 由于需要多次添加关键点和控制点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
     canvas.renderOnAddRemove = false;
 
     // 移除旧对象
-    canvas.remove(...this.controllers.lines, ...this.controllers.points);
+    canvas.remove(...this.controllers.map((i) => [i.point, i.line]).flat(1));
 
     // 初始路径控制点
-    this.controllers = { points, lines };
+    this.controllers = controllers;
 
-    // 移除旧对象
-    canvas.add(...this.controllers.lines, ...this.controllers.points);
+    // 添加新对象
+    this.controllers.forEach((i, idx) => {
+      canvas.insertAt(i.line, idx, false);
+      canvas.insertAt(i.point, idx + 1, false);
+    });
 
     canvas.renderOnAddRemove = true;
 
@@ -347,7 +370,7 @@ class EditorNode extends EditorModule {
       top: number;
     }
   ) {
-    const pathwayNode = this.objectMap.get(object);
+    const pathwayNode = this.objectNodeMap.get(object);
     if (!pathwayNode) return;
 
     const { node, section, controllers = {} } = pathwayNode;
@@ -441,55 +464,77 @@ class EditorNode extends EditorModule {
     object.canvas?.requestRenderAll();
   }
 
-  focus(...selectedNodes: fabric.Group[]) {
+  focus(...selectedObjects: fabric.Object[]) {
     const canvas = this.editor?.canvas;
     if (!canvas) return;
 
-    const focusNodes: fabric.Group[] = selectedNodes.filter((i) =>
-      this.nodes.includes(i)
-    );
-    const focusControllerPoints: fabric.Group[] = selectedNodes.filter((i) =>
-      this.controllers.points.includes(i)
-    );
+    const editorPath = this.vizPath?.context.find(EditorPath);
+    if (!editorPath) return;
 
-    if (focusNodes.length === 0 && focusControllerPoints.length == 0) return;
+    const focusNodes = selectedObjects.filter((i) =>
+      this.nodes.includes(i as fabric.Group)
+    ) as fabric.Group[];
+    const focusControllerPoints = selectedObjects.filter((i) =>
+      this.controllers.find(({ point }) => point === i)
+    ) as fabric.Group[];
+
+    // 优先判断是否聚焦关键点
+    if (focusNodes.length) {
+      // 聚焦多个时只保留关键点
+      focusControllerPoints.length = 0;
+    }
+    // 没有聚焦关键点再考虑是否只有一个控制点聚焦情况
+    else if (focusControllerPoints.length === 1) {
+      const { node } = this.controllers.find(
+        (i) => i.point === focusControllerPoints[0]
+      )!;
+      // 控制点所在的关键点需要先选中
+      focusNodes.push(node);
+    }
+    // else if (selectedObjects.length == 1) {
+    //   const focusPath = editorPath.paths.find(
+    //     (i) => i.path === selectedObjects[0]
+    //   );
+    //   if (focusPath) {
+    //     focusNodes.push(
+    //       ...this.nodes.filter((node) => {
+    //         return (
+    //           editorPath.nodePathMap.get(this.objectNodeMap.get(node)!.node!) ===
+    //           focusPath
+    //         );
+    //       })
+    //     );
+    //   }
+    // }
 
     this._cancelSelectEvent = true;
 
-    // 选中对象中包含关键点则特殊处理
-    if (focusNodes.length) {
-      // 取消画布选中重新构造只包含关键点的选中框对象
-      canvas.discardActiveObject();
-      if (focusNodes.length === 1) {
-        const focusNode = focusNodes[0];
-        canvas.setActiveObject(focusNode);
-        this._addActivePointObserve(focusNode);
-        this._addActivePointControllers(focusNode);
-      } else {
-        const activeSelection = new fabric.ActiveSelection(focusNodes, {
-          canvas,
-          lockScalingFlip: true,
-          // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
-          lockRotation: true,
-          originX: 'center',
-          originY: 'center',
-        });
-        if (activeSelection.lockRotation) {
-          activeSelection.setControlVisible('mtr', false);
-        }
-        canvas.setActiveObject(activeSelection);
-        this._addActiveSelectionObserve(activeSelection);
-      }
-    }
-    // 不允许同时选中多个曲线控制点
-    else if (focusControllerPoints.length > 1) {
-      canvas.discardActiveObject();
-    }
-    // 选中曲线控制点
-    else if (focusControllerPoints.length === 1) {
-    }
+    // 取消画布选中重新构造只包含关键点的选中框对象
+    canvas.discardActiveObject();
 
-    canvas.requestRenderAll();
+    if (focusNodes.length === 1) {
+      const focusNode = focusNodes[0];
+      this._addActivePointObserve(focusNode);
+      this._addActivePointControllers(focusNode);
+      canvas.setActiveObject(focusControllerPoints[0] ?? focusNode);
+    } else if (focusNodes.length > 1) {
+      const activeSelection = new fabric.ActiveSelection(focusNodes, {
+        canvas,
+        lockScalingFlip: true,
+        // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
+        lockRotation: true,
+        originX: 'center',
+        originY: 'center',
+      });
+      if (activeSelection.lockRotation) {
+        activeSelection.setControlVisible('mtr', false);
+      }
+      this._addActiveSelectionObserve(activeSelection);
+      this._removeCurrentControllers();
+      canvas.setActiveObject(activeSelection);
+    } else {
+      this._removeCurrentControllers();
+    }
 
     this._cancelSelectEvent = false;
   }
@@ -519,9 +564,8 @@ class EditorNode extends EditorModule {
 
       // 移除旧对象
       canvas.remove(
-        ...this.controllers.lines,
-        ...this.controllers.points,
-        ...this.nodes
+        ...this.nodes,
+        ...this.controllers.map((i) => [i.point, i.line]).flat(1)
       );
 
       // 初始路径关键点
@@ -539,9 +583,8 @@ class EditorNode extends EditorModule {
       const canvas = editor.canvas;
       if (!canvas) return;
       canvas.remove(
-        ...this.controllers.lines,
-        ...this.controllers.points,
-        ...this.nodes
+        ...this.nodes,
+        ...this.controllers.map((i) => [i.point, i.line]).flat(1)
       );
     });
   }
