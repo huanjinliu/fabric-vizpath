@@ -177,30 +177,77 @@ class VizPath {
 
   /**
    * 获取前后的指令节点信息
+   * @param pathwayNode 路径节点
+   * @param cycle 闭合路径是否开启循环查找
    */
-  getAroundPathwayNodes<T extends Crood>(pathwayNode: PathwayNode<T>) {
+  getNeighboringNodes<T extends Crood>(pathwayNode: PathwayNode<T>, cycle = false) {
     const { section } = pathwayNode;
     const index = section.indexOf(pathwayNode);
 
     let pre = section[index - 1];
     let next = section[index + 1];
 
-    // 如果没有上一个指令，则判断是否是闭合路径，如果是闭合路径则倒数第二个指令视为上一个指令
-    const isClosePath =
-      section[section.length - 1].instruction[0] === InstructionType.CLOSE;
-    if (isClosePath && !pre) {
-      pre = section[section.length - 2];
-    }
+    // 是否循环并且是闭合路径
+    if (cycle && this.isClosePath(section)) {
+      // 如果没有上一个指令，则倒数第二个指令视为上一个指令
+      if (!pre) {
+        pre = section[section.length - 2];
+      }
 
-    // 如果有下一个指令且下一个指令是闭合指令，则指向起始指令
-    if (next && next.instruction[0] === InstructionType.CLOSE) {
-      next = section[0];
+      // 如果没有下一个指令，则起始指令视为下一个指令
+      if (!next) {
+        pre = section[0];
+      }
+
+      // 如果有下一个指令但下一个指令是闭合指令，则指向起始指令
+      if (next && next.instruction[0] === InstructionType.CLOSE) {
+        next = section[0];
+      }
     }
 
     return { pre, next } as Partial<{
       pre: PathwayNode<T>;
       next: PathwayNode<T>;
     }>;
+  }
+
+  /**
+   * 获取更多周围的控制点信息（前、后、上一关键点后、下一关键点前），默认循环查找
+   */
+  getMoreNeighboringNodes<T extends Crood>(pathwayNode: PathwayNode<T>) {
+    const nodes: ['cur-pre' | 'cur-next' | 'pre-next' | 'next-pre', PathwayNode<T>][] = [];
+
+    const cur = pathwayNode;
+    const { pre, next } = this.getNeighboringNodes(cur, true);
+
+    // 特殊情况1：当前是起始节点
+    if (cur.instruction[0] === InstructionType.START) {
+      if (pre) {
+        const { pre: ppre } = this.getNeighboringNodes(pre, true);
+        if (ppre) nodes.push(['pre-next', ppre])
+        nodes.push(['cur-pre', pre])
+      }
+      nodes.push(['cur-next', cur])
+      if (next) nodes.push(['next-pre', next])
+    }
+    // 特殊情况2：当前是自动闭合路径的闭合前节点
+    else if (next?.instruction[0] === InstructionType.CLOSE) {
+      const start = pathwayNode.section[0];
+      const nnext = pathwayNode.section[1];
+      if (pre) nodes.push(['pre-next', pre])
+      nodes.push(['cur-pre', cur])
+      nodes.push(['cur-next', start])
+      if (nnext) nodes.push(['next-pre', nnext])
+    }
+    // 正常情况
+    else {
+      if (pre) nodes.push(['pre-next', pre]);
+      nodes.push(['cur-pre', cur])
+      nodes.push(['cur-next', cur])
+      if (next) nodes.push(['next-pre', next]);
+    }
+
+    return nodes;
   }
 
   /**
@@ -231,36 +278,30 @@ class VizPath {
         }
 
         // 指令控制点
-        const { pre, next } = this.getAroundPathwayNodes(item);
+        const { pre, next } = this.getNeighboringNodes(item);
         const controllers = {} as NonNullable<
           PathwayNode<ResponsiveCrood>['controllers']
         >;
-        const instructions = {
-          // 如果是起始指令且为自动闭合路径，则前一个控制点来自前一个指令
-          pre: (instruction[0] === InstructionType.START && pre ? pre : item)
-            ?.instruction,
-          next: next?.instruction,
-        };
 
-        if (instructions.pre?.[0] === InstructionType.BEZIER_CURVE) {
+        if (item?.instruction[0] === InstructionType.BEZIER_CURVE) {
           controllers.pre = this._toResponsive({
-            x: instructions.pre[3],
-            y: instructions.pre[4],
+            x: item.instruction[3],
+            y: item.instruction[4],
           });
           controllers.pre.observe((x, y) => {
-            instructions.pre[3] = x;
-            instructions.pre[4] = y;
+            item.instruction[3] = x;
+            item.instruction[4] = y;
           });
         }
 
-        if (instructions.next?.[0] === InstructionType.BEZIER_CURVE) {
+        if (next?.instruction[0] === InstructionType.BEZIER_CURVE) {
           controllers.next = this._toResponsive({
-            x: instructions.next[1],
-            y: instructions.next[2],
+            x: next!.instruction[1],
+            y: next!.instruction[2],
           });
           controllers.next.observe((x, y) => {
-            instructions.next![1] = x;
-            instructions.next![2] = y;
+            next!.instruction[1] = x;
+            next!.instruction[2] = y;
           });
         }
 

@@ -20,9 +20,9 @@ class EditorNode extends EditorModule {
 
   controllers: {
     type: 'pre' | 'next';
+    node: PathwayNode<ResponsiveCrood>;
     point: fabric.Group;
     line: fabric.Line;
-    node: fabric.Group;
   }[] = [];
 
   objectNodeMap: WeakMap<fabric.Group, PathwayNode<ResponsiveCrood>> =
@@ -167,40 +167,22 @@ class EditorNode extends EditorModule {
 
     const controllers: typeof this.controllers = [];
 
-    const cur = pathwayNode;
-    const { pre, next } = this.vizPath.getAroundPathwayNodes(pathwayNode);
+    const neighboringNodes = this.vizPath.getMoreNeighboringNodes(pathwayNode);
 
-    const list: [PathwayNode<ResponsiveCrood>, 'pre' | 'next'][] = [];
-
-    if (pre?.controllers?.next) list.push([pre, 'next']);
-    if (cur.controllers?.pre) list.push([cur, 'pre']);
-    if (cur.controllers?.next) list.push([cur, 'next']);
-    if (next?.controllers?.pre) list.push([next, 'pre']);
-
-    // 如果是开始指令且闭合需要特殊处理
-    if (
-      cur.instruction[0] === InstructionType.START &&
-      this.vizPath.isClosePath(cur.section) &&
-      pre
-    ) {
-      const { pre: prePre } = this.vizPath.getAroundPathwayNodes(pre);
-      if (prePre?.controllers?.next) list.unshift([prePre, 'next']);
-    }
-
-    list.forEach(([pathwayNode, controllerPos]) => {
+    neighboringNodes.forEach(([type, pathwayNode]) => {
+      const pos = type.split('-')[1] as 'pre' | 'next';
       // 已存在的节点直接复用
-      const existIdx = this.controllers.findIndex(
-        (i) =>
-          this.objectNodeMap.get(i.node) === pathwayNode &&
-          i.type === controllerPos
-      );
+      const existIdx = this.controllers.findIndex((i) => {
+        return i.node === pathwayNode && i.type === pos;
+      });
       if (existIdx !== -1) {
         controllers.push(this.controllers[existIdx]);
         return;
       }
 
-      const node = pathwayNode.node!;
-      const controller = pathwayNode.controllers![controllerPos]!;
+      const node = pathwayNode.node;
+      const controller = pathwayNode.controllers![pos];
+      if (!node || !controller) return;
 
       /**
        * 创建指令控制点
@@ -319,8 +301,8 @@ class EditorNode extends EditorModule {
       if (!line[VizPath.symbol]) line = lineDecorator(line);
 
       controllers.push({
-        type: controllerPos,
-        node: this.nodeObjectMap.get(pathwayNode)!,
+        type: pos,
+        node: pathwayNode,
         point,
         line,
       });
@@ -337,8 +319,8 @@ class EditorNode extends EditorModule {
 
     // 添加新对象
     this.controllers.forEach((i, idx) => {
-      canvas.insertAt(i.line, idx, false);
-      canvas.insertAt(i.point, idx + 1, false);
+      canvas.insertAt(i.line, editorPath.paths.length + idx, false);
+      canvas.insertAt(i.point, editorPath.paths.length + idx + 1, false);
     });
 
     canvas.renderOnAddRemove = true;
@@ -348,7 +330,6 @@ class EditorNode extends EditorModule {
 
   private _initSelectEvents() {
     if (!this.editor) return;
-
     this.editor.on('canvas', 'selection:created', (e) => {
       if (this._cancelSelectEvent) return;
       this.focus(...e.selected);
@@ -361,6 +342,30 @@ class EditorNode extends EditorModule {
       if (this._cancelSelectEvent) return;
       this.focus();
     });
+    // 选中路径段时自动选中路线段内的所有指令关键点
+    this.editor.on('canvas', 'mouse:dblclick', (e) => {
+      if (e.target !== null) return;
+
+      const editorPath = this.vizPath?.context.find(EditorPath);
+      if (!editorPath) return;
+
+      let focusPath: typeof editorPath.paths[number] | undefined;
+      for (let i = editorPath.paths.length - 1; i >= 0; i--) {
+        const path = editorPath.paths[i];
+        if (path.path.containsPoint(e.pointer)) {
+          focusPath = path;
+          break;
+        }
+      }
+      if (focusPath) {
+        this.focus(
+          ...this.nodes.filter((node) => (
+            editorPath.nodePathMap.get(this.objectNodeMap.get(node)!.node!) ===
+            focusPath
+          ))
+        )
+      }
+    })
   }
 
   move(
@@ -373,7 +378,7 @@ class EditorNode extends EditorModule {
     const pathwayNode = this.objectNodeMap.get(object);
     if (!pathwayNode) return;
 
-    const { node, section, controllers = {} } = pathwayNode;
+    const { node, section } = pathwayNode;
 
     const editorPath = this.vizPath?.context.find(EditorPath);
     if (!editorPath) return [];
@@ -390,12 +395,12 @@ class EditorNode extends EditorModule {
       scaleY: newScaleY,
       angle: newAngle,
     } = selectionGroup
-      ? {
+        ? {
           scaleX: 1 / selectionGroup.scaleX!,
           scaleY: 1 / selectionGroup.scaleY!,
           angle: -selectionGroup.angle!,
         }
-      : { scaleX: 1, scaleY: 1, angle: 0 };
+        : { scaleX: 1, scaleY: 1, angle: 0 };
 
     object
       .set({
@@ -424,8 +429,13 @@ class EditorNode extends EditorModule {
     };
 
     node!.set(newCrood, [object?.name]);
-    if (controllers.pre) followCroods.push(controllers.pre);
-    if (controllers.next) followCroods.push(controllers.next);
+
+    const list = this.vizPath?.getMoreNeighboringNodes(pathwayNode);
+    list?.forEach(([type, node]) => {
+      if (type === 'cur-pre' || type === 'cur-next') {
+        followCroods.push(node.controllers![type.split('-')[1]]!);
+      }
+    });
 
     // 如果『路径自动闭合（带有z指令）』，首尾两个节点需要同步操作
     if (
@@ -433,10 +443,8 @@ class EditorNode extends EditorModule {
       section.length > 2
     ) {
       if (section[0].node === node) {
-        const { node, controllers = {} } = section[section.length - 2];
+        const { node } = section[section.length - 2];
         node!.set(newCrood);
-        if (controllers.pre) followCroods.push(controllers.pre);
-        if (controllers.next) followCroods.push(controllers.next);
       }
       // 闭合节点不可能存在可视操作节点
       // if (section[section.length - 2].node === node) {}
@@ -489,23 +497,9 @@ class EditorNode extends EditorModule {
         (i) => i.point === focusControllerPoints[0]
       )!;
       // 控制点所在的关键点需要先选中
-      focusNodes.push(node);
+      const object = this.nodeObjectMap.get(node) ?? this.nodeObjectMap.get(node.section[0]);
+      if (object) focusNodes.push(object);
     }
-    // else if (selectedObjects.length == 1) {
-    //   const focusPath = editorPath.paths.find(
-    //     (i) => i.path === selectedObjects[0]
-    //   );
-    //   if (focusPath) {
-    //     focusNodes.push(
-    //       ...this.nodes.filter((node) => {
-    //         return (
-    //           editorPath.nodePathMap.get(this.objectNodeMap.get(node)!.node!) ===
-    //           focusPath
-    //         );
-    //       })
-    //     );
-    //   }
-    // }
 
     this._cancelSelectEvent = true;
 

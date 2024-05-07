@@ -87,7 +87,7 @@ const loadSVGToPathFromURL = async (url: string) => {
       d[0][0] = 'M';
 
       if (type === 'polygon') {
-        d.push('z');
+        d.push(['z']);
       }
 
       return new fabric.Path(d);

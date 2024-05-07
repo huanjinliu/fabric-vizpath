@@ -39,33 +39,6 @@ class EditorPath extends EditorModule {
   }
 
   /**
-   * 将相对坐标点转化为带元素本身变换的偏移位置
-   */
-  calcAbsolutePosition(crood: Crood, matrix: number[]): Position {
-    const point = fabric.util.transformPoint(
-      new fabric.Point(crood.x, crood.y),
-      matrix
-    );
-
-    return { left: point.x, top: point.y };
-  }
-
-  /**
-   * 移除元素本身变换，将实际偏移转化为路径相对坐标
-   */
-  calcRelativeCrood(position: Position, matrix: number[]): Crood {
-    const point = fabric.util.transformPoint(
-      new fabric.Point(position.left, position.top),
-      fabric.util.invertTransform(matrix)
-    );
-
-    return {
-      x: round(point.x, 4),
-      y: round(point.y, 4),
-    };
-  }
-
-  /**
    * 重新修正路径的尺寸和位置
    *
    * @param path 路径对象
@@ -75,10 +48,7 @@ class EditorPath extends EditorModule {
    * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
    * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
    */
-  updatePathStatus(path: fabric.Path) {
-    const { matrix } = this.paths.find(i => i.path === path) ?? {};
-    if (!matrix) return;
-
+  static reinitializePath(path: fabric.Path) {
     // 记录旧的路径信息
     const oldInfo = {
       left: path.left!,
@@ -108,7 +78,7 @@ class EditorPath extends EditorModule {
           (path.height! - oldInfo.height) / 2 -
           oldInfo.pathOffset.y
       ),
-      [...matrix.slice(0, 4), 0, 0]
+      [...path.calcOwnMatrix().slice(0, 4), 0, 0]
     );
 
     // 设置回正确的偏移位置
@@ -118,6 +88,48 @@ class EditorPath extends EditorModule {
     });
 
     path.setCoords();
+  }
+
+  /**
+   * 将相对坐标点转化为带元素本身变换的偏移位置
+   */
+  calcAbsolutePosition(crood: Crood, matrix: number[]): Position {
+    const point = fabric.util.transformPoint(
+      new fabric.Point(crood.x, crood.y),
+      matrix
+    );
+
+    return { left: point.x, top: point.y };
+  }
+
+  /**
+   * 移除元素本身变换，将实际偏移转化为路径相对坐标
+   */
+  calcRelativeCrood(position: Position, matrix: number[]): Crood {
+    const point = fabric.util.transformPoint(
+      new fabric.Point(position.left, position.top),
+      fabric.util.invertTransform(matrix)
+    );
+
+    return {
+      x: round(point.x, 4),
+      y: round(point.y, 4),
+    };
+  }
+
+  
+  /**
+   * 重新修正路径的尺寸和位置
+   *
+   * @param path 路径对象
+   *
+   * @note
+   *
+   * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
+   * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
+   */
+  updatePathStatus(path: fabric.Path) {
+    EditorPath.reinitializePath(path)
 
     path.canvas?.requestRenderAll();
   }

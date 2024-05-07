@@ -24,6 +24,14 @@
         max-width: 580px;
         margin: 32px auto;
       }
+      fieldset {
+        padding: 8px 12px;
+        margin:  12px 0;
+      }
+      button {
+        padding: 2px 4px;
+        cursor: pointer;
+      }
       main {
         height: 380px;
         margin: 20px auto;
@@ -35,13 +43,17 @@
   </head>
   <body>
     <div class="container">
-      <header>
-        <div class="">
-          <span>上传文件</span>
-          <input id="upload" type="file">
-        </div>
-      </header>
       <main></main>
+      <footer>
+        <fieldset>
+          <legend>操作按钮</legend>
+          <button id="btn-delete" type="button">删除节点</button>
+        </fieldset>
+        <fieldset>
+          <legend>上传文件</legend>
+          <input id="upload" type="file">
+        </fieldset>
+      </footer>
     </div>
   </body>
 </html>

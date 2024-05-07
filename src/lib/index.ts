@@ -2,13 +2,14 @@ import { fabric } from 'fabric';
 import cloneDeep from 'lodash-es/cloneDeep';
 import defaults from 'lodash-es/defaults';
 import VizPath from './vizpath.class';
-import type EditorModule from './modules/base.class';
 import {
   getCubicFromQuadratic,
   loadSVGToPathFromURL,
   parsePathJSON,
   transform,
 } from '@utils';
+import EditorPath from './modules/editor-path/index.class';
+import type EditorModule from './modules/base.class';
 
 /** 指令类型 */
 export enum InstructionType {
@@ -65,6 +66,7 @@ class VizPathContext {
       const originPath = new fabric.Path(
         (fabric.util as any).joinPath(section)
       );
+
       originPath.path = section as unknown as fabric.Point[];
       originPath.set(styles);
 
@@ -82,31 +84,40 @@ class VizPathContext {
      */
     const pathway: Pathway = sections.map(({ section, originPath }) => {
       // ① 清除路径自带偏移，如果不消除，后续的所有关键点、控制点的编辑都要额外处理路径自身的偏移
-      section.forEach((item, pathIdx) => {
-        const [, ...croods] = item as unknown as [
-          type: string,
-          ...croods: number[]
-        ];
-        for (let i = 0; i < croods.length; i += 2) {
-          const { x, y } = transform(
-            {
-              x: section[pathIdx][i + 1] as number,
-              y: section[pathIdx][i + 2] as number,
-            },
-            [
+      const clearPathOffset = (path: fabric.Path) => {
+        const section = path.path as unknown as Instruction[];
+        section.forEach((item, pathIdx) => {
+          const [, ...croods] = item as unknown as [
+            type: string,
+            ...croods: number[]
+          ];
+          for (let i = 0; i < croods.length; i += 2) {
+            const { x, y } = transform(
               {
-                translate: {
-                  x: -originPath.pathOffset.x,
-                  y: -originPath.pathOffset.y,
-                },
+                x: section[pathIdx][i + 1] as number,
+                y: section[pathIdx][i + 2] as number,
               },
-            ]
-          );
-          section[pathIdx][i + 1] = x;
-          section[pathIdx][i + 2] = y;
-        }
-      });
-      originPath.pathOffset = new fabric.Point(0, 0);
+              [
+                {
+                  translate: {
+                    x: -originPath.pathOffset.x,
+                    y: -originPath.pathOffset.y,
+                  },
+                },
+              ]
+            );
+            section[pathIdx][i + 1] = x;
+            section[pathIdx][i + 2] = y;
+          }
+        });
+        originPath.pathOffset = new fabric.Point(0, 0);
+      }
+
+      // 第一次清除是清除成组子元素的偏移
+      clearPathOffset(originPath);
+      EditorPath.reinitializePath(originPath);
+      // 第二次清除是清除自身的偏移
+      clearPathOffset(originPath);
 
       // ② 修正头指令，头指令必须是M开始指令，其他的也没效果
       if (section[0][0] !== InstructionType.START) {
