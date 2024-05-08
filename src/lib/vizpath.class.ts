@@ -1,12 +1,21 @@
 import { fabric } from 'fabric';
 import round from 'lodash-es/round';
-import type VizPathContext from '.';
+import cloneDeep from 'lodash-es/cloneDeep';
+import VizPathContext from '.';
 import {
   type Pathway,
   type Instruction,
   InstructionType,
   type PathwayNode,
 } from '.';
+import { clearPathOffset, parsePathJSON, reinitializePath } from '@utils';
+
+export enum VizPathSymbalType {
+  PATH = 'path',
+  NODE = 'node',
+  CONTROLLER_POINT = 'controller-point',
+  CONTROLLER_LINE = 'controller-line',
+}
 
 export type ResponsiveCrood = Crood & {
   set: (crood: Crood, skipObserverIDs?: (string | undefined)[]) => void;
@@ -27,8 +36,9 @@ export type ResponsivePathway = {
 
 export type VizPathEvent = {
   update: (crood: ResponsiveCrood) => void;
-  draw: () => void;
-  clean: () => void;
+  draw: (pathway: Pathway) => void;
+  clear: (pathway: Pathway) => void;
+  clearAll: () => void;
 };
 
 /**
@@ -172,7 +182,9 @@ class VizPath {
    * @param section 路径段
    */
   isClosePath(section: PathwayNode[]) {
-    return section[section.length - 1]?.instruction[0] === InstructionType.CLOSE;
+    return (
+      section[section.length - 1]?.instruction[0] === InstructionType.CLOSE
+    );
   }
 
   /**
@@ -180,7 +192,10 @@ class VizPath {
    * @param pathwayNode 路径节点
    * @param cycle 闭合路径是否开启循环查找
    */
-  getNeighboringNodes<T extends Crood>(pathwayNode: PathwayNode<T>, cycle = false) {
+  getNeighboringNodes<T extends Crood>(
+    pathwayNode: PathwayNode<T>,
+    cycle = false
+  ) {
     const { section } = pathwayNode;
     const index = section.indexOf(pathwayNode);
 
@@ -215,7 +230,10 @@ class VizPath {
    * 获取更多周围的控制点信息（前、后、上一关键点后、下一关键点前），默认循环查找
    */
   getMoreNeighboringNodes<T extends Crood>(pathwayNode: PathwayNode<T>) {
-    const nodes: ['cur-pre' | 'cur-next' | 'pre-next' | 'next-pre', PathwayNode<T>][] = [];
+    const nodes: [
+      'cur-pre' | 'cur-next' | 'pre-next' | 'next-pre',
+      PathwayNode<T>
+    ][] = [];
 
     const cur = pathwayNode;
     const { pre, next } = this.getNeighboringNodes(cur, true);
@@ -224,26 +242,26 @@ class VizPath {
     if (cur.instruction[0] === InstructionType.START) {
       if (pre) {
         const { pre: ppre } = this.getNeighboringNodes(pre, true);
-        if (ppre) nodes.push(['pre-next', ppre])
-        nodes.push(['cur-pre', pre])
+        if (ppre) nodes.push(['pre-next', ppre]);
+        nodes.push(['cur-pre', pre]);
       }
-      nodes.push(['cur-next', cur])
-      if (next) nodes.push(['next-pre', next])
+      nodes.push(['cur-next', cur]);
+      if (next) nodes.push(['next-pre', next]);
     }
     // 特殊情况2：当前是自动闭合路径的闭合前节点
     else if (next?.instruction[0] === InstructionType.CLOSE) {
       const start = pathwayNode.section[0];
       const nnext = pathwayNode.section[1];
-      if (pre) nodes.push(['pre-next', pre])
-      nodes.push(['cur-pre', cur])
-      nodes.push(['cur-next', start])
-      if (nnext) nodes.push(['next-pre', nnext])
+      if (pre) nodes.push(['pre-next', pre]);
+      nodes.push(['cur-pre', cur]);
+      nodes.push(['cur-next', start]);
+      if (nnext) nodes.push(['next-pre', nnext]);
     }
     // 正常情况
     else {
       if (pre) nodes.push(['pre-next', pre]);
-      nodes.push(['cur-pre', cur])
-      nodes.push(['cur-next', cur])
+      nodes.push(['cur-pre', cur]);
+      nodes.push(['cur-next', cur]);
       if (next) nodes.push(['next-pre', next]);
     }
 
@@ -278,7 +296,7 @@ class VizPath {
         }
 
         // 指令控制点
-        const { pre, next } = this.getNeighboringNodes(item);
+        const { next } = this.getNeighboringNodes(item);
         const controllers = {} as NonNullable<
           PathwayNode<ResponsiveCrood>['controllers']
         >;
@@ -315,23 +333,86 @@ class VizPath {
       });
     });
 
-    this._fire('draw');
+    this._fire('draw', pathway);
+  }
+
+  /**
+   * 使用新的路径信息绘制旧路径，多个路径段则会使原路径拆分成多个
+   */
+  drawWithNewSections(pathway: Pathway[number], sections: Instruction[][]) {
+    const { originPath } = pathway;
+
+    const { styles, layout } = parsePathJSON(originPath);
+    const newPaths = sections.map((section) => {
+      const path = new fabric.Path(
+        (fabric.util as any).joinPath(
+          originPath.path as unknown as Instruction[]
+        )
+      );
+      path.set({ ...styles, ...layout });
+      path.path = section as unknown as fabric.Point[];
+      reinitializePath(path);
+
+      const _section: PathwayNode[] = [];
+      section.forEach((instruction) => {
+        _section.push({
+          section: _section,
+          instruction,
+        });
+      });
+
+      return {
+        section: _section,
+        originPath: path,
+      };
+    });
+
+    this.clear(originPath);
+    this.draw(newPaths);
+  }
+
+  /**
+   * 清除路径
+   */
+  clear(target: PathwayNode[] | fabric.Path) {
+    const index =
+      target instanceof fabric.Path
+        ? this.pathway.findIndex((i) => i.originPath === target)
+        : this.pathway.findIndex((i) => i.section === target);
+
+    if (index === -1) return;
+
+    const pathway = this.pathway[index];
+
+    pathway.section.forEach(({ node, controllers }) => {
+      if (!node) return;
+
+      node.unobserve();
+      controllers?.pre?.unobserve();
+      controllers?.next?.unobserve();
+      this.pathwayNodeMap.delete(node);
+    });
+
+    this.pathway.splice(index, 1);
+
+    this._fire('clear', [pathway]);
   }
 
   /**
    * 清除所有路径
    */
-  clean() {
+  clearAll() {
     this.pathway.forEach(({ section }) => {
-      section.forEach(({ node }) => {
+      section.forEach(({ node, controllers }) => {
         node?.unobserve();
+        controllers?.pre?.unobserve();
+        controllers?.next?.unobserve();
       });
     });
     this.pathway = [];
     this.pathwayNodeMap = new WeakMap([]);
 
-    this._fire('draw');
-    this._fire('clean');
+    this._fire('clearAll');
   }
 
   /**
@@ -385,6 +466,125 @@ class VizPath {
 
     target.x = crood.x;
     target.y = crood.y;
+  }
+
+  /**
+   * 移除关键点
+   *
+   * @note
+   *
+   * ① 只有一个删除节点时，删除节点前后线段
+   * ② 有多个删除节点，仅删除节点间的线段
+   */
+  remove(...targets: ResponsiveCrood[]) {
+    // 找出需要删除的路径和指令索引映射，便于后续同路径下节点的批量操作
+    const sectionIndexMap = targets.reduce((maps, target) => {
+      const pathwayNode = this.pathwayNodeMap.get(target);
+      if (!pathwayNode) return maps;
+
+      const { section, instruction } = pathwayNode;
+
+      const indexes = maps.get(section) ?? [];
+
+      const index = section.findIndex((i) => i.instruction === instruction);
+
+      indexes.push(index);
+
+      maps.set(section, indexes);
+
+      return maps;
+    }, new Map<PathwayNode<ResponsiveCrood>[], number[]>([]));
+
+    const needRemoveSections = Array.from(sectionIndexMap).map((item) => {
+      const [section, indexes] = item;
+
+      indexes.sort();
+
+      const isMultipleRemove = indexes.length > 1;
+      const isIncludeStartNode = indexes[0] === 0;
+      const isClosePath = section[section.length - 1].instruction[0] === InstructionType.CLOSE;
+      if (isMultipleRemove && isIncludeStartNode && isClosePath) indexes.push(section.length - 2);
+
+      return item;
+    })
+
+    const sections = needRemoveSections.map(([section, indexes]) => {
+      let isClosePath = this.isClosePath(section);
+
+      // 如果路径所有点都在删除列表列表中，直接移除整个路径
+      const isWholePath =
+        indexes.length === section.length ||
+        (isClosePath && indexes.length === section.length - 1);
+      if (isWholePath) {
+        return {
+          pathway: this.pathway.find((i) => i.section === section)!,
+          section: [],
+        };
+      }
+
+      // 需要克隆出新的指令列表不然会影响到originPath
+      const _sections: Instruction[][] = [
+        cloneDeep(section.map((i) => i.instruction)),
+      ];
+
+      const removeIndexes =
+        indexes.length <= 1
+          ? indexes
+          : indexes.filter(
+              (i, idx, arr) =>
+                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
+            );
+
+      for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
+        const instructions = _sections[0];
+        const index = startIndex + removeIndexes[i];
+
+        const pre = instructions.slice(0, index);
+        const next = instructions.slice(index);
+
+        if (isClosePath) {
+          pre.shift();
+          next.pop();
+          if (next[0][0] === InstructionType.START) next.pop();
+        }
+
+        if (indexes.length === 1) next.shift();
+        next[0]?.splice(
+          0,
+          next[0].length,
+          InstructionType.START,
+          ...next[0].slice(-2)
+        );
+
+        _sections.shift();
+        if (isClosePath) {
+          startIndex = next.length - 1;
+          next.push(...pre);
+          pre.length = 0;
+        }
+
+        const needMinNodeCount = indexes.length === 1 ? 1 : 2;
+        if (next.length >= needMinNodeCount) _sections.unshift(next);
+        if (pre.length >= needMinNodeCount) _sections.unshift(pre);
+
+        isClosePath = false;
+      }
+
+      return {
+        pathway: this.pathway.find((i) => i.section === section)!,
+        section: _sections,
+      };
+    });
+
+    sections.forEach((i) => {
+      if (i.section.length) {
+        this.drawWithNewSections(i.pathway, i.section);
+      } else {
+        this.clear(i.pathway.originPath);
+      }
+    });
+
+    sectionIndexMap.clear();
   }
 
   /**

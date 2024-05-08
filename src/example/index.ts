@@ -9,6 +9,7 @@ import {
 } from 'fabric-path-editor';
 
 const EXAMPLE_PATH_D = {
+  single: 'M 100 100 z',
   circle:
     'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
   bubble:
@@ -20,6 +21,9 @@ const EXAMPLE_PATH_D = {
 (async () => {
   // 取得上传文件输入框
   const uploader = document.getElementById('upload') as HTMLInputElement;
+
+  // 取得操作按钮
+  const btnDelete = document.getElementById('btn-delete') as HTMLButtonElement;
 
   // 取得容器节点
   const container = document.getElementsByTagName('main')[0];
@@ -70,15 +74,17 @@ const EXAMPLE_PATH_D = {
 
   const operator = await vizPath
     .use(new Editor(fabricCanvas))
-    // .use(
-    //   new EditorUI({
-    //     // path: (decorator, originPath) => {
-    //     //   return originPath;
-    //     // },
-    //   })
-    // )
+    .use(
+      new EditorUI({
+        // path: (decorator, originPath) => {
+        //   return originPath;
+        // },
+      })
+    )
     .use(new EditorBackground())
-    .use(new EditorPath())
+    .use(new EditorPath({
+      // updateTriggerTime: 'auto'
+    }))
     .use(new EditorNode())
     .initialize();
 
@@ -123,7 +129,7 @@ const EXAMPLE_PATH_D = {
     const file = ((e.target as HTMLInputElement)?.files ?? [])[0];
     if (!file) return;
 
-    operator.clean();
+    operator.clearAll();
 
     const url = URL.createObjectURL(file);
     const pathways = await VizPath.parsePathFromURL(url, {
@@ -138,4 +144,13 @@ const EXAMPLE_PATH_D = {
   }
 
   // operator.move(operator.pathway[0][0].node, { x: 200, y: 200 })
+
+  // 操作按钮
+  btnDelete.addEventListener('click', () => {
+    const editorNode = vizPath.find(EditorNode);
+    if (!editorNode) return;
+
+    if (editorNode.activePoint) editorNode.remove(editorNode.activePoint);
+    if (editorNode.activeNodes.length) editorNode.remove(...editorNode.activeNodes);
+  });
 })();
