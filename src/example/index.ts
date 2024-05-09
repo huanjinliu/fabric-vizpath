@@ -9,7 +9,8 @@ import {
 } from 'fabric-path-editor';
 
 const EXAMPLE_PATH_D = {
-  single: 'M 100 100 z',
+  point: 'M 100 100 z',
+  polyline: 'M 20 20 L 80 20 L 20 50 L 80 50 L 20 80 L 80 80',
   circle:
     'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
   bubble:
@@ -94,6 +95,8 @@ const EXAMPLE_PATH_D = {
     top: fabricCanvas.getHeight() / 2,
     originX: 'center',
     originY: 'center',
+    scaleX: 1.2,
+    scaleY: 1.2,
   });
   operator.draw(pathway1);
 

@@ -473,8 +473,8 @@ class VizPath {
    *
    * @note
    *
-   * ① 只有一个删除节点时，删除节点前后线段
-   * ② 有多个删除节点，仅删除节点间的线段
+   * ① 只有一个删除节点时，删除节点前后线段，连接前后节点
+   * ② 有多个删除节点，仅删除节点间的线段，中间节点同时也会被移除
    */
   remove(...targets: ResponsiveCrood[]) {
     // 找出需要删除的路径和指令索引映射，便于后续同路径下节点的批量操作
@@ -522,22 +522,16 @@ class VizPath {
         };
       }
 
-      // 需要克隆出新的指令列表不然会影响到originPath
-      const _sections: Instruction[][] = [
-        cloneDeep(section.map((i) => i.instruction)),
-      ];
+      /**
+       * 删除单节点时
+       */
+      const removeSingleNode = (index: number) => {
+        // 需要克隆出新的指令列表不然会影响到originPath
+        const _sections: Instruction[][] = [
+          cloneDeep(section.map((i) => i.instruction)),
+        ];
 
-      const removeIndexes =
-        indexes.length <= 1
-          ? indexes
-          : indexes.filter(
-              (i, idx, arr) =>
-                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
-            );
-
-      for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
         const instructions = _sections[0];
-        const index = startIndex + removeIndexes[i];
 
         const pre = instructions.slice(0, index);
         const next = instructions.slice(index);
@@ -548,7 +542,7 @@ class VizPath {
           if (next[0][0] === InstructionType.START) next.pop();
         }
 
-        if (indexes.length === 1) next.shift();
+        next.shift();
         next[0]?.splice(
           0,
           next[0].length,
@@ -558,21 +552,80 @@ class VizPath {
 
         _sections.shift();
         if (isClosePath) {
-          startIndex = next.length - 1;
           next.push(...pre);
           pre.length = 0;
+        } else {
+          pre.push(...next);
+          next.length = 0;
         }
 
-        const needMinNodeCount = indexes.length === 1 ? 1 : 2;
-        if (next.length >= needMinNodeCount) _sections.unshift(next);
-        if (pre.length >= needMinNodeCount) _sections.unshift(pre);
+        if (next.length >= 1) _sections.unshift(next);
+        if (pre.length >= 1) _sections.unshift(pre);
 
-        isClosePath = false;
+        // 如果原本是闭合路径，且剩余节点多于两个，保留闭合状态
+        if (isClosePath && _sections[0].length > 2) {
+          _sections[0].push([InstructionType.LINE, ..._sections[0][0].slice(-2)] as Instruction, [InstructionType.CLOSE]);
+        }
+
+        return _sections;
+      }
+
+      /**
+       * 删除多节点
+       */
+      const removeMulitpleNodes = (indexs: number[]) => {
+        // 需要克隆出新的指令列表不然会影响到originPath
+        const _sections: Instruction[][] = [
+          cloneDeep(section.map((i) => i.instruction)),
+        ];
+
+        const removeIndexes =
+          indexes.length <= 1
+            ? indexes
+            : indexes.filter(
+              (i, idx, arr) =>
+                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
+            );
+
+        for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
+          const instructions = _sections[0];
+          const index = startIndex + removeIndexes[i];
+
+          const pre = instructions.slice(0, index);
+          const next = instructions.slice(index);
+
+          if (isClosePath) {
+            pre.shift();
+            next.pop();
+            if (next[0][0] === InstructionType.START) next.pop();
+          }
+
+          next[0]?.splice(
+            0,
+            next[0].length,
+            InstructionType.START,
+            ...next[0].slice(-2)
+          );
+
+          _sections.shift();
+          if (isClosePath) {
+            startIndex = next.length - 1;
+            next.push(...pre);
+            pre.length = 0;
+          }
+
+          if (next.length > 1) _sections.unshift(next);
+          if (pre.length > 1) _sections.unshift(pre);
+
+          isClosePath = false;
+        }
+
+        return _sections;
       }
 
       return {
         pathway: this.pathway.find((i) => i.section === section)!,
-        section: _sections,
+        section: indexes.length === 1 ? removeSingleNode(indexes[0]) : removeMulitpleNodes(indexes),
       };
     });
 

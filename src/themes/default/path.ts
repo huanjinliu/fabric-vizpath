@@ -13,6 +13,7 @@ const createDefaultPath: Theme['path'] = (decorator, originPath) => {
     stroke: '#333',
     strokeWidth: 4,
     fill: 'transparent',
+    strokeUniform: true,
   });
 
   return decorator(path);

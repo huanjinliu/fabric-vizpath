@@ -4104,8 +4104,8 @@
        *
        * @note
        *
-       * ① 只有一个删除节点时，删除节点前后线段
-       * ② 有多个删除节点，仅删除节点间的线段
+       * ① 只有一个删除节点时，删除节点前后线段，连接前后节点
+       * ② 有多个删除节点，仅删除节点间的线段，中间节点同时也会被移除
        */
     }, {
       key: "remove",
@@ -4144,7 +4144,6 @@
           var _ref8 = _slicedToArray(_ref7, 2),
             section = _ref8[0],
             indexes = _ref8[1];
-          var _a;
           var isClosePath = _this4.isClosePath(section);
           // 如果路径所有点都在删除列表列表中，直接移除整个路径
           var isWholePath = indexes.length === section.length || isClosePath && indexes.length === section.length - 1;
@@ -4156,17 +4155,17 @@
               section: []
             };
           }
-          // 需要克隆出新的指令列表不然会影响到originPath
-          var _sections = [cloneDeep(section.map(function (i) {
-            return i.instruction;
-          }))];
-          var removeIndexes = indexes.length <= 1 ? indexes : indexes.filter(function (i, idx, arr) {
-            return arr.length <= 1 || idx >= 1 && arr[idx - 1] + 1 === i;
-          });
-          for (var i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
+          /**
+           * 删除单节点时
+           */
+          var removeSingleNode = function removeSingleNode(index) {
             var _a2;
+            var _a;
+            // 需要克隆出新的指令列表不然会影响到originPath
+            var _sections = [cloneDeep(section.map(function (i) {
+              return i.instruction;
+            }))];
             var instructions = _sections[0];
-            var index = startIndex + removeIndexes[i];
             var pre = instructions.slice(0, index);
             var next = instructions.slice(index);
             if (isClosePath) {
@@ -4174,24 +4173,65 @@
               next.pop();
               if (next[0][0] === InstructionType.START) next.pop();
             }
-            if (indexes.length === 1) next.shift();
+            next.shift();
             (_a = next[0]) === null || _a === void 0 ? void 0 : (_a2 = _a).splice.apply(_a2, [0, next[0].length, InstructionType.START].concat(_toConsumableArray(next[0].slice(-2))));
             _sections.shift();
             if (isClosePath) {
-              startIndex = next.length - 1;
               next.push.apply(next, _toConsumableArray(pre));
               pre.length = 0;
+            } else {
+              pre.push.apply(pre, _toConsumableArray(next));
+              next.length = 0;
             }
-            var needMinNodeCount = indexes.length === 1 ? 1 : 2;
-            if (next.length >= needMinNodeCount) _sections.unshift(next);
-            if (pre.length >= needMinNodeCount) _sections.unshift(pre);
-            isClosePath = false;
-          }
+            if (next.length >= 1) _sections.unshift(next);
+            if (pre.length >= 1) _sections.unshift(pre);
+            // 如果原本是闭合路径，且剩余节点多于两个，保留闭合状态
+            if (isClosePath && _sections[0].length > 2) {
+              _sections[0].push([InstructionType.LINE].concat(_toConsumableArray(_sections[0][0].slice(-2))), [InstructionType.CLOSE]);
+            }
+            return _sections;
+          };
+          /**
+           * 删除多节点
+           */
+          var removeMulitpleNodes = function removeMulitpleNodes(indexs) {
+            var _a;
+            // 需要克隆出新的指令列表不然会影响到originPath
+            var _sections = [cloneDeep(section.map(function (i) {
+              return i.instruction;
+            }))];
+            var removeIndexes = indexes.length <= 1 ? indexes : indexes.filter(function (i, idx, arr) {
+              return arr.length <= 1 || idx >= 1 && arr[idx - 1] + 1 === i;
+            });
+            for (var i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
+              var _a3;
+              var instructions = _sections[0];
+              var index = startIndex + removeIndexes[i];
+              var pre = instructions.slice(0, index);
+              var next = instructions.slice(index);
+              if (isClosePath) {
+                pre.shift();
+                next.pop();
+                if (next[0][0] === InstructionType.START) next.pop();
+              }
+              (_a = next[0]) === null || _a === void 0 ? void 0 : (_a3 = _a).splice.apply(_a3, [0, next[0].length, InstructionType.START].concat(_toConsumableArray(next[0].slice(-2))));
+              _sections.shift();
+              if (isClosePath) {
+                startIndex = next.length - 1;
+                next.push.apply(next, _toConsumableArray(pre));
+                pre.length = 0;
+              }
+              if (next.length > 1) _sections.unshift(next);
+              if (pre.length > 1) _sections.unshift(pre);
+              isClosePath = false;
+            }
+            return _sections;
+          };
           return {
             pathway: _this4.pathway.find(function (i) {
               return i.section === section;
             }),
-            section: _sections
+            section: indexes.length === 1 ? removeSingleNode(indexes[0]) : removeMulitpleNodes()
           };
         });
         sections.forEach(function (i) {
@@ -4832,7 +4872,8 @@
     path.set({
       stroke: '#333',
       strokeWidth: 4,
-      fill: 'transparent'
+      fill: 'transparent',
+      strokeUniform: true
     });
     return decorator(path);
   };
@@ -5684,7 +5725,8 @@
   EditorNode.ID = Symbol('editor-node');
 
   const EXAMPLE_PATH_D = {
-      single: 'M 100 100 z',
+      point: 'M 100 100 z',
+      polyline: 'M 20 20 L 80 20 L 20 50 L 80 50 L 20 80 L 80 80',
       circle: 'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
       bubble: 'M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z',
       shapes: 'L-188.7846 -47L-100.923 97H-256.3538 z M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
@@ -5752,6 +5794,8 @@
           top: fabricCanvas.getHeight() / 2,
           originX: 'center',
           originY: 'center',
+          scaleX: 1.2,
+          scaleY: 1.2,
       });
       operator.draw(pathway1);
       // ② 通过路径对象绘制
