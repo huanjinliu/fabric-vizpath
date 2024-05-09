@@ -38,14 +38,20 @@ class EditorPath extends EditorModule {
   }
 
   /**
-   * 将相对坐标点转化为带元素本身变换的偏移位置
+   * 将画布坐标转化为特定路径的相对指令坐标位置
    */
   calcAbsolutePosition(crood: Crood, object: fabric.Object): Position {
     const matrix = [...object.calcOwnMatrix()];
 
+    // 路径如果带有偏移则需要移除偏移带来的影响
     if (object.type === 'path') {
-      matrix[4] -= (object as fabric.Path).pathOffset.x;
-      matrix[5] -= (object as fabric.Path).pathOffset.y;
+      const offset = fabric.util.transformPoint(
+        (object as fabric.Path).pathOffset,
+        [...matrix.slice(0, 4), 0, 0]
+      );
+  
+      matrix[4] -= offset.x;
+      matrix[5] -= offset.y;
     }
 
     const point = fabric.util.transformPoint(
@@ -57,14 +63,19 @@ class EditorPath extends EditorModule {
   }
 
   /**
-   * 移除元素本身变换，将实际偏移转化为路径相对坐标
+   * 将路径内的相对指令坐标位置转为所在画布的坐标位置
    */
   calcRelativeCrood(position: Position, object: fabric.Object): Crood {
     const matrix = [...object.calcOwnMatrix()];
 
     if (object.type === 'path') {
-      matrix[4] -= (object as fabric.Path).pathOffset.x;
-      matrix[5] -= (object as fabric.Path).pathOffset.y;
+      const offset = fabric.util.transformPoint(
+        (object as fabric.Path).pathOffset,
+        [...matrix.slice(0, 4), 0, 0]
+      );
+  
+      matrix[4] -= offset.x;
+      matrix[5] -= offset.y;
     }
 
     const point = fabric.util.transformPoint(

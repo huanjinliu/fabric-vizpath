@@ -8,7 +8,7 @@ import {
   InstructionType,
   type PathwayNode,
 } from '.';
-import { clearPathOffset, parsePathJSON, reinitializePath } from '@utils';
+import { parsePathJSON, reinitializePath } from '@utils';
 
 export enum VizPathSymbalType {
   PATH = 'path',

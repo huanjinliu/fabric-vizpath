@@ -4382,9 +4382,8 @@
         var instructions = cloneDeep(path.path);
         var sections = VizPath.getPathSections(instructions).map(function (section) {
           // 为每个子路径分配新建的路径对象
-          var originPath = new fabric.fabric.Path(fabric.fabric.util.joinPath(section));
+          var originPath = new fabric.fabric.Path(fabric.fabric.util.joinPath(section), styles);
           originPath.path = section;
-          originPath.set(styles);
           return {
             section: section,
             originPath: originPath
@@ -4944,16 +4943,18 @@
       return _this8;
     }
     /**
-     * 将相对坐标点转化为带元素本身变换的偏移位置
+     * 将画布坐标转化为特定路径的相对指令坐标位置
      */
     _inherits(EditorPath, _EditorModule4);
     return _createClass(EditorPath, [{
       key: "calcAbsolutePosition",
       value: function calcAbsolutePosition(crood, object) {
         var matrix = _toConsumableArray(object.calcOwnMatrix());
+        // 路径如果带有偏移则需要移除偏移带来的影响
         if (object.type === 'path') {
-          matrix[4] -= object.pathOffset.x;
-          matrix[5] -= object.pathOffset.y;
+          var offset = fabric.fabric.util.transformPoint(object.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
+          matrix[4] -= offset.x;
+          matrix[5] -= offset.y;
         }
         var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(crood.x, crood.y), matrix);
         return {
@@ -4962,15 +4963,16 @@
         };
       }
       /**
-       * 移除元素本身变换，将实际偏移转化为路径相对坐标
+       * 将路径内的相对指令坐标位置转为所在画布的坐标位置
        */
     }, {
       key: "calcRelativeCrood",
       value: function calcRelativeCrood(position, object) {
         var matrix = _toConsumableArray(object.calcOwnMatrix());
         if (object.type === 'path') {
-          matrix[4] -= object.pathOffset.x;
-          matrix[5] -= object.pathOffset.y;
+          var offset = fabric.fabric.util.transformPoint(object.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
+          matrix[4] -= offset.x;
+          matrix[5] -= offset.y;
         }
         var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(position.left, position.top), fabric.fabric.util.invertTransform(matrix));
         return {
@@ -5740,7 +5742,7 @@
       }))
           .use(new EditorBackground())
           .use(new EditorPath({
-      // updateTriggerTime: 'auto'
+          updateTriggerTime: 'auto'
       }))
           .use(new EditorNode())
           .initialize();
@@ -5756,18 +5758,20 @@
       // const pathway2 = VizPath.parsePathFromObject(path);
       // operator.draw(pathway2);
       // ③ 通过URL绘制
-      // const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
+      // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';
+      // // const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
       // const pathways = await VizPath.parsePathFromURL(svgURL, {
       //   left: fabricCanvas.getWidth() / 2,
       //   top: fabricCanvas.getHeight() / 2,
       //   originX: 'center',
       //   originY: 'center',
-      //   scaleX: 2,
-      //   scaleY: 2
+      //   scaleX: 1.2,
+      //   scaleY: 1.2
       // });
       // pathways?.forEach((pathway) => {
       //   operator.draw(pathway);
       // })
+      // console.log(pathways);
       // ④ 快速使用
       // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.bubble, {
       //   left: fabricCanvas.getWidth() / 2,

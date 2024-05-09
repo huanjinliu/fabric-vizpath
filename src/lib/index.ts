@@ -64,11 +64,11 @@ class VizPathContext {
     const sections = VizPath.getPathSections(instructions).map((section) => {
       // 为每个子路径分配新建的路径对象
       const originPath = new fabric.Path(
-        (fabric.util as any).joinPath(section)
+        (fabric.util as any).joinPath(section),
+        styles,
       );
 
       originPath.path = section as unknown as fabric.Point[];
-      originPath.set(styles);
 
       return { section, originPath };
     });
