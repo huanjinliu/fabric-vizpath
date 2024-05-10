@@ -7,6 +7,7 @@ import {
   EditorNode,
   EditorUI,
 } from 'fabric-path-editor';
+import { debugTheme } from '@themes';
 
 const EXAMPLE_PATH_D = {
   point: 'M 100 100 z',
@@ -76,29 +77,23 @@ const EXAMPLE_PATH_D = {
   const operator = await vizPath
     .use(new Editor(fabricCanvas))
     .use(
-      new EditorUI({
-        // path: (decorator, originPath) => {
-        //   return originPath;
-        // },
-      })
+      new EditorUI(debugTheme)
     )
     .use(new EditorBackground())
-    .use(new EditorPath({
-      updateTriggerTime: 'auto'
-    }))
+    .use(new EditorPath())
     .use(new EditorNode())
     .initialize();
 
   // ① 通过路径指令直接绘制
-  const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
-    left: fabricCanvas.getWidth() / 2,
-    top: fabricCanvas.getHeight() / 2,
-    originX: 'center',
-    originY: 'center',
-    scaleX: 1.2,
-    scaleY: 1.2,
-  });
-  operator.draw(pathway1);
+  // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
+  //   left: fabricCanvas.getWidth() / 2,
+  //   top: fabricCanvas.getHeight() / 2,
+  //   originX: 'center',
+  //   originY: 'center',
+  //   scaleX: 1.2,
+  //   scaleY: 1.2,
+  // });
+  // operator.draw(pathway1);
 
   // ② 通过路径对象绘制
   // const pathway2 = VizPath.parsePathFromObject(path);
@@ -106,19 +101,18 @@ const EXAMPLE_PATH_D = {
 
   // ③ 通过URL绘制
   // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';
-  // // const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
-  // const pathways = await VizPath.parsePathFromURL(svgURL, {
-  //   left: fabricCanvas.getWidth() / 2,
-  //   top: fabricCanvas.getHeight() / 2,
-  //   originX: 'center',
-  //   originY: 'center',
-  //   scaleX: 1.2,
-  //   scaleY: 1.2
-  // });
-  // pathways?.forEach((pathway) => {
-  //   operator.draw(pathway);
-  // })
-  // console.log(pathways);
+  const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
+  const pathways = await VizPath.parsePathFromURL(svgURL, {
+    left: fabricCanvas.getWidth() / 2,
+    top: fabricCanvas.getHeight() / 2,
+    originX: 'center',
+    originY: 'center',
+    scaleX: 1.2,
+    scaleY: 1.2
+  });
+  pathways?.forEach((pathway) => {
+    operator.draw(pathway);
+  })
 
   // ④ 快速使用
   // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.bubble, {
@@ -149,6 +143,8 @@ const EXAMPLE_PATH_D = {
   }
 
   // operator.move(operator.pathway[0][0].node, { x: 200, y: 200 })
+
+  // operator.insert(operator.pathway[0].section[0].node!, { x: 100, y: 100 }, true);
 
   // 操作按钮
   btnDelete.addEventListener('click', () => {

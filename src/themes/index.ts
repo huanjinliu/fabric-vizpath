@@ -16,3 +16,4 @@ export interface Theme {
 
 export { default as noneTheme } from './none';
 export { default as defaultTheme } from './default';
+export { default as debugTheme } from './debug';

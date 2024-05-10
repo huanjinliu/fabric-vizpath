@@ -9,7 +9,8 @@ const observe = <T extends Record<string, any>>(
   callback: (
     value: Pick<T, ArrayElement<typeof keys>>,
     oldValue: Pick<T, ArrayElement<typeof keys>>
-  ) => void
+  ) => void,
+  
 ) => {
   const data: any = {};
   const properties: PropertyDescriptorMap = {};

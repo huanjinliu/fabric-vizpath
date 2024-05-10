@@ -5,7 +5,7 @@ import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import VizPath, { VizPathSymbalType } from '../../vizpath.class';
 import EditorPath from '../editor-path/index.class';
-import { InstructionType, type PathwayNode } from '../..';
+import { InstructionType, type Instruction, type PathwayNode } from '../..';
 import type { ResponsiveCrood } from '../../vizpath.class';
 import EditorUI from '../editor-ui/index.class';
 
@@ -78,7 +78,7 @@ class EditorNode extends EditorModule {
               (x, y) => {
                 const position = editorPath.calcAbsolutePosition(
                   { x, y },
-                  editorPath.nodePathMap.get(node)!.path
+                  editorPath.nodePathMap.get(node)!.originPath
                 );
                 if (_object.group) {
                   const relativePosition = editorPath.calcRelativeCrood(
@@ -108,7 +108,7 @@ class EditorNode extends EditorModule {
           return _object;
         };
 
-        let object = (ui?.options.node ?? EditorUI.noneUI.node)(
+        let object = this.nodeObjectMap.get(item) ?? (ui?.options.node ?? EditorUI.noneUI.node)(
           decorator
         ) as fabric.Group;
 
@@ -127,15 +127,17 @@ class EditorNode extends EditorModule {
   // 添加活跃组的响应式变化
   private _addActiveSelectionObserve(group: fabric.ActiveSelection) {
     observe(group, ['left', 'top', 'angle'], () => {
-      for (const object of group._objects as fabric.Group[]) {
-        const decomposeMatrix = fabric.util.qrDecompose(
-          object.calcTransformMatrix(false)
-        );
-        const left = decomposeMatrix.translateX;
-        const top = decomposeMatrix.translateY;
+      this.vizPath?.onceRerenderOriginPath(() => {
+        for (const object of group._objects as fabric.Group[]) {
+          const decomposeMatrix = fabric.util.qrDecompose(
+            object.calcTransformMatrix(false)
+          );
+          const left = decomposeMatrix.translateX;
+          const top = decomposeMatrix.translateY;
 
-        this.move(object, { left, top });
-      }
+          this.move(object, { left, top });
+        }
+      })
     });
   }
 
@@ -214,7 +216,7 @@ class EditorNode extends EditorModule {
               if (_object.canvas?.getActiveObject() === _object) return;
               const position = editorPath.calcAbsolutePosition(
                 { x, y },
-                editorPath.nodePathMap.get(node)!.path
+                editorPath.nodePathMap.get(node)!.originPath
               );
               _object.set(position).setCoords();
             },
@@ -233,9 +235,9 @@ class EditorNode extends EditorModule {
               left: left!,
               top: top!,
             },
-            editorPath.nodePathMap.get(node)!.path
+            editorPath.nodePathMap.get(node)!.originPath
           );
-          controller.set(crood, [_object.name]);
+          controller.setCrood(crood, [_object.name]);
         });
 
         return _object;
@@ -271,7 +273,7 @@ class EditorNode extends EditorModule {
             (x, y) => {
               const position = editorPath.calcAbsolutePosition(
                 { x, y },
-                editorPath.nodePathMap.get(node)!.path
+                editorPath.nodePathMap.get(node)!.originPath
               );
               _line.set({ x1: position.left, y1: position.top });
             },
@@ -284,7 +286,7 @@ class EditorNode extends EditorModule {
             (x, y) => {
               const position = editorPath.calcAbsolutePosition(
                 { x, y },
-                editorPath.nodePathMap.get(node)!.path
+                editorPath.nodePathMap.get(node)!.originPath
               );
               _line.set({ x2: position.left, y2: position.top });
             },
@@ -347,7 +349,7 @@ class EditorNode extends EditorModule {
     });
     this.editor.on('canvas', 'selection:cleared', () => {
       if (this._cancelSelectEvent) return;
-      this.focus();
+      // this.focus();
     });
     // 选中路径段时自动选中路线段内的所有指令关键点
     this.editor.on('canvas', 'mouse:dblclick', (e) => {
@@ -359,7 +361,7 @@ class EditorNode extends EditorModule {
       let focusPath: typeof editorPath.paths[number] | undefined;
       for (let i = editorPath.paths.length - 1; i >= 0; i--) {
         const path = editorPath.paths[i];
-        if (path.path.containsPoint(e.pointer)) {
+        if (path.originPath.containsPoint(e.pointer)) {
           focusPath = path;
           break;
         }
@@ -435,6 +437,110 @@ class EditorNode extends EditorModule {
     });
   }
 
+  // private _initAddEvents() {
+  //   if (!this.editor) return;
+
+  //   const editorPath = this.vizPath?.context.find(EditorPath);
+  //   if (!editorPath) return;
+
+  //   let newNode: PathwayNode<ResponsiveCrood> | undefined;
+  //   let newNodeObject: fabric.Group | undefined;
+  //   let upgradeInstruction: Instruction | undefined;
+  //   this.editor.on('canvas', 'mouse:down:before', (event) => {
+  //     const { e, target } = event;
+
+  //     if (target) return;
+
+  //     // 判断是否是添加
+  //     // if (!this._inbuiltStatus.awaitAdd) return;
+
+  //     const node = this.activeNodes[0];
+
+  //     const pathwayNode = this.objectNodeMap.get(node);
+  //     if (!pathwayNode) return;
+
+  //     const position = { left: e.offsetX, top: e.offsetY };
+  //     const newCrood = editorPath.calcRelativeCrood(
+  //       position,
+  //       editorPath.nodePathMap.get(pathwayNode.node!)!.originPath
+  //     );
+
+  //     newNode = this.vizPath?.insert(pathwayNode.node!, newCrood);
+  //   });
+  //   this.editor.on('canvas', 'mouse:down', () => {
+  //     if (!newNode) return;
+  //     newNodeObject = this.nodeObjectMap.get(newNode)!;
+  //     if (newNodeObject) {
+  //       this.focus(newNodeObject);
+  //       this.editor!.canvas!.selection = false;
+  //     }
+  //   });
+  //   this.editor.on('canvas', 'mouse:move', (event) => {
+  //     const { e } = event;
+
+  //     if (newNode && newNodeObject) {
+  //       // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+  //       if (newNodeObject.containsPoint(event.pointer)) return;
+
+  //       const position = { left: e.offsetX, top: e.offsetY };
+  //       const mirrorPosition = {
+  //         left: newNodeObject.left! - (e.offsetX - newNodeObject.left!),
+  //         top: newNodeObject.top! - (e.offsetY - newNodeObject.top!)
+  //       }
+  //       const newCrood = editorPath.calcRelativeCrood(
+  //         mirrorPosition,
+  //         editorPath.nodePathMap.get(newNode.node!)!.originPath
+  //       );
+
+  //       newNode = this.vizPath?.update(newNode.node!, [
+  //         InstructionType.QUADRATIC_CURCE,
+  //         newCrood.x,
+  //         newCrood.y,
+  //         newNode.node?.x,
+  //         newNode.node?.y
+  //       ] as Instruction);
+
+  //       // next instruction
+  //       const { next } = this.vizPath?.getNeighboringNodes(newNode!) ?? {};
+  //       if (next) {
+  //         const nextHandlerCrood = editorPath.calcRelativeCrood(
+  //           position,
+  //           editorPath.nodePathMap.get(next.node!)!.originPath
+  //         );
+  //         const _nextNode = this.vizPath?.update(next.node!, [
+  //           InstructionType.QUADRATIC_CURCE,
+  //           nextHandlerCrood.x,
+  //           nextHandlerCrood.y,
+  //           next.node?.x,
+  //           next.node?.y
+  //         ] as Instruction);
+  //         const { pre } = this.vizPath?.getNeighboringNodes(_nextNode!) ?? {};
+  //         newNode = pre;
+  //       }
+  //       newNodeObject = this.nodeObjectMap.get(newNode!)!;
+  //       this.focus(newNodeObject);
+
+
+
+  //       // if (upgradeInstruction[0] === InstructionType.QUADRATIC_CURCE) {
+  //       //   upgradeInstruction[1] = newCrood.x;
+  //       //   upgradeInstruction[2] = newCrood.y;
+  //       // } else {
+  //       //   upgradeInstruction[0] = InstructionType.QUADRATIC_CURCE;
+  //       //   upgradeInstruction.splice(1, 0, newCrood.x, newCrood.y);
+  //       // }
+  //       // this._updatePointHandlers();
+  //     }
+  //   });
+  //   this.editor.on('canvas', 'mouse:up', () => {
+  //     upgradeInstruction = undefined;
+  //     newNodeObject = undefined;
+  //     newNode = undefined;
+  //     this.editor!.canvas!.selection = true;
+  //     // this._fire('update');
+  //   });
+  // }
+
   remove(...objects: fabric.Group[]) {
     const canvas = this.editor?.canvas;
     if (!canvas) return;
@@ -498,7 +604,7 @@ class EditorNode extends EditorModule {
 
     const newCrood = editorPath.calcRelativeCrood(
       position,
-      editorPath.nodePathMap.get(node!)!.path
+      editorPath.nodePathMap.get(node!)!.originPath
     );
     // 需要跟随变化的曲线控制点
     const followCroods: ResponsiveCrood[] = [];
@@ -514,7 +620,7 @@ class EditorNode extends EditorModule {
       },
     };
 
-    node!.set(newCrood, [object?.name]);
+    node!.setCrood(newCrood, [object!.name]);
 
     const list = this.vizPath?.getMoreNeighboringNodes(pathwayNode);
     list?.forEach(([type, node]) => {
@@ -530,7 +636,7 @@ class EditorNode extends EditorModule {
     ) {
       if (section[0].node === node) {
         const { node } = section[section.length - 2];
-        node!.set(newCrood);
+        node!.setCrood(newCrood);
       }
       // 闭合节点不可能存在可视操作节点
       // if (section[section.length - 2].node === node) {}
@@ -556,6 +662,29 @@ class EditorNode extends EditorModule {
     });
 
     object.canvas?.requestRenderAll();
+  }
+
+  add(position: {
+    left: number;
+    top: number;
+  }) {
+    if (this.activeNodes.length !== 1) return;
+
+    const editorPath = this.vizPath?.context.find(EditorPath);
+    if (!editorPath) return [];
+
+    const node = this.activeNodes[0];
+
+    const pathwayNode = this.objectNodeMap.get(node);
+    if (!pathwayNode) return;
+
+    const newCrood = editorPath.calcRelativeCrood(
+      position,
+      editorPath.nodePathMap.get(pathwayNode.node!)!.originPath
+    );
+
+    const newPathwayNode = this.vizPath?.insert(pathwayNode.node!, newCrood);
+    this.focus(this.nodeObjectMap.get(newPathwayNode!)!);
   }
 
   focus(...selectedObjects: fabric.Object[]) {
@@ -631,6 +760,7 @@ class EditorNode extends EditorModule {
     this._initSelectEvents();
     this._initDrawEvents();
     this._initClearEvents();
+    // this._initAddEvents();
   }
 }
 

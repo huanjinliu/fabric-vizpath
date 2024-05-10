@@ -37,14 +37,30 @@ export type Pathway = {
   originPath: fabric.Path;
 }[];
 
+type VizPathOptions = {
+  /**
+   * 触发路径更新状态的时机
+   * @default 'auto' 自动更新，defer会延迟更新，比自动更新性能好，但是状态不完全同步，manual则完全不更新等待手动更新
+   */
+  refreshPathTriggerTime?: 'auto' | 'manual' | 'defer';
+};
+
 /**
  * VizPath
  */
 class VizPathContext {
+  options: Required<VizPathOptions> = {
+    refreshPathTriggerTime: 'auto',
+  };
+
   /**
    * 增强模块列表
    */
   private _modules: EditorModule[] = [];
+
+  constructor(options: VizPathOptions = {}) {
+    this.options = defaults(options, this.options);
+  }
 
   /**
    * 通过fabric.Path对象解析路径信息
@@ -96,20 +112,20 @@ class VizPathContext {
       }
 
       // ③ 如果是二阶曲线全部升级为三阶曲线便于后续处理
-      for (let i = 1; i < section.length; i++) {
-        const instruction = section[i];
-        const preInstruction = section[i - 1];
-        if (instruction[0] === InstructionType.QUADRATIC_CURCE) {
-          instruction.splice(
-            0,
-            instruction.length,
-            ...getCubicFromQuadratic(
-              VizPath.getInstructionNodeCrood(preInstruction)!,
-              instruction
-            )
-          );
-        }
-      }
+      // for (let i = 1; i < section.length; i++) {
+      //   const instruction = section[i];
+      //   const preInstruction = section[i - 1];
+      //   if (instruction[0] === InstructionType.QUADRATIC_CURCE) {
+      //     instruction.splice(
+      //       0,
+      //       instruction.length,
+      //       ...getCubicFromQuadratic(
+      //         VizPath.getInstructionNodeCrood(preInstruction)!,
+      //         instruction
+      //       )
+      //     );
+      //   }
+      // }
 
       // ④ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
       const isAutoClose =

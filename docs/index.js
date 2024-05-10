@@ -2252,7 +2252,7 @@
   var Promise$1 = getNative(root, 'Promise');
 
   /* Built-in method references that are verified to be native. */
-  var Set = getNative(root, 'Set');
+  var Set$1 = getNative(root, 'Set');
 
   /* Built-in method references that are verified to be native. */
   var WeakMap$1 = getNative(root, 'WeakMap');
@@ -2269,7 +2269,7 @@
   var dataViewCtorString = toSource(DataView),
     mapCtorString = toSource(Map$1),
     promiseCtorString = toSource(Promise$1),
-    setCtorString = toSource(Set),
+    setCtorString = toSource(Set$1),
     weakMapCtorString = toSource(WeakMap$1);
 
   /**
@@ -2282,7 +2282,7 @@
   var getTag = baseGetTag;
 
   // Fallback for data views, maps, sets, and weak maps in IE 11 and promises in Node.js < 6.
-  if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag$2 || Map$1 && getTag(new Map$1()) != mapTag$3 || Promise$1 && getTag(Promise$1.resolve()) != promiseTag || Set && getTag(new Set()) != setTag$3 || WeakMap$1 && getTag(new WeakMap$1()) != weakMapTag$1) {
+  if (DataView && getTag(new DataView(new ArrayBuffer(1))) != dataViewTag$2 || Map$1 && getTag(new Map$1()) != mapTag$3 || Promise$1 && getTag(Promise$1.resolve()) != promiseTag || Set$1 && getTag(new Set$1()) != setTag$3 || WeakMap$1 && getTag(new WeakMap$1()) != weakMapTag$1) {
     getTag = function getTag(value) {
       var result = baseGetTag(value),
         Ctor = result == objectTag$1 ? value.constructor : undefined,
@@ -2377,8 +2377,8 @@
   }
 
   /** Used to convert symbols to primitives and strings. */
-  var symbolProto$1 = Symbol$1 ? Symbol$1.prototype : undefined,
-    symbolValueOf = symbolProto$1 ? symbolProto$1.valueOf : undefined;
+  var symbolProto = Symbol$1 ? Symbol$1.prototype : undefined,
+    symbolValueOf = symbolProto ? symbolProto.valueOf : undefined;
 
   /**
    * Creates a clone of the `symbol` object.
@@ -2412,7 +2412,7 @@
     regexpTag$1 = '[object RegExp]',
     setTag$2 = '[object Set]',
     stringTag$1 = '[object String]',
-    symbolTag$2 = '[object Symbol]';
+    symbolTag$1 = '[object Symbol]';
   var arrayBufferTag$1 = '[object ArrayBuffer]',
     dataViewTag$1 = '[object DataView]',
     float32Tag$1 = '[object Float32Array]',
@@ -2466,7 +2466,7 @@
         return cloneRegExp(object);
       case setTag$2:
         return new Ctor();
-      case symbolTag$2:
+      case symbolTag$1:
         return cloneSymbol(object);
     }
   }
@@ -2600,7 +2600,7 @@
     regexpTag = '[object RegExp]',
     setTag = '[object Set]',
     stringTag = '[object String]',
-    symbolTag$1 = '[object Symbol]',
+    symbolTag = '[object Symbol]',
     weakMapTag = '[object WeakMap]';
   var arrayBufferTag = '[object ArrayBuffer]',
     dataViewTag = '[object DataView]',
@@ -2616,7 +2616,7 @@
 
   /** Used to identify `toStringTag` values supported by `_.clone`. */
   var cloneableTags = {};
-  cloneableTags[argsTag] = cloneableTags[arrayTag] = cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] = cloneableTags[boolTag] = cloneableTags[dateTag] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag] = cloneableTags[numberTag] = cloneableTags[objectTag] = cloneableTags[regexpTag] = cloneableTags[setTag] = cloneableTags[stringTag] = cloneableTags[symbolTag$1] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
+  cloneableTags[argsTag] = cloneableTags[arrayTag] = cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] = cloneableTags[boolTag] = cloneableTags[dateTag] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag] = cloneableTags[numberTag] = cloneableTags[objectTag] = cloneableTags[regexpTag] = cloneableTags[setTag] = cloneableTags[stringTag] = cloneableTags[symbolTag] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
   cloneableTags[errorTag] = cloneableTags[funcTag] = cloneableTags[weakMapTag] = false;
 
   /**
@@ -2974,315 +2974,6 @@
     }
     return object;
   });
-
-  /** Used to match a single whitespace character. */
-  var reWhitespace = /\s/;
-
-  /**
-   * Used by `_.trim` and `_.trimEnd` to get the index of the last non-whitespace
-   * character of `string`.
-   *
-   * @private
-   * @param {string} string The string to inspect.
-   * @returns {number} Returns the index of the last non-whitespace character.
-   */
-  function trimmedEndIndex(string) {
-    var index = string.length;
-    while (index-- && reWhitespace.test(string.charAt(index))) {}
-    return index;
-  }
-
-  /** Used to match leading whitespace. */
-  var reTrimStart = /^\s+/;
-
-  /**
-   * The base implementation of `_.trim`.
-   *
-   * @private
-   * @param {string} string The string to trim.
-   * @returns {string} Returns the trimmed string.
-   */
-  function baseTrim(string) {
-    return string ? string.slice(0, trimmedEndIndex(string) + 1).replace(reTrimStart, '') : string;
-  }
-
-  /** `Object#toString` result references. */
-  var symbolTag = '[object Symbol]';
-
-  /**
-   * Checks if `value` is classified as a `Symbol` primitive or object.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to check.
-   * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
-   * @example
-   *
-   * _.isSymbol(Symbol.iterator);
-   * // => true
-   *
-   * _.isSymbol('abc');
-   * // => false
-   */
-  function isSymbol(value) {
-    return _typeof(value) == 'symbol' || isObjectLike(value) && baseGetTag(value) == symbolTag;
-  }
-
-  /** Used as references for various `Number` constants. */
-  var NAN = 0 / 0;
-
-  /** Used to detect bad signed hexadecimal string values. */
-  var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
-
-  /** Used to detect binary string values. */
-  var reIsBinary = /^0b[01]+$/i;
-
-  /** Used to detect octal string values. */
-  var reIsOctal = /^0o[0-7]+$/i;
-
-  /** Built-in method references without a dependency on `root`. */
-  var freeParseInt = parseInt;
-
-  /**
-   * Converts `value` to a number.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to process.
-   * @returns {number} Returns the number.
-   * @example
-   *
-   * _.toNumber(3.2);
-   * // => 3.2
-   *
-   * _.toNumber(Number.MIN_VALUE);
-   * // => 5e-324
-   *
-   * _.toNumber(Infinity);
-   * // => Infinity
-   *
-   * _.toNumber('3.2');
-   * // => 3.2
-   */
-  function toNumber(value) {
-    if (typeof value == 'number') {
-      return value;
-    }
-    if (isSymbol(value)) {
-      return NAN;
-    }
-    if (isObject(value)) {
-      var other = typeof value.valueOf == 'function' ? value.valueOf() : value;
-      value = isObject(other) ? other + '' : other;
-    }
-    if (typeof value != 'string') {
-      return value === 0 ? value : +value;
-    }
-    value = baseTrim(value);
-    var isBinary = reIsBinary.test(value);
-    return isBinary || reIsOctal.test(value) ? freeParseInt(value.slice(2), isBinary ? 2 : 8) : reIsBadHex.test(value) ? NAN : +value;
-  }
-
-  /** Used as references for various `Number` constants. */
-  var INFINITY$1 = 1 / 0,
-    MAX_INTEGER = 1.7976931348623157e+308;
-
-  /**
-   * Converts `value` to a finite number.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.12.0
-   * @category Lang
-   * @param {*} value The value to convert.
-   * @returns {number} Returns the converted number.
-   * @example
-   *
-   * _.toFinite(3.2);
-   * // => 3.2
-   *
-   * _.toFinite(Number.MIN_VALUE);
-   * // => 5e-324
-   *
-   * _.toFinite(Infinity);
-   * // => 1.7976931348623157e+308
-   *
-   * _.toFinite('3.2');
-   * // => 3.2
-   */
-  function toFinite(value) {
-    if (!value) {
-      return value === 0 ? value : 0;
-    }
-    value = toNumber(value);
-    if (value === INFINITY$1 || value === -INFINITY$1) {
-      var sign = value < 0 ? -1 : 1;
-      return sign * MAX_INTEGER;
-    }
-    return value === value ? value : 0;
-  }
-
-  /**
-   * Converts `value` to an integer.
-   *
-   * **Note:** This method is loosely based on
-   * [`ToInteger`](http://www.ecma-international.org/ecma-262/7.0/#sec-tointeger).
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to convert.
-   * @returns {number} Returns the converted integer.
-   * @example
-   *
-   * _.toInteger(3.2);
-   * // => 3
-   *
-   * _.toInteger(Number.MIN_VALUE);
-   * // => 0
-   *
-   * _.toInteger(Infinity);
-   * // => 1.7976931348623157e+308
-   *
-   * _.toInteger('3.2');
-   * // => 3
-   */
-  function toInteger(value) {
-    var result = toFinite(value),
-      remainder = result % 1;
-    return result === result ? remainder ? result - remainder : result : 0;
-  }
-
-  /**
-   * A specialized version of `_.map` for arrays without support for iteratee
-   * shorthands.
-   *
-   * @private
-   * @param {Array} [array] The array to iterate over.
-   * @param {Function} iteratee The function invoked per iteration.
-   * @returns {Array} Returns the new mapped array.
-   */
-  function arrayMap(array, iteratee) {
-    var index = -1,
-      length = array == null ? 0 : array.length,
-      result = Array(length);
-    while (++index < length) {
-      result[index] = iteratee(array[index], index, array);
-    }
-    return result;
-  }
-
-  /** Used as references for various `Number` constants. */
-  var INFINITY = 1 / 0;
-
-  /** Used to convert symbols to primitives and strings. */
-  var symbolProto = Symbol$1 ? Symbol$1.prototype : undefined,
-    symbolToString = symbolProto ? symbolProto.toString : undefined;
-
-  /**
-   * The base implementation of `_.toString` which doesn't convert nullish
-   * values to empty strings.
-   *
-   * @private
-   * @param {*} value The value to process.
-   * @returns {string} Returns the string.
-   */
-  function baseToString(value) {
-    // Exit early for strings to avoid a performance hit in some environments.
-    if (typeof value == 'string') {
-      return value;
-    }
-    if (isArray(value)) {
-      // Recursively convert values (susceptible to call stack limits).
-      return arrayMap(value, baseToString) + '';
-    }
-    if (isSymbol(value)) {
-      return symbolToString ? symbolToString.call(value) : '';
-    }
-    var result = value + '';
-    return result == '0' && 1 / value == -INFINITY ? '-0' : result;
-  }
-
-  /**
-   * Converts `value` to a string. An empty string is returned for `null`
-   * and `undefined` values. The sign of `-0` is preserved.
-   *
-   * @static
-   * @memberOf _
-   * @since 4.0.0
-   * @category Lang
-   * @param {*} value The value to convert.
-   * @returns {string} Returns the converted string.
-   * @example
-   *
-   * _.toString(null);
-   * // => ''
-   *
-   * _.toString(-0);
-   * // => '-0'
-   *
-   * _.toString([1, 2, 3]);
-   * // => '1,2,3'
-   */
-  function toString(value) {
-    return value == null ? '' : baseToString(value);
-  }
-
-  /* Built-in method references for those with the same name as other `lodash` methods. */
-  var nativeIsFinite = root.isFinite,
-    nativeMin = Math.min;
-
-  /**
-   * Creates a function like `_.round`.
-   *
-   * @private
-   * @param {string} methodName The name of the `Math` method to use when rounding.
-   * @returns {Function} Returns the new round function.
-   */
-  function createRound(methodName) {
-    var func = Math[methodName];
-    return function (number, precision) {
-      number = toNumber(number);
-      precision = precision == null ? 0 : nativeMin(toInteger(precision), 292);
-      if (precision && nativeIsFinite(number)) {
-        // Shift with exponential notation to avoid floating-point issues.
-        // See [MDN](https://mdn.io/round#Examples) for more details.
-        var pair = (toString(number) + 'e').split('e'),
-          value = func(pair[0] + 'e' + (+pair[1] + precision));
-        pair = (toString(value) + 'e').split('e');
-        return +(pair[0] + 'e' + (+pair[1] - precision));
-      }
-      return func(number);
-    };
-  }
-
-  /**
-   * Computes `number` rounded to `precision`.
-   *
-   * @static
-   * @memberOf _
-   * @since 3.10.0
-   * @category Math
-   * @param {number} number The number to round.
-   * @param {number} [precision=0] The precision to round to.
-   * @returns {number} Returns the rounded number.
-   * @example
-   *
-   * _.round(4.006);
-   * // => 4
-   *
-   * _.round(4.006, 2);
-   * // => 4.01
-   *
-   * _.round(4060, -2);
-   * // => 4100
-   */
-  var round = createRound('round');
 
   /**
    * 变换
@@ -3645,8 +3336,8 @@
    *
    * @note
    *
-   * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
-   * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
+   * fabric.Path对象直接改内部路径指令，其路径会渲染正确的，但却保持其原尺寸和偏移信息，导致对象信息错误，
+   * 该方法使用initialize重新初始化路径，使其获取正确的尺寸，但偏移是错的，该方法同时修正偏移。
    */
   var reinitializePath = function reinitializePath(path) {
     // 记录旧的路径信息
@@ -3671,39 +3362,6 @@
       top: oldInfo.top + distance.y
     });
     path.setCoords();
-  };
-
-  /**
-   * 获取二阶曲线的三阶表现
-   */
-  var getCubicFromQuadratic = function getCubicFromQuadratic(p0, instruction) {
-    // 如果不是二阶直接返回
-    if (instruction[0] !== 'Q') return cloneDeep(instruction);
-    // 解析输入字符串
-    var points = Array.from({
-      length: 2
-    }).map(function (_, i) {
-      return {
-        x: instruction[i * 2 + 1],
-        y: instruction[i * 2 + 2]
-      };
-    });
-    // 二阶贝塞尔曲线的点
-    var _points = _slicedToArray(points, 2),
-      p1 = _points[0],
-      p2 = _points[1];
-    // 计算三阶贝塞尔曲线的控制点
-    var q1 = {
-      x: 2 / 3 * p1.x + 1 / 3 * p0.x,
-      y: 2 / 3 * p1.y + 1 / 3 * p0.y
-    };
-    var q2 = {
-      x: 2 / 3 * p1.x + 1 / 3 * p2.x,
-      y: 2 / 3 * p1.y + 1 / 3 * p2.y
-    };
-    var q3 = p2;
-    // 创建三阶贝塞尔曲线指令
-    return ['C', q1.x, q1.y, q2.x, q2.y, q3.x, q3.y];
   };
   var VizPathSymbalType;
   (function (VizPathSymbalType) {
@@ -3734,6 +3392,14 @@
        * 监听事件
        */
       this.events = {};
+      /**
+       * 防抖更新路径
+       */
+      this._debounceRerenderPathMap = new WeakMap([]);
+      /**
+       * 需要一次更新路径列表
+       */
+      this._onceRerenderPaths = null;
       this.context = context;
     }
     /**
@@ -3751,24 +3417,22 @@
        * @returns
        */
       function _toResponsive(crood) {
-        var _this = this;
-        var observes = [];
+        var observers = [];
         var temporaryIgnoreIds = [];
         var proxy = new Proxy(crood, {
           set: function set(target, p, value, receiver) {
             if (p === 'x' || p === 'y') {
               var oldValue = target[p];
-              var newValue = round(value, 4);
-              var result = Reflect.set(target, p, newValue, receiver);
-              if (oldValue !== newValue) {
-                var x = p === 'x' ? newValue : target.x;
-                var y = p === 'y' ? newValue : target.y;
-                var _iterator = _createForOfIteratorHelper(observes),
+              var result = Reflect.set(target, p, value, receiver);
+              if (oldValue !== value) {
+                var x = p === 'x' ? value : target.x;
+                var y = p === 'y' ? value : target.y;
+                var _iterator = _createForOfIteratorHelper(observers),
                   _step;
                 try {
                   for (_iterator.s(); !(_step = _iterator.n()).done;) {
                     var _observe = _step.value;
-                    if (_observe.id && temporaryIgnoreIds.length && temporaryIgnoreIds.indexOf(_observe.id) !== -1) continue;
+                    if (_observe.id && temporaryIgnoreIds.indexOf(_observe.id) !== -1) continue;
                     _observe.handler(x, y);
                   }
                 } catch (err) {
@@ -3776,7 +3440,6 @@
                 } finally {
                   _iterator.f();
                 }
-                _this._fire('update', proxy);
               }
               return result;
             } else {
@@ -3784,11 +3447,11 @@
             }
           }
         });
-        proxy.set = function (crood) {
+        proxy.setCrood = function (crood) {
           var skipObserverIDs = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
           if (_typeof(crood) !== 'object') return;
           if (Array.isArray(skipObserverIDs)) {
-            temporaryIgnoreIds = skipObserverIDs.filter(Boolean);
+            temporaryIgnoreIds = skipObserverIDs;
           }
           proxy.x = crood.x;
           proxy.y = crood.y;
@@ -3799,21 +3462,38 @@
           var immediate = options.immediate,
             id = options.id;
           if (immediate) handler(crood.x, crood.y);
-          observes.push({
+          if (observers.find(function (observer) {
+            return observer.id === id;
+          })) return;
+          observers.push({
             handler: handler,
             id: id
           });
         };
         proxy.unobserve = function (id) {
           if (!id) {
-            observes.length = 0;
+            observers.length = 0;
             return;
           }
-          observes = observes.filter(function (i) {
+          observers = observers.filter(function (i) {
             return i.id !== id;
           });
         };
         return proxy;
+      }
+      /**
+       * 获取路径或指令列表所在的路径
+       */
+    }, {
+      key: "getPathway",
+      value: function getPathway(target) {
+        var index = target instanceof fabric.fabric.Path ? this.pathway.findIndex(function (i) {
+          return i.originPath === target;
+        }) : this.pathway.findIndex(function (i) {
+          return i.section === target;
+        });
+        if (index === -1) return;
+        return this.pathway[index];
       }
       /**
        * 是否是闭合路径段
@@ -3905,61 +3585,131 @@
     }, {
       key: "draw",
       value: function draw(pathway) {
-        var _this2 = this;
-        pathway.forEach(function (_ref3) {
-          var section = _ref3.section,
-            originPath = _ref3.originPath;
-          var _section = [];
-          section.forEach(function (item) {
-            var instruction = item.instruction;
-            var proxyItem = {
-              section: _section,
-              instruction: instruction
-            };
+        var _this = this;
+        var allDrawPathways = [];
+        pathway.forEach(function (item) {
+          var drawPathway = item;
+          var section = item.section,
+            originPath = item.originPath;
+          section.forEach(function (pathwayNode) {
+            var instruction = pathwayNode.instruction;
             // 关键点
             var node = VizPath.getInstructionNodeCrood(instruction);
-            if (node) {
-              var responsiveNode = _this2._toResponsive(node);
+            if (node && !pathwayNode.node) {
+              var responsiveNode = _this._toResponsive(node);
               responsiveNode.observe(function (x, y) {
                 instruction[instruction.length - 2] = x;
                 instruction[instruction.length - 1] = y;
+                _this._rerenderOriginPath(originPath);
               });
-              proxyItem.node = responsiveNode;
-              _this2.pathwayNodeMap.set(proxyItem.node, proxyItem);
+              pathwayNode.node = responsiveNode;
+              _this.pathwayNodeMap.set(pathwayNode.node, pathwayNode);
             }
             // 指令控制点
-            var _this2$getNeighboring = _this2.getNeighboringNodes(item),
-              next = _this2$getNeighboring.next;
+            var _this$getNeighboringN3 = _this.getNeighboringNodes(pathwayNode),
+              next = _this$getNeighboringN3.next;
             var controllers = {};
-            if ((item === null || item === void 0 ? void 0 : item.instruction[0]) === InstructionType.BEZIER_CURVE) {
-              controllers.pre = _this2._toResponsive({
-                x: item.instruction[3],
-                y: item.instruction[4]
+            if ((pathwayNode === null || pathwayNode === void 0 ? void 0 : pathwayNode.instruction[0]) === InstructionType.BEZIER_CURVE) {
+              controllers.pre = _this._toResponsive({
+                x: pathwayNode.instruction[3],
+                y: pathwayNode.instruction[4]
               });
               controllers.pre.observe(function (x, y) {
-                item.instruction[3] = x;
-                item.instruction[4] = y;
+                pathwayNode.instruction[3] = x;
+                pathwayNode.instruction[4] = y;
+                _this._rerenderOriginPath(originPath);
+              });
+            }
+            if ((pathwayNode === null || pathwayNode === void 0 ? void 0 : pathwayNode.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
+              controllers.pre = _this._toResponsive({
+                x: pathwayNode.instruction[1],
+                y: pathwayNode.instruction[2]
+              });
+              controllers.pre.observe(function (x, y) {
+                pathwayNode.instruction[1] = x;
+                pathwayNode.instruction[2] = y;
+                _this._rerenderOriginPath(originPath);
               });
             }
             if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.BEZIER_CURVE) {
-              controllers.next = _this2._toResponsive({
+              controllers.next = _this._toResponsive({
                 x: next.instruction[1],
                 y: next.instruction[2]
               });
               controllers.next.observe(function (x, y) {
                 next.instruction[1] = x;
                 next.instruction[2] = y;
+                _this._rerenderOriginPath(originPath);
               });
             }
-            proxyItem.controllers = controllers;
-            _section.push(proxyItem);
+            pathwayNode.controllers = controllers;
           });
-          _this2.pathway.push({
-            section: _section,
-            originPath: originPath
-          });
+          var index = _this.pathway.indexOf(drawPathway);
+          if (index === -1) {
+            _this.pathway.push(drawPathway);
+          } else {
+            originPath.path = section.map(function (i) {
+              return i.instruction;
+            });
+            _this._rerenderOriginPath(originPath);
+            _this.pathway.splice(index, 1, drawPathway);
+          }
+          allDrawPathways.push(drawPathway);
         });
         this._fire('draw', pathway);
+        return allDrawPathways;
+      }
+      /**
+       * 重新渲染路径，修正路径位置及尺寸
+       * @param pathway 路径信息
+       *
+       * @description
+       *
+       * fabric.Path对象直接改内部路径指令，其路径会渲染正确的，但却保持其原尺寸和偏移信息，导致对象信息错误，
+       * 该方法使用initialize重新初始化路径，使其获取正确的尺寸，但偏移是错的，该方法同时修正偏移。
+       */
+    }, {
+      key: "rerenderOriginPath",
+      value: function rerenderOriginPath(path) {
+        var _a;
+        reinitializePath(path);
+        (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      }
+      /**
+       * 重新渲染路径，修正路径位置及尺寸，为了性能默认为延迟（防抖）更新
+       */
+    }, {
+      key: "_rerenderOriginPath",
+      value: function _rerenderOriginPath(path) {
+        var _this2 = this;
+        if (this._onceRerenderPaths) {
+          this._onceRerenderPaths.add(path);
+          return;
+        }
+        var refreshPathTriggerTime = this.context.options.refreshPathTriggerTime;
+        if (refreshPathTriggerTime === 'manual') return;
+        if (refreshPathTriggerTime === 'auto') {
+          this.rerenderOriginPath(path);
+        } else {
+          var timeout = this._debounceRerenderPathMap.get(path);
+          if (timeout) clearTimeout(timeout);
+          this._debounceRerenderPathMap.set(path, setTimeout(function () {
+            _this2.rerenderOriginPath(path);
+            _this2._debounceRerenderPathMap["delete"](path);
+          }, 100));
+        }
+      }
+      /**
+       * 在回调中执行，可以让过程中的路径重渲染操作只执行一次
+       */
+    }, {
+      key: "onceRerenderOriginPath",
+      value: function onceRerenderOriginPath(callback) {
+        this._onceRerenderPaths = new Set();
+        callback();
+        var paths = Array.from(this._onceRerenderPaths);
+        this._onceRerenderPaths = null;
+        paths.forEach(this._rerenderOriginPath.bind(this));
       }
       /**
        * 使用新的路径信息绘制旧路径，多个路径段则会使原路径拆分成多个
@@ -3971,7 +3721,7 @@
         var _parsePathJSON = parsePathJSON(originPath),
           styles = _parsePathJSON.styles,
           layout = _parsePathJSON.layout;
-        var newPaths = sections.map(function (section) {
+        var newPathway = sections.map(function (section) {
           var path = new fabric.fabric.Path(fabric.fabric.util.joinPath(originPath.path));
           path.set(Object.assign(Object.assign({}, styles), layout));
           path.path = section;
@@ -3989,7 +3739,7 @@
           };
         });
         this.clear(originPath);
-        this.draw(newPaths);
+        return this.draw(newPathway);
       }
       /**
        * 清除路径
@@ -4005,9 +3755,9 @@
         });
         if (index === -1) return;
         var pathway = this.pathway[index];
-        pathway.section.forEach(function (_ref4) {
-          var node = _ref4.node,
-            controllers = _ref4.controllers;
+        pathway.section.forEach(function (_ref3) {
+          var node = _ref3.node,
+            controllers = _ref3.controllers;
           var _a, _b;
           if (!node) return;
           node.unobserve();
@@ -4024,11 +3774,11 @@
     }, {
       key: "clearAll",
       value: function clearAll() {
-        this.pathway.forEach(function (_ref5) {
-          var section = _ref5.section;
-          section.forEach(function (_ref6) {
-            var node = _ref6.node,
-              controllers = _ref6.controllers;
+        this.pathway.forEach(function (_ref4) {
+          var section = _ref4.section;
+          section.forEach(function (_ref5) {
+            var node = _ref5.node,
+              controllers = _ref5.controllers;
             var _a, _b;
             node === null || node === void 0 ? void 0 : node.unobserve();
             (_a = controllers === null || controllers === void 0 ? void 0 : controllers.pre) === null || _a === void 0 ? void 0 : _a.unobserve();
@@ -4090,16 +3840,6 @@
         }
       }
       /**
-       * 移动控制点
-       */
-    }, {
-      key: "move",
-      value: function move(target, crood) {
-        if (target.x === crood.x && target.y === crood.y) return;
-        target.x = crood.x;
-        target.y = crood.y;
-      }
-      /**
        * 移除关键点
        *
        * @note
@@ -4140,10 +3880,10 @@
           if (isMultipleRemove && isIncludeStartNode && isClosePath) indexes.push(section.length - 2);
           return item;
         });
-        var sections = needRemoveSections.map(function (_ref7) {
-          var _ref8 = _slicedToArray(_ref7, 2),
-            section = _ref8[0],
-            indexes = _ref8[1];
+        var sections = needRemoveSections.map(function (_ref6) {
+          var _ref7 = _slicedToArray(_ref6, 2),
+            section = _ref7[0],
+            indexes = _ref7[1];
           var isClosePath = _this4.isClosePath(section);
           // 如果路径所有点都在删除列表列表中，直接移除整个路径
           var isWholePath = indexes.length === section.length || isClosePath && indexes.length === section.length - 1;
@@ -4244,6 +3984,83 @@
         sectionIndexMap.clear();
       }
       /**
+       * 插入关键点
+       * @param target 参考关键点
+       * @param newTarget 新添加的关键点位置
+       * @param replace 是否替换参考关键点
+       */
+    }, {
+      key: "insert",
+      value: function insert(target, newTarget) {
+        var replace = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+        var pathwayNode = this.pathwayNodeMap.get(target);
+        if (!pathwayNode) return;
+        var section = pathwayNode.section;
+        var index = section.indexOf(pathwayNode);
+        if (index === -1) return;
+        var updateCommands = [];
+        if (replace) {
+          if (index === 0 && this.isClosePath(section)) {
+            updateCommands.push({
+              type: 'update',
+              index: index,
+              instruction: [InstructionType.START, newTarget.x, newTarget.y]
+            });
+            updateCommands.push({
+              type: 'add',
+              index: section.length - 2,
+              instruction: [].concat(_toConsumableArray(section[section.length - 2].instruction.slice(0, -2)), [newTarget.x, newTarget.y])
+            });
+          } else {
+            updateCommands.push({
+              type: 'update',
+              index: index,
+              instruction: [InstructionType.LINE, newTarget.x, newTarget.y]
+            });
+          }
+        } else {
+          updateCommands.push({
+            type: 'add',
+            index: index,
+            instruction: [InstructionType.LINE, newTarget.x, newTarget.y]
+          });
+        }
+        this._updatePathwayByCommands(this.pathway.find(function (i) {
+          return i.section === section;
+        }), updateCommands);
+      }
+      /**
+       * 通过更新命令更新路径
+       * @param target
+       * @param instruction
+       */
+    }, {
+      key: "_updatePathwayByCommands",
+      value: function _updatePathwayByCommands(pathway, queue) {
+        var section = pathway.section;
+        queue.sort(function (a, b) {
+          return b.index - a.index;
+        });
+        queue.forEach(function (_ref8) {
+          var type = _ref8.type,
+            index = _ref8.index,
+            instruction = _ref8.instruction;
+          if (type === 'add') {
+            section.splice(index + 1, 0, {
+              section: section,
+              instruction: instruction
+            });
+          }
+          if (type === 'update') {
+            section.splice(index, 1, {
+              section: section,
+              instruction: instruction
+            });
+          }
+        });
+        this.draw([pathway]);
+      }
+      /**
        * 输出路径
        */
     }, {
@@ -4310,11 +4127,16 @@
    */
   var VizPathContext = /*#__PURE__*/function () {
     function VizPathContext() {
+      var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
       _classCallCheck(this, VizPathContext);
+      this.options = {
+        refreshPathTriggerTime: 'auto'
+      };
       /**
        * 增强模块列表
        */
       this._modules = [];
+      this.options = defaults(options, this.options);
     }
     /**
      * 通过fabric.Path对象解析路径信息
@@ -4447,13 +4269,20 @@
             section[0] = [InstructionType.START].concat(_toConsumableArray(section[0].slice(section[0].length - 2)));
           }
           // ③ 如果是二阶曲线全部升级为三阶曲线便于后续处理
-          for (var i = 1; i < section.length; i++) {
-            var instruction = section[i];
-            var preInstruction = section[i - 1];
-            if (instruction[0] === InstructionType.QUADRATIC_CURCE) {
-              instruction.splice.apply(instruction, [0, instruction.length].concat(_toConsumableArray(getCubicFromQuadratic(VizPath.getInstructionNodeCrood(preInstruction), instruction))));
-            }
-          }
+          // for (let i = 1; i < section.length; i++) {
+          //   const instruction = section[i];
+          //   const preInstruction = section[i - 1];
+          //   if (instruction[0] === InstructionType.QUADRATIC_CURCE) {
+          //     instruction.splice(
+          //       0,
+          //       instruction.length,
+          //       ...getCubicFromQuadratic(
+          //         VizPath.getInstructionNodeCrood(preInstruction)!,
+          //         instruction
+          //       )
+          //     );
+          //   }
+          // }
           // ④ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
           var isAutoClose = section[section.length - 1][0] === InstructionType.CLOSE;
           if (isAutoClose) {
@@ -4862,7 +4691,7 @@
     controllerPoint: createDefaultPoint$1,
     controllerLine: createDefaultLine$1
   };
-  var createDefaultPath = function createDefaultPath(decorator, originPath) {
+  var createDefaultPath$2 = function createDefaultPath(decorator, originPath) {
     var path = new fabric.fabric.Path();
     path.set(originPath.toJSON());
     var _originPath$pathOffse2 = originPath.pathOffset,
@@ -4877,7 +4706,7 @@
     });
     return decorator(path);
   };
-  var createDefaultNode = function createDefaultNode(decorator) {
+  var createDefaultNode$2 = function createDefaultNode(decorator) {
     var object = new fabric.fabric.Circle({
       strokeWidth: 4,
       radius: 6,
@@ -4915,7 +4744,7 @@
     });
     return group;
   };
-  var createDefaultPoint = function createDefaultPoint(decorator) {
+  var createDefaultPoint$2 = function createDefaultPoint(decorator) {
     var circle = new fabric.fabric.Circle({
       radius: 4,
       fill: '#bebebe',
@@ -4939,7 +4768,7 @@
     });
     return object;
   };
-  var createDefaultLine = function createDefaultLine(decorator) {
+  var createDefaultLine$2 = function createDefaultLine(decorator) {
     var line = new fabric.fabric.Line([0, 0, 0, 0], {
       stroke: '#bebebe',
       strokeWidth: 1,
@@ -4948,10 +4777,10 @@
     return decorator(line);
   };
   var defaultTheme = {
-    path: createDefaultPath,
-    node: createDefaultNode,
-    controllerPoint: createDefaultPoint,
-    controllerLine: createDefaultLine
+    path: createDefaultPath$2,
+    node: createDefaultNode$2,
+    controllerPoint: createDefaultPoint$2,
+    controllerLine: createDefaultLine$2
   };
   var EditorUI = /*#__PURE__*/function (_EditorModule3) {
     function EditorUI() {
@@ -4972,15 +4801,10 @@
   var EditorPath = /*#__PURE__*/function (_EditorModule4) {
     function EditorPath() {
       var _this8;
-      var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
       _classCallCheck(this, EditorPath);
-      _this8 = _callSuper(this, EditorPath);
-      _this8.options = {
-        updateTriggerTime: 'defer'
-      };
+      _this8 = _callSuper(this, EditorPath, arguments);
       _this8.paths = [];
       _this8.nodePathMap = new WeakMap([]);
-      _this8.options = defaults(options, _this8.options);
       return _this8;
     }
     /**
@@ -5016,10 +4840,7 @@
           matrix[5] -= offset.y;
         }
         var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(position.left, position.top), fabric.fabric.util.invertTransform(matrix));
-        return {
-          x: round(point.x, 4),
-          y: round(point.y, 4)
-        };
+        return point;
       }
       /**
        * 重新修正路径的尺寸和位置
@@ -5053,12 +4874,14 @@
         if (!canvas) {
           return;
         }
-        var updatePaths = function updatePaths() {
+        var handler = function handler(pathway) {
+          var _this9$paths;
           var ui = vizPath.context.find(EditorUI);
-          var paths = vizPath.pathway.map(function (_ref12) {
-            var section = _ref12.section,
-              originPath = _ref12.originPath;
+          pathway.forEach(function (item) {
             var _a;
+            var originPath = item.originPath;
+            // 如果已经带有标志则是已经添加进画布的路径
+            if (originPath[VizPath.symbol]) return;
             var decorator = function decorator(customPath) {
               var _parsePathJSON3 = parsePathJSON(customPath),
                 layout = _parsePathJSON3.layout,
@@ -5078,67 +4901,65 @@
               _path[VizPath.symbol] = VizPathSymbalType.PATH;
               return _path;
             };
-            var path = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.path) !== null && _a !== void 0 ? _a : EditorUI.noneUI.path)(decorator, originPath);
-            if (!path[VizPath.symbol]) path = decorator(path);
-            return {
-              path: path,
-              section: section
-            };
+            ((_a = ui === null || ui === void 0 ? void 0 : ui.options.path) !== null && _a !== void 0 ? _a : EditorUI.noneUI.path)(decorator, originPath);
+            if (!originPath[VizPath.symbol]) decorator(originPath);
           });
-          // 移除旧的路径对象并添加新的路径对象
+          // 添加新的路径对象
           canvas.renderOnAddRemove = true;
-          _this9.paths.forEach(function (_ref13) {
-            var path = _ref13.path;
-            canvas.remove(path);
-          });
-          paths.forEach(function (_ref14) {
-            var path = _ref14.path;
-            canvas.add(path);
+          pathway.forEach(function (_ref12) {
+            var originPath = _ref12.originPath;
+            if (!canvas.contains(originPath)) canvas.add(originPath);
           });
           canvas.renderOnAddRemove = false;
           canvas.renderAll();
-          _this9.paths = paths;
+          (_this9$paths = _this9.paths).push.apply(_this9$paths, _toConsumableArray(pathway));
           // 建立映射关系，便于减少后续计算
           _this9.paths.forEach(function (item) {
-            item.section.forEach(function (_ref15) {
-              var node = _ref15.node;
+            item.section.forEach(function (_ref13) {
+              var node = _ref13.node;
               if (node) _this9.nodePathMap.set(node, item);
             });
           });
         };
-        vizPath.on('draw', updatePaths);
-        vizPath.on('clear', updatePaths);
+        vizPath.on('draw', handler);
       }
       /**
-       * 初始化路径更新监听
+       * 初始化路径清除监听
        */
     }, {
-      key: "_initPathListener",
-      value: function _initPathListener(vizPath) {
+      key: "_initClearListener",
+      value: function _initClearListener(vizPath) {
         var _this10 = this;
-        var debounceWeakMap = new WeakMap([]);
-        vizPath.on('update', function (crood) {
-          var updateTriggerTime = _this10.options.updateTriggerTime;
-          if (updateTriggerTime === 'manual') return;
-          var path = _this10.nodePathMap.get(crood);
-          if (!path) return;
-          if (updateTriggerTime === 'auto') {
-            _this10.updatePathStatus(path.path);
-          } else {
-            var timeout = debounceWeakMap.get(path);
-            if (timeout) clearTimeout(timeout);
-            debounceWeakMap.set(path, setTimeout(function () {
-              _this10.updatePathStatus(path.path);
-              debounceWeakMap["delete"](path);
-            }, 60));
-          }
-        });
+        var editor = vizPath.context.find(Editor);
+        if (!editor) {
+          return;
+        }
+        var canvas = editor.canvas;
+        if (!canvas) {
+          return;
+        }
+        var handler = function handler(pathway) {
+          canvas.remove.apply(canvas, _toConsumableArray(pathway.map(function (i) {
+            return i.originPath;
+          })));
+          _this10.paths = _this10.paths.filter(function (i) {
+            return pathway.includes(i);
+          });
+          // 清除映射
+          pathway.forEach(function (item) {
+            item.section.forEach(function (_ref14) {
+              var node = _ref14.node;
+              if (node) _this10.nodePathMap["delete"](node);
+            });
+          });
+        };
+        vizPath.on('clear', handler);
       }
     }, {
       key: "load",
       value: function load(vizPath) {
+        this._initClearListener(vizPath);
         this._initDrawListener(vizPath);
-        this._initPathListener(vizPath);
       }
     }]);
   }(EditorModule);
@@ -5171,10 +4992,10 @@
         var ui = vizPath.context.find(EditorUI);
         var nodes = [];
         // 创建路径关键点的操作点（即实际路径上的节点，而非曲线上的虚拟点）
-        vizPath.pathway.forEach(function (_ref16) {
-          var section = _ref16.section;
+        vizPath.pathway.forEach(function (_ref15) {
+          var section = _ref15.section;
           section.forEach(function (item, index) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             var node = item.node;
             if (!node) return;
             // 如果下一个指令是闭合点，则不添加关键点
@@ -5197,7 +5018,7 @@
                   var position = editorPath.calcAbsolutePosition({
                     x: x,
                     y: y
-                  }, editorPath.nodePathMap.get(node).path);
+                  }, editorPath.nodePathMap.get(node).originPath);
                   if (_object.group) {
                     var relativePosition = editorPath.calcRelativeCrood(position, _object.group);
                     _object.set({
@@ -5219,7 +5040,7 @@
               });
               return _object;
             };
-            var object = ((_c = ui === null || ui === void 0 ? void 0 : ui.options.node) !== null && _c !== void 0 ? _c : EditorUI.noneUI.node)(decorator);
+            var object = (_c = _this12.nodeObjectMap.get(item)) !== null && _c !== void 0 ? _c : ((_d = ui === null || ui === void 0 ? void 0 : ui.options.node) !== null && _d !== void 0 ? _d : EditorUI.noneUI.node)(decorator);
             if (!object[VizPath.symbol]) object = decorator(object);
             nodes.push(object);
             _this12.objectNodeMap.set(object, item);
@@ -5234,24 +5055,27 @@
       value: function _addActiveSelectionObserve(group) {
         var _this13 = this;
         observe(group, ['left', 'top', 'angle'], function () {
-          var _iterator3 = _createForOfIteratorHelper(group._objects),
-            _step3;
-          try {
-            for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
-              var object = _step3.value;
-              var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix(false));
-              var left = decomposeMatrix.translateX;
-              var top = decomposeMatrix.translateY;
-              _this13.move(object, {
-                left: left,
-                top: top
-              });
+          var _a;
+          (_a = _this13.vizPath) === null || _a === void 0 ? void 0 : _a.onceRerenderOriginPath(function () {
+            var _iterator3 = _createForOfIteratorHelper(group._objects),
+              _step3;
+            try {
+              for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
+                var object = _step3.value;
+                var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix(false));
+                var left = decomposeMatrix.translateX;
+                var top = decomposeMatrix.translateY;
+                _this13.move(object, {
+                  left: left,
+                  top: top
+                });
+              }
+            } catch (err) {
+              _iterator3.e(err);
+            } finally {
+              _iterator3.f();
             }
-          } catch (err) {
-            _iterator3.e(err);
-          } finally {
-            _iterator3.f();
-          }
+          });
         });
       }
       // 添加单个活跃对象的响应式变化
@@ -5259,9 +5083,9 @@
       key: "_addActivePointObserve",
       value: function _addActivePointObserve(object) {
         var _this14 = this;
-        observe(object, ['left', 'top'], function (_ref17) {
-          var left = _ref17.left,
-            top = _ref17.top;
+        observe(object, ['left', 'top'], function (_ref16) {
+          var left = _ref16.left,
+            top = _ref16.top;
           if (object.group) return;
           _this14.move(object, {
             left: left,
@@ -5296,10 +5120,10 @@
         if (!pathwayNode.node) return;
         var controllers = [];
         var neighboringNodes = this.vizPath.getMoreNeighboringNodes(pathwayNode);
-        neighboringNodes.forEach(function (_ref18) {
-          var _ref19 = _slicedToArray(_ref18, 2),
-            type = _ref19[0],
-            pathwayNode = _ref19[1];
+        neighboringNodes.forEach(function (_ref17) {
+          var _ref18 = _slicedToArray(_ref17, 2),
+            type = _ref18[0],
+            pathwayNode = _ref18[1];
           var _a, _b;
           var pos = type.split('-')[1];
           // 已存在的节点直接复用
@@ -5335,7 +5159,7 @@
                 var position = editorPath.calcAbsolutePosition({
                   x: x,
                   y: y
-                }, editorPath.nodePathMap.get(node).path);
+                }, editorPath.nodePathMap.get(node).originPath);
                 _object.set(position).setCoords();
               }, {
                 immediate: true,
@@ -5345,16 +5169,16 @@
             _object.on('removed', function () {
               return controller.unobserve(_object);
             });
-            observe(_object, ['left', 'top'], function (_ref20) {
-              var left = _ref20.left,
-                top = _ref20.top;
+            observe(_object, ['left', 'top'], function (_ref19) {
+              var left = _ref19.left,
+                top = _ref19.top;
               var _a;
               if (((_a = _object.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) !== _object) return;
               var crood = editorPath.calcRelativeCrood({
                 left: left,
                 top: top
-              }, editorPath.nodePathMap.get(node).path);
-              controller.set(crood, [_object.name]);
+              }, editorPath.nodePathMap.get(node).originPath);
+              controller.setCrood(crood, [_object.name]);
             });
             return _object;
           };
@@ -5382,7 +5206,7 @@
                 var position = editorPath.calcAbsolutePosition({
                   x: x,
                   y: y
-                }, editorPath.nodePathMap.get(node).path);
+                }, editorPath.nodePathMap.get(node).originPath);
                 _line.set({
                   x1: position.left,
                   y1: position.top
@@ -5395,7 +5219,7 @@
                 var position = editorPath.calcAbsolutePosition({
                   x: x,
                   y: y
-                }, editorPath.nodePathMap.get(node).path);
+                }, editorPath.nodePathMap.get(node).originPath);
                 _line.set({
                   x2: position.left,
                   y2: position.top
@@ -5451,7 +5275,7 @@
         });
         this.editor.on('canvas', 'selection:cleared', function () {
           if (_this16._cancelSelectEvent) return;
-          _this16.focus();
+          // this.focus();
         });
         // 选中路径段时自动选中路线段内的所有指令关键点
         this.editor.on('canvas', 'mouse:dblclick', function (e) {
@@ -5462,7 +5286,7 @@
           var focusPath;
           for (var _i2 = editorPath.paths.length - 1; _i2 >= 0; _i2--) {
             var path = editorPath.paths[_i2];
-            if (path.path.containsPoint(e.pointer)) {
+            if (path.originPath.containsPoint(e.pointer)) {
               focusPath = path;
               break;
             }
@@ -5523,6 +5347,94 @@
           _this18.activePoint = null;
         });
       }
+      // private _initAddEvents() {
+      //   if (!this.editor) return;
+      //   const editorPath = this.vizPath?.context.find(EditorPath);
+      //   if (!editorPath) return;
+      //   let newNode: PathwayNode<ResponsiveCrood> | undefined;
+      //   let newNodeObject: fabric.Group | undefined;
+      //   let upgradeInstruction: Instruction | undefined;
+      //   this.editor.on('canvas', 'mouse:down:before', (event) => {
+      //     const { e, target } = event;
+      //     if (target) return;
+      //     // 判断是否是添加
+      //     // if (!this._inbuiltStatus.awaitAdd) return;
+      //     const node = this.activeNodes[0];
+      //     const pathwayNode = this.objectNodeMap.get(node);
+      //     if (!pathwayNode) return;
+      //     const position = { left: e.offsetX, top: e.offsetY };
+      //     const newCrood = editorPath.calcRelativeCrood(
+      //       position,
+      //       editorPath.nodePathMap.get(pathwayNode.node!)!.originPath
+      //     );
+      //     newNode = this.vizPath?.insert(pathwayNode.node!, newCrood);
+      //   });
+      //   this.editor.on('canvas', 'mouse:down', () => {
+      //     if (!newNode) return;
+      //     newNodeObject = this.nodeObjectMap.get(newNode)!;
+      //     if (newNodeObject) {
+      //       this.focus(newNodeObject);
+      //       this.editor!.canvas!.selection = false;
+      //     }
+      //   });
+      //   this.editor.on('canvas', 'mouse:move', (event) => {
+      //     const { e } = event;
+      //     if (newNode && newNodeObject) {
+      //       // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+      //       if (newNodeObject.containsPoint(event.pointer)) return;
+      //       const position = { left: e.offsetX, top: e.offsetY };
+      //       const mirrorPosition = {
+      //         left: newNodeObject.left! - (e.offsetX - newNodeObject.left!),
+      //         top: newNodeObject.top! - (e.offsetY - newNodeObject.top!)
+      //       }
+      //       const newCrood = editorPath.calcRelativeCrood(
+      //         mirrorPosition,
+      //         editorPath.nodePathMap.get(newNode.node!)!.originPath
+      //       );
+      //       newNode = this.vizPath?.update(newNode.node!, [
+      //         InstructionType.QUADRATIC_CURCE,
+      //         newCrood.x,
+      //         newCrood.y,
+      //         newNode.node?.x,
+      //         newNode.node?.y
+      //       ] as Instruction);
+      //       // next instruction
+      //       const { next } = this.vizPath?.getNeighboringNodes(newNode!) ?? {};
+      //       if (next) {
+      //         const nextHandlerCrood = editorPath.calcRelativeCrood(
+      //           position,
+      //           editorPath.nodePathMap.get(next.node!)!.originPath
+      //         );
+      //         const _nextNode = this.vizPath?.update(next.node!, [
+      //           InstructionType.QUADRATIC_CURCE,
+      //           nextHandlerCrood.x,
+      //           nextHandlerCrood.y,
+      //           next.node?.x,
+      //           next.node?.y
+      //         ] as Instruction);
+      //         const { pre } = this.vizPath?.getNeighboringNodes(_nextNode!) ?? {};
+      //         newNode = pre;
+      //       }
+      //       newNodeObject = this.nodeObjectMap.get(newNode!)!;
+      //       this.focus(newNodeObject);
+      //       // if (upgradeInstruction[0] === InstructionType.QUADRATIC_CURCE) {
+      //       //   upgradeInstruction[1] = newCrood.x;
+      //       //   upgradeInstruction[2] = newCrood.y;
+      //       // } else {
+      //       //   upgradeInstruction[0] = InstructionType.QUADRATIC_CURCE;
+      //       //   upgradeInstruction.splice(1, 0, newCrood.x, newCrood.y);
+      //       // }
+      //       // this._updatePointHandlers();
+      //     }
+      //   });
+      //   this.editor.on('canvas', 'mouse:up', () => {
+      //     upgradeInstruction = undefined;
+      //     newNodeObject = undefined;
+      //     newNode = undefined;
+      //     this.editor!.canvas!.selection = true;
+      //     // this._fire('update');
+      //   });
+      // }
     }, {
       key: "remove",
       value: function remove() {
@@ -5563,7 +5475,7 @@
           preScaleY = _object$scaleY === void 0 ? 1 : _object$scaleY,
           _object$angle = object.angle,
           preAngle = _object$angle === void 0 ? 0 : _object$angle;
-        var _ref21 = selectionGroup ? {
+        var _ref20 = selectionGroup ? {
             scaleX: 1 / selectionGroup.scaleX,
             scaleY: 1 / selectionGroup.scaleY,
             angle: -selectionGroup.angle
@@ -5572,15 +5484,15 @@
             scaleY: 1,
             angle: 0
           },
-          newScaleX = _ref21.scaleX,
-          newScaleY = _ref21.scaleY,
-          newAngle = _ref21.angle;
+          newScaleX = _ref20.scaleX,
+          newScaleY = _ref20.scaleY,
+          newAngle = _ref20.angle;
         object.set({
           scaleX: newScaleX,
           scaleY: newScaleY,
           angle: newAngle
         }).setCoords();
-        var newCrood = editorPath.calcRelativeCrood(position, editorPath.nodePathMap.get(node).path);
+        var newCrood = editorPath.calcRelativeCrood(position, editorPath.nodePathMap.get(node).originPath);
         // 需要跟随变化的曲线控制点
         var followCroods = [];
         var followTransform = {
@@ -5594,12 +5506,12 @@
             y: preScaleY / newScaleY
           }
         };
-        node.set(newCrood, [object === null || object === void 0 ? void 0 : object.name]);
+        node.setCrood(newCrood, [object.name]);
         var list = (_b = this.vizPath) === null || _b === void 0 ? void 0 : _b.getMoreNeighboringNodes(pathwayNode);
-        list === null || list === void 0 ? void 0 : list.forEach(function (_ref22) {
-          var _ref23 = _slicedToArray(_ref22, 2),
-            type = _ref23[0],
-            node = _ref23[1];
+        list === null || list === void 0 ? void 0 : list.forEach(function (_ref21) {
+          var _ref22 = _slicedToArray(_ref21, 2),
+            type = _ref22[0],
+            node = _ref22[1];
           if (type === 'cur-pre' || type === 'cur-next') {
             followCroods.push(node.controllers[type.split('-')[1]]);
           }
@@ -5608,7 +5520,7 @@
         if (((_d = (_c = section[section.length - 1]) === null || _c === void 0 ? void 0 : _c.instruction) === null || _d === void 0 ? void 0 : _d[0]) === InstructionType.CLOSE && section.length > 2) {
           if (section[0].node === node) {
             var _node = section[section.length - 2].node;
-            _node.set(newCrood);
+            _node.setCrood(newCrood);
           }
           // 闭合节点不可能存在可视操作节点
           // if (section[section.length - 2].node === node) {}
@@ -5644,6 +5556,20 @@
         (_e = object.canvas) === null || _e === void 0 ? void 0 : _e.requestRenderAll();
       }
     }, {
+      key: "add",
+      value: function add(position) {
+        var _a, _b;
+        if (this.activeNodes.length !== 1) return;
+        var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath);
+        if (!editorPath) return [];
+        var node = this.activeNodes[0];
+        var pathwayNode = this.objectNodeMap.get(node);
+        if (!pathwayNode) return;
+        var newCrood = editorPath.calcRelativeCrood(position, editorPath.nodePathMap.get(pathwayNode.node).originPath);
+        var newPathwayNode = (_b = this.vizPath) === null || _b === void 0 ? void 0 : _b.insert(pathwayNode.node, newCrood);
+        this.focus(this.nodeObjectMap.get(newPathwayNode));
+      }
+    }, {
       key: "focus",
       value: function focus() {
         var _this20 = this;
@@ -5659,8 +5585,8 @@
           return _this20.nodes.includes(i);
         });
         var focusControllerPoints = selectedObjects.filter(function (i) {
-          return _this20.controllers.find(function (_ref24) {
-            var point = _ref24.point;
+          return _this20.controllers.find(function (_ref23) {
+            var point = _ref23.point;
             return point === i;
           });
         });
@@ -5719,10 +5645,100 @@
         this._initSelectEvents();
         this._initDrawEvents();
         this._initClearEvents();
+        // this._initAddEvents();
       }
     }]);
   }(EditorModule);
   EditorNode.ID = Symbol('editor-node');
+
+  const createDefaultPath = (decorator, originPath) => {
+      const path = new fabric.fabric.Path();
+      path.set(originPath.toJSON());
+      const { x, y } = originPath.pathOffset;
+      path.pathOffset = new fabric.fabric.Point(x, y);
+      path.set({
+          stroke: '#333',
+          strokeWidth: 4,
+          fill: 'transparent',
+          strokeUniform: true,
+          backgroundColor: 'rgba(255, 0, 0, 0.2)'
+      });
+      return decorator(path);
+  };
+
+  const createDefaultNode = (decorator) => {
+      const object = new fabric.fabric.Circle({
+          strokeWidth: 4,
+          radius: 6,
+          fill: "#ffffff",
+          stroke: "#4b4b4b"
+      });
+      const group = decorator(object);
+      group.on("mouseover", () => {
+          var _a;
+          object.set({ fill: "#7ef4ad" });
+          (_a = group.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      });
+      group.on("mouseout", () => {
+          var _a, _b;
+          object.set({
+              fill: ((_a = group.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === group ? "#29ca6e" : "#ffffff"
+          });
+          (_b = group.canvas) === null || _b === void 0 ? void 0 : _b.requestRenderAll();
+      });
+      group.on("selected", () => {
+          var _a;
+          object.set({ fill: "#29ca6e" });
+          (_a = group.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      });
+      group.on("deselected", () => {
+          var _a;
+          object.set({ fill: "#ffffff" });
+          (_a = group.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      });
+      return group;
+  };
+
+  const createDefaultPoint = (decorator) => {
+      const circle = new fabric.fabric.Circle({
+          radius: 4,
+          fill: '#bebebe',
+          stroke: '#bebebe',
+          strokeWidth: 2,
+      });
+      const object = decorator(circle);
+      object.on('selected', () => {
+          var _a;
+          circle.set({
+              stroke: '#333',
+          });
+          (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      });
+      object.on('deselected', () => {
+          var _a;
+          circle.set({
+              stroke: '#bebebe',
+          });
+          (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      });
+      return object;
+  };
+
+  const createDefaultLine = (decorator) => {
+      const line = new fabric.fabric.Line([0, 0, 0, 0], {
+          stroke: '#bebebe',
+          strokeWidth: 1,
+          strokeDashArray: [4, 3],
+      });
+      return decorator(line);
+  };
+
+  var debugTheme = {
+      path: createDefaultPath,
+      node: createDefaultNode,
+      controllerPoint: createDefaultPoint,
+      controllerLine: createDefaultLine,
+  };
 
   const EXAMPLE_PATH_D = {
       point: 'M 100 100 z',
@@ -5777,45 +5793,38 @@
       const vizPath = new VizPathContext();
       const operator = await vizPath
           .use(new Editor(fabricCanvas))
-          .use(new EditorUI({
-      // path: (decorator, originPath) => {
-      //   return originPath;
-      // },
-      }))
+          .use(new EditorUI(debugTheme))
           .use(new EditorBackground())
-          .use(new EditorPath({
-          updateTriggerTime: 'auto'
-      }))
+          .use(new EditorPath())
           .use(new EditorNode())
           .initialize();
       // ① 通过路径指令直接绘制
-      const pathway1 = VizPathContext.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
-          left: fabricCanvas.getWidth() / 2,
-          top: fabricCanvas.getHeight() / 2,
-          originX: 'center',
-          originY: 'center',
-          scaleX: 1.2,
-          scaleY: 1.2,
-      });
-      operator.draw(pathway1);
-      // ② 通过路径对象绘制
-      // const pathway2 = VizPath.parsePathFromObject(path);
-      // operator.draw(pathway2);
-      // ③ 通过URL绘制
-      // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';
-      // // const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
-      // const pathways = await VizPath.parsePathFromURL(svgURL, {
+      // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.shapes, {
       //   left: fabricCanvas.getWidth() / 2,
       //   top: fabricCanvas.getHeight() / 2,
       //   originX: 'center',
       //   originY: 'center',
       //   scaleX: 1.2,
-      //   scaleY: 1.2
+      //   scaleY: 1.2,
       // });
-      // pathways?.forEach((pathway) => {
-      //   operator.draw(pathway);
-      // })
-      // console.log(pathways);
+      // operator.draw(pathway1);
+      // ② 通过路径对象绘制
+      // const pathway2 = VizPath.parsePathFromObject(path);
+      // operator.draw(pathway2);
+      // ③ 通过URL绘制
+      // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';
+      const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
+      const pathways = await VizPathContext.parsePathFromURL(svgURL, {
+          left: fabricCanvas.getWidth() / 2,
+          top: fabricCanvas.getHeight() / 2,
+          originX: 'center',
+          originY: 'center',
+          scaleX: 1.2,
+          scaleY: 1.2
+      });
+      pathways === null || pathways === void 0 ? void 0 : pathways.forEach((pathway) => {
+          operator.draw(pathway);
+      });
       // ④ 快速使用
       // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.bubble, {
       //   left: fabricCanvas.getWidth() / 2,
@@ -5843,6 +5852,7 @@
           });
       };
       // operator.move(operator.pathway[0][0].node, { x: 200, y: 200 })
+      // operator.insert(operator.pathway[0].section[0].node!, { x: 100, y: 100 }, true);
       // 操作按钮
       btnDelete.addEventListener('click', () => {
           const editorNode = vizPath.find(EditorNode);

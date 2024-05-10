@@ -1,41 +1,21 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
-import round from 'lodash-es/round';
-import defaults from 'lodash-es/defaults';
-import VizPath, { VizPathSymbalType, type ResponsiveCrood } from '../../vizpath.class';
+import VizPath, {
+  VizPathSymbalType,
+  type ResponsiveCrood,
+  type ResponsivePathway,
+} from '../../vizpath.class';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
-import type { PathwayNode } from '../..';
 import EditorUI from '../editor-ui/index.class';
 import { parsePathJSON, reinitializePath } from '@utils';
-
-type EditorPathOptions = {
-  /**
-   * 触发路径更新状态的时机
-   * @default 'defer' 延迟自动更新，比auto性能好，但是状态不完全同步
-   */
-  updateTriggerTime?: 'auto' | 'manual' | 'defer';
-};
 
 class EditorPath extends EditorModule {
   static ID = Symbol('editor-path');
 
-  options: Required<EditorPathOptions> = {
-    updateTriggerTime: 'defer',
-  };
+  paths: ResponsivePathway = [];
 
-  paths: {
-    path: fabric.Path;
-    section: PathwayNode<ResponsiveCrood>[];
-  }[] = [];
-
-  nodePathMap = new WeakMap<ResponsiveCrood, (typeof this.paths)[number]>([]);
-
-  constructor(options: EditorPathOptions = {}) {
-    super();
-
-    this.options = defaults(options, this.options);
-  }
+  nodePathMap = new WeakMap<ResponsiveCrood, ResponsivePathway[number]>([]);
 
   /**
    * 将画布坐标转化为特定路径的相对指令坐标位置
@@ -49,7 +29,7 @@ class EditorPath extends EditorModule {
         (object as fabric.Path).pathOffset,
         [...matrix.slice(0, 4), 0, 0]
       );
-  
+
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
     }
@@ -73,7 +53,7 @@ class EditorPath extends EditorModule {
         (object as fabric.Path).pathOffset,
         [...matrix.slice(0, 4), 0, 0]
       );
-  
+
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
     }
@@ -83,12 +63,8 @@ class EditorPath extends EditorModule {
       fabric.util.invertTransform(matrix)
     );
 
-    return {
-      x: round(point.x, 4),
-      y: round(point.y, 4),
-    };
+    return point;
   }
-
 
   /**
    * 重新修正路径的尺寸和位置
@@ -120,10 +96,15 @@ class EditorPath extends EditorModule {
       return;
     }
 
-    const updatePaths = () => {
+    const handler = (pathway: ResponsivePathway) => {
       const ui = vizPath.context.find(EditorUI);
 
-      const paths = vizPath.pathway.map(({ section, originPath }) => {
+      pathway.forEach((item) => {
+        const { originPath } = item;
+
+        // 如果已经带有标志则是已经添加进画布的路径
+        if (originPath[VizPath.symbol]) return;
+
         const decorator = (customPath: fabric.Path) => {
           const { layout, styles } = parsePathJSON(customPath);
           const _path = originPath;
@@ -144,27 +125,19 @@ class EditorPath extends EditorModule {
 
           return _path;
         };
-        let path = (ui?.options.path ?? EditorUI.noneUI.path)(
-          decorator,
-          originPath
-        );
-        if (!path[VizPath.symbol]) path = decorator(path);
-
-        return { path, section };
+        (ui?.options.path ?? EditorUI.noneUI.path)(decorator, originPath);
+        if (!originPath[VizPath.symbol]) decorator(originPath);
       });
 
-      // 移除旧的路径对象并添加新的路径对象
+      // 添加新的路径对象
       canvas.renderOnAddRemove = true;
-      this.paths.forEach(({ path }) => {
-        canvas.remove(path);
-      });
-      paths.forEach(({ path }) => {
-        canvas.add(path);
+      pathway.forEach(({ originPath }) => {
+        if (!canvas.contains(originPath)) canvas.add(originPath);
       });
       canvas.renderOnAddRemove = false;
       canvas.renderAll();
 
-      this.paths = paths;
+      this.paths.push(...pathway);
 
       // 建立映射关系，便于减少后续计算
       this.paths.forEach((item) => {
@@ -172,45 +145,42 @@ class EditorPath extends EditorModule {
           if (node) this.nodePathMap.set(node, item);
         });
       });
-    }
-    vizPath.on('draw', updatePaths);
-    vizPath.on('clear', updatePaths);
+    };
+    vizPath.on('draw', handler);
   }
 
   /**
-   * 初始化路径更新监听
+   * 初始化路径清除监听
    */
-  private _initPathListener(vizPath: VizPath) {
-    const debounceWeakMap = new WeakMap<(typeof this.paths)[number], number>(
-      []
-    );
-    vizPath.on('update', (crood) => {
-      const { updateTriggerTime } = this.options;
-      if (updateTriggerTime === 'manual') return;
+  private _initClearListener(vizPath: VizPath) {
+    const editor = vizPath.context.find(Editor);
+    if (!editor) {
+      return;
+    }
 
-      const path = this.nodePathMap.get(crood);
-      if (!path) return;
+    const canvas = editor.canvas;
+    if (!canvas) {
+      return;
+    }
 
-      if (updateTriggerTime === 'auto') {
-        this.updatePathStatus(path.path);
-      } else {
-        const timeout = debounceWeakMap.get(path);
-        if (timeout) clearTimeout(timeout);
+    const handler = (pathway: ResponsivePathway) => {
+      canvas.remove(...pathway.map((i) => i.originPath));
 
-        debounceWeakMap.set(
-          path,
-          setTimeout(() => {
-            this.updatePathStatus(path.path);
-            debounceWeakMap.delete(path);
-          }, 60)
-        );
-      }
-    });
+      this.paths = this.paths.filter((i) => pathway.includes(i));
+
+      // 清除映射
+      pathway.forEach((item) => {
+        item.section.forEach(({ node }) => {
+          if (node) this.nodePathMap.delete(node);
+        });
+      });
+    };
+    vizPath.on('clear', handler);
   }
 
   load(vizPath: VizPath) {
+    this._initClearListener(vizPath);
     this._initDrawListener(vizPath);
-    this._initPathListener(vizPath);
   }
 }
 
