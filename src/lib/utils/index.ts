@@ -3,6 +3,7 @@
  */
 export { default as transform } from './transform';
 export { default as observe } from './observe';
+export { default as deepIterateGroup } from './deep-iterate-group';
 
 /**
  * 路径操作

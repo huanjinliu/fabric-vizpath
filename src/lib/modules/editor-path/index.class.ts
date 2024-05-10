@@ -135,7 +135,7 @@ class EditorPath extends EditorModule {
         if (!canvas.contains(originPath)) canvas.add(originPath);
       });
       canvas.renderOnAddRemove = false;
-      canvas.renderAll();
+      canvas.requestRenderAll();
 
       this.paths.push(...pathway);
 

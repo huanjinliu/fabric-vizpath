@@ -10,7 +10,6 @@ const observe = <T extends Record<string, any>>(
     value: Pick<T, ArrayElement<typeof keys>>,
     oldValue: Pick<T, ArrayElement<typeof keys>>
   ) => void,
-  
 ) => {
   const data: any = {};
   const properties: PropertyDescriptorMap = {};

@@ -39,7 +39,7 @@ class EditorBackground extends EditorModule {
             offsetY: -(canvas.getHeight() % size) / 2,
           }),
           () => {
-            canvas.renderAll();
+            canvas.requestRenderAll();
             resolve();
           }
         );

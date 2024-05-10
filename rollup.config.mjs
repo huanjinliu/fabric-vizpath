@@ -36,11 +36,33 @@ const build_umd = () => ({
   ],
 });
 
-const build_es = () => ({
+const build_es_lib = () => ({
   input: 'src/index.ts',
   output: [
     {
       file: 'dist/index.es.js',
+      format: 'es',
+    },
+  ],
+  plugins: [
+    resolve(),
+    peerDepsExternal(),
+    commonjs(),
+    json(),
+    typescript({
+      declaration: false,
+    }),
+    babel({
+      babelHelpers: 'bundled',
+    }),
+  ],
+});
+
+const build_es_theme = () => ({
+  input: 'src/themes/index.ts',
+  output: [
+    {
+      file: 'dist/themes/index.es.js',
       format: 'es',
     },
   ],
@@ -101,7 +123,8 @@ const build_serve = () => {
 
 const configs = {
   umd: build_umd(),
-  es: build_es(),
+  es_lib: build_es_lib(),
+  es_theme: build_es_theme(),
   serve: process.env.ENV === 'dev' ? build_serve() : undefined,
 };
 
