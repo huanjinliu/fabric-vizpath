@@ -56,7 +56,7 @@ class VizPathContext {
   /**
    * 增强模块列表
    */
-  private _modules: EditorModule[] = [];
+  modules: EditorModule[] = [];
 
   constructor(options: VizPathOptions = {}) {
     this.options = defaults(options, this.options);
@@ -230,14 +230,14 @@ class VizPathContext {
    * 添加拓展模块
    */
   use(module: EditorModule) {
-    const index = this._modules.findIndex(
+    const index = this.modules.findIndex(
       (item) => (item.constructor as any).ID === (module.constructor as any).ID
     );
     if (index !== -1) {
-      this._modules.splice(index, 1);
+      this.modules.splice(index, 1);
     }
 
-    this._modules.push(module);
+    this.modules.push(module);
 
     return this;
   }
@@ -246,7 +246,7 @@ class VizPathContext {
    * 查找模块
    */
   find<Module extends Constructor>(moduleConstructor: Module) {
-    return this._modules.find(
+    return this.modules.find(
       (module) =>
         (module.constructor as any).ID === (moduleConstructor as any).ID
     ) as InstanceType<Module> | undefined;
@@ -262,7 +262,7 @@ class VizPathContext {
       let next = 0;
 
       const loadModule = async () => {
-        const module = this._modules[next];
+        const module = this.modules[next];
         if (!module) {
           resolve(vizPath);
           return;

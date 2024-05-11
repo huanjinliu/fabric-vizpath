@@ -6,6 +6,7 @@ import {
   EditorPath,
   EditorNode,
   EditorUI,
+  EditorShortcut,
 } from 'fabric-path-editor';
 import { debugTheme } from '@themes';
 
@@ -18,6 +19,10 @@ const EXAMPLE_PATH_D = {
     'M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z',
   shapes:
     'L-188.7846 -47L-100.923 97H-256.3538 z M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
+  heart:
+    'M,-108.5,-211.5 C,-175.5,-211.5,-228.5,-157.5,-228.5,-91.5 C,-228.5,43.5,-92.5,78.5,-0.5,211.5 C,87.5,79.5,228.5,38.5,228.5,-91.5 C,228.5,-157.5,174.5,-211.5,108.5,-211.5 C,60.5,-211.5,18.5,-183.5,-0.5,-142.5 C,-19.5,-183.5,-60.5,-211.5,-108.5,-211.5 z',
+  banana:
+    'M 8,223 c 0,0 143,3 185,-181 c 2,-11 -1,-20 1,-33 h 16 c 0,0 -3,17 1,30 c 21,68 -4,242 -204,196 L 8,223 z M 8,230 c 0,0 188,40 196,-160',
 };
 
 (async () => {
@@ -80,6 +85,18 @@ const EXAMPLE_PATH_D = {
     .use(new EditorBackground())
     .use(new EditorPath())
     .use(new EditorNode())
+    .use(new EditorShortcut([
+      {
+        // 删除节点快捷键
+        key: 'backspace|delete',
+        onActivate: () => {
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+
+          if (editorNode.activeNodes.length) editorNode.remove(...editorNode.activeNodes);
+        },
+      },
+    ]))
     .initialize();
 
   // ① 通过路径指令直接绘制
@@ -88,8 +105,8 @@ const EXAMPLE_PATH_D = {
     top: fabricCanvas.getHeight() / 2,
     originX: 'center',
     originY: 'center',
-    scaleX: 1.2,
-    scaleY: 1.2,
+    scaleX: 2,
+    scaleY: 2,
   });
   operator.draw(pathway1);
 
@@ -153,7 +170,10 @@ const EXAMPLE_PATH_D = {
   // const editorNode = vizPath.find(EditorNode);
   // if (!editorNode) return;
 
-  // editorNode.focus(...editorNode.nodes.slice(0, 3));
+  // editorNode.focus(editorNode.nodes[0]);
+
+  // const object = editorNode.add({ left: 100, top: 100 });
+  // editorNode.focus(object);
 
   // editorNode.remove();
 

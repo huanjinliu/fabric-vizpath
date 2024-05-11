@@ -1,4 +1,4 @@
-import { defaults } from 'lodash-es';
+import defaults from 'lodash-es/defaults';
 import EditorModule from '../base.class';
 import { defaultTheme, noneTheme } from '@themes';
 import type { Theme } from '@themes';

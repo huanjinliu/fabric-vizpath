@@ -5,3 +5,4 @@ export { default as EditorBackground } from './lib/modules/editor-background/ind
 export { default as EditorPath } from './lib/modules/editor-path/index.class';
 export { default as EditorNode } from './lib/modules/editor-node/index.class';
 export { default as EditorUI } from './lib/modules/editor-ui/index.class';
+export { default as EditorShortcut } from './lib/modules/editor-shortcut/index.class';

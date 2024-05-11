@@ -6,6 +6,9 @@ abstract class EditorModule {
   async prepare() {
   }
 
+  unload(vizPath: VizPath) {
+  }
+
   load(vizPath: VizPath) {
   }
 }

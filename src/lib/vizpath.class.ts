@@ -193,6 +193,20 @@ class VizPath {
   }
 
   /**
+   * 输出路径
+   */
+  toPaths(pathway: ResponsivePathway = this.pathway) {
+    return pathway.map(({ section }) => section.map((i) => i.instruction));
+  }
+
+  /**
+   * 输出路径指令
+   */
+  toPathD(pathway: ResponsivePathway = this.pathway) {
+    return (fabric.util as any).joinPath(this.toPaths(pathway));
+  }
+
+  /**
    * 获取路径或指令列表所在的路径
    */
   getPathway(target: PathwayNode[] | fabric.Path) {
@@ -483,62 +497,6 @@ class VizPath {
   }
 
   /**
-   * 清除路径
-   */
-  clear(target: PathwayNode[] | fabric.Path) {
-    const index =
-      target instanceof fabric.Path
-        ? this.pathway.findIndex((i) => i.originPath === target)
-        : this.pathway.findIndex((i) => i.section === target);
-
-    if (index === -1) return;
-
-    const pathway = this.pathway[index];
-
-    pathway.section.forEach(({ node, controllers }) => {
-      if (!node) return;
-
-      node.unobserve();
-      controllers?.pre?.unobserve();
-      controllers?.next?.unobserve();
-      this.pathwayNodeMap.delete(node);
-    });
-
-    this.pathway.splice(index, 1);
-
-    this._fire('clear', [pathway]);
-  }
-
-  /**
-   * 清除所有路径
-   */
-  clearAll() {
-    this.pathway.forEach(({ section }) => {
-      section.forEach(({ node, controllers }) => {
-        node?.unobserve();
-        controllers?.pre?.unobserve();
-        controllers?.next?.unobserve();
-      });
-    });
-    this.pathway = [];
-    this.pathwayNodeMap.clear();
-    this._observers.clear();
-
-    this._fire('clearAll');
-  }
-
-  /**
-   * 销毁并释放内存
-   */
-  destroy() {
-    this.clearAll();
-
-    this.events = {};
-
-    this._fire('destroy');
-  }
-
-  /**
    * 监听事件
    * @param eventName 事件名
    * @param callback 回调
@@ -684,8 +642,6 @@ class VizPath {
         if (isClosePath && _sections[0].length > 2) {
           _sections[0].push([InstructionType.LINE, ..._sections[0][0].slice(-2)] as Instruction, [InstructionType.CLOSE]);
         }
-
-        console.log(_sections);
 
         return _sections;
       }
@@ -888,17 +844,63 @@ class VizPath {
   }
 
   /**
-   * 输出路径
+   * 清除路径
    */
-  toPaths(pathway: ResponsivePathway = this.pathway) {
-    return pathway.map(({ section }) => section.map((i) => i.instruction));
+  clear(target: PathwayNode[] | fabric.Path) {
+    const index =
+      target instanceof fabric.Path
+        ? this.pathway.findIndex((i) => i.originPath === target)
+        : this.pathway.findIndex((i) => i.section === target);
+
+    if (index === -1) return;
+
+    const pathway = this.pathway[index];
+
+    pathway.section.forEach(({ node, controllers }) => {
+      if (!node) return;
+
+      node.unobserve();
+      controllers?.pre?.unobserve();
+      controllers?.next?.unobserve();
+      this.pathwayNodeMap.delete(node);
+    });
+
+    this.pathway.splice(index, 1);
+
+    this._fire('clear', [pathway]);
   }
 
   /**
-   * 输出路径指令
+   * 清除所有路径
    */
-  toPathD(pathway: ResponsivePathway = this.pathway) {
-    return (fabric.util as any).joinPath(this.toPaths(pathway));
+  clearAll() {
+    this.pathway.forEach(({ section }) => {
+      section.forEach(({ node, controllers }) => {
+        node?.unobserve();
+        controllers?.pre?.unobserve();
+        controllers?.next?.unobserve();
+      });
+    });
+    this.pathway = [];
+    this.pathwayNodeMap.clear();
+    this._observers.clear();
+
+    this._fire('clearAll');
+  }
+
+  /**
+   * 销毁并释放内存
+   */
+  destroy() {
+    this.clearAll();
+
+    this.events = {};
+
+    this.context.modules.forEach(module => {
+      module.unload(this);
+    });
+
+    this._fire('destroy');
   }
 }
 
