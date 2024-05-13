@@ -7,12 +7,13 @@ import {
   EditorNode,
   EditorUI,
   EditorShortcut,
+  utils,
 } from 'fabric-path-editor';
 import { debugTheme } from '@themes';
 
 const EXAMPLE_PATH_D = {
   point: 'M 100 100 z',
-  polyline: 'M 20 20 L 80 20 L 20 50 L 80 50 L 20 80 L 80 80',
+  polyline: 'M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160',
   circle:
     'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
   bubble:
@@ -23,6 +24,7 @@ const EXAMPLE_PATH_D = {
     'M,-108.5,-211.5 C,-175.5,-211.5,-228.5,-157.5,-228.5,-91.5 C,-228.5,43.5,-92.5,78.5,-0.5,211.5 C,87.5,79.5,228.5,38.5,228.5,-91.5 C,228.5,-157.5,174.5,-211.5,108.5,-211.5 C,60.5,-211.5,18.5,-183.5,-0.5,-142.5 C,-19.5,-183.5,-60.5,-211.5,-108.5,-211.5 z',
   banana:
     'M 8,223 c 0,0 143,3 185,-181 c 2,-11 -1,-20 1,-33 h 16 c 0,0 -3,17 1,30 c 21,68 -4,242 -204,196 L 8,223 z M 8,230 c 0,0 188,40 196,-160',
+  test: 'M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100',
 };
 
 (async () => {
@@ -77,7 +79,10 @@ const EXAMPLE_PATH_D = {
   // fabricCanvas.add(path);
   // fabricCanvas.renderAll();
 
-  const vizPath = new VizPath();
+  const vizPath = new VizPath({
+    refreshPathTriggerTime: 'defer',
+    refreshDeferDuration: 10
+  });
 
   const operator = await vizPath
     .use(new Editor(fabricCanvas))
@@ -100,19 +105,69 @@ const EXAMPLE_PATH_D = {
     .initialize();
 
   // ① 通过路径指令直接绘制
-  const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.polyline, {
+  const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.test, {
     left: fabricCanvas.getWidth() / 2,
     top: fabricCanvas.getHeight() / 2,
     originX: 'center',
     originY: 'center',
-    scaleX: 2,
-    scaleY: 2,
+    // scaleX: 2,
+    // scaleY: 2,
   });
   operator.draw(pathway1);
+  // console.log(pathway1);
 
   // ② 通过路径对象绘制
   // const pathway2 = VizPath.parsePathFromObject(path);
   // operator.draw(pathway2);
+  // console.log(pathway2);
+
+  // console.log('origin => ', (fabric.util as any).joinPath(path.path));
+  // operator.on('update', (pathway) => {
+  //   // console.log(path.calcOwnMatrix());
+  //   const d = operator.toPathD([pathway]);
+  //   // path.initialize(d);
+  //   // console.log('update => ', d);
+  //   // utils.reinitializePath(path, d);
+  //   // // console.log(path.pathOffset)
+  //   // fabricCanvas.renderAll();
+
+  //   const oldCroods = { left: path.left!, top: path.top! };
+
+  //   // 记录旧的路径中心点
+  //   const oldPath = new fabric.Path((fabric.util as any).joinPath(path.path));
+  //   const oldPathCenter = oldPath.getCenterPoint();
+
+  //   // path.set({ fill: '#0000FF55' });
+
+  //   // 使用新的路径重新构建路径对象
+  //   path.initialize(d as any);
+
+  //   // 记录新的路径中心的
+  //   const newPath = new fabric.Path(d);
+  //   const newPathCenter = newPath.getCenterPoint();
+
+  //   // 要考虑上元素的变换
+  //   // const matrix = [...pathway.originPath.calcOwnMatrix()];
+  //   // matrix[4] = 0;
+  //   // matrix[5] = 0;
+
+  //   // 计算路径偏移差值
+  //   const distinct = fabric.util.transformPoint(
+  //     new fabric.Point(newPathCenter.x - oldPathCenter.x, newPathCenter.y - oldPathCenter.y),
+  //     [1, 0, 0, 1, 0, 0]
+  //   );
+
+  //   path.pathOffset = newPath.pathOffset;
+
+  //   (path as fabric.Object)
+  //     ?.set({
+  //       left: oldCroods.left! + distinct.x,
+  //       top: oldCroods.top! + distinct.y
+  //     })
+  //     .setCoords();
+    
+  //   fabricCanvas.renderAll();
+  // })
 
   // ③ 通过URL绘制
   // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';

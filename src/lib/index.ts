@@ -43,6 +43,11 @@ type VizPathOptions = {
    * @default 'auto' 自动更新，defer会延迟更新，比自动更新性能好，但是状态不完全同步，manual则完全不更新等待手动更新
    */
   refreshPathTriggerTime?: 'auto' | 'manual' | 'defer';
+  /**
+   * 延迟更新时的延迟时间/ms，仅当[refreshPathTriggerTime='defer']时生效
+   * @default 100
+   */
+  refreshDeferDuration?: number;
 };
 
 /**
@@ -51,6 +56,7 @@ type VizPathOptions = {
 class VizPathContext {
   options: Required<VizPathOptions> = {
     refreshPathTriggerTime: 'auto',
+    refreshDeferDuration: 100,
   };
 
   /**

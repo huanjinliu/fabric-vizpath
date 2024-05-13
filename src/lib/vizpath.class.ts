@@ -36,6 +36,7 @@ export type ResponsivePathway = {
 export type VizPathEvent = {
   draw: (pathway: ResponsivePathway) => void;
   clear: (pathway: ResponsivePathway) => void;
+  update: (pathway: ResponsivePathway[number]) => void;
   clearAll: () => void;
   destroy: () => void;
 };
@@ -70,10 +71,13 @@ class VizPath {
   /**
    * 响应式节点的更改监听
    */
-  private _observers = new Map<ResponsiveCrood, {
-    handler: (newX: number, newY: number) => void;
-    id?: string;
-  }[]>;
+  private _observers = new Map<
+    ResponsiveCrood,
+    {
+      handler: (newX: number, newY: number) => void;
+      id?: string;
+    }[]
+  >();
 
   /**
    * 防抖更新路径
@@ -145,10 +149,7 @@ class VizPath {
               const x = p === 'x' ? value : target.x;
               const y = p === 'y' ? value : target.y;
               for (let observe of observers) {
-                if (
-                  observe.id &&
-                  temporaryIgnoreIds.indexOf(observe.id) !== -1
-                )
+                if (observe.id && temporaryIgnoreIds.indexOf(observe.id) !== -1)
                   continue;
                 observe.handler(x, y);
               }
@@ -174,7 +175,7 @@ class VizPath {
       if (immediate) handler(crood.x, crood.y);
 
       const observers = this._observers.get(proxy) ?? [];
-      const index = observers.findIndex(observer => observer.id === id);
+      const index = observers.findIndex((observer) => observer.id === id);
       if (index === -1) observers.push({ handler, id });
       else observers.splice(index, 1, { handler, id });
 
@@ -187,7 +188,10 @@ class VizPath {
         this._observers.delete(proxy);
         return;
       }
-      this._observers.set(proxy, observers.filter((i) => i.id !== id));
+      this._observers.set(
+        proxy,
+        observers.filter((i) => i.id !== id)
+      );
     };
     return proxy;
   }
@@ -196,6 +200,33 @@ class VizPath {
    * 输出路径
    */
   toPaths(pathway: ResponsivePathway = this.pathway) {
+    // return pathway.map(({ section, originPath }) => {
+    //   // let matrix = [...originPath.calcOwnMatrix()];
+    //   const startInstruction = section[0].node!;
+    //   let matrix = [1, 0, 0, 1, -startInstruction.x, -startInstruction.y];
+    //   // matrix = fabric.util.invertTransform(matrix)
+    //   // console.log(matrix);
+    //   // matrix[4] -= originPath.pathOffset.x;
+    //   // matrix[5] -= originPath.pathOffset.y;
+
+    //   const instructions = section.map((item) => {
+    //     const instruction = [...item.instruction];
+    //     for (let i = 0; i < instruction.length - 1; i += 2) {
+    //       const { x, y } = fabric.util.transformPoint(
+    //         new fabric.Point(
+    //           instruction[i + 1] as number,
+    //           instruction[i + 2] as number
+    //         ),
+    //         matrix
+    //       );
+    //       instruction[i + 1] = x;
+    //       instruction[i + 2] = y;
+    //     }
+    //     return instruction;
+    //   });
+
+    //   return instructions;
+    // });
     return pathway.map(({ section }) => section.map((i) => i.instruction));
   }
 
@@ -203,6 +234,9 @@ class VizPath {
    * 输出路径指令
    */
   toPathD(pathway: ResponsivePathway = this.pathway) {
+    // console.log(
+    //   (fabric.util as any).joinPath(pathway.map(({ section }) => section.map((i) => i.instruction)))
+    // )
     return (fabric.util as any).joinPath(this.toPaths(pathway));
   }
 
@@ -274,8 +308,9 @@ class VizPath {
    */
   getMoreNeighboringNodes<T extends Crood>(pathwayNode: PathwayNode<T>) {
     const nodes: [
-      'cur-pre' | 'cur-next' | 'pre-next' | 'next-pre',
-      PathwayNode<T>
+      position: 'cur' | 'pre' | 'next',
+      direction: 'pre' | 'next',
+      from: PathwayNode<T>
     ][] = [];
 
     const cur = pathwayNode;
@@ -285,30 +320,30 @@ class VizPath {
     if (cur.instruction[0] === InstructionType.START) {
       if (pre) {
         const { pre: ppre } = this.getNeighboringNodes(pre, true);
-        if (ppre) nodes.push(['pre-next', ppre]);
-        nodes.push(['cur-pre', pre]);
+        if (ppre) nodes.push(['pre', 'next', ppre]);
+        nodes.push(['cur', 'pre', pre]);
       }
-      nodes.push(['cur-next', cur]);
-      if (next) nodes.push(['next-pre', next]);
+      nodes.push(['cur', 'next', cur]);
+      if (next) nodes.push(['next', 'pre', next]);
     }
     // 特殊情况2：当前是自动闭合路径的闭合前节点
     else if (next?.instruction[0] === InstructionType.CLOSE) {
       const start = pathwayNode.section[0];
       const nnext = pathwayNode.section[1];
-      if (pre) nodes.push(['pre-next', pre]);
-      nodes.push(['cur-pre', cur]);
-      nodes.push(['cur-next', start]);
-      if (nnext) nodes.push(['next-pre', nnext]);
+      if (pre) nodes.push(['pre', 'next', pre]);
+      nodes.push(['cur', 'pre', cur]);
+      nodes.push(['cur', 'next', start]);
+      if (nnext) nodes.push(['next', 'pre', nnext]);
     }
     // 正常情况
     else {
-      if (pre) nodes.push(['pre-next', pre]);
-      nodes.push(['cur-pre', cur]);
-      nodes.push(['cur-next', cur]);
-      if (next) nodes.push(['next-pre', next]);
+      if (pre) nodes.push(['pre', 'next', pre]);
+      nodes.push(['cur', 'pre', cur]);
+      nodes.push(['cur', 'next', cur]);
+      if (next) nodes.push(['next', 'pre', next]);
     }
 
-    return nodes;
+    return { nodes, from: pathwayNode };
   }
 
   /**
@@ -337,7 +372,7 @@ class VizPath {
         }
 
         // 指令控制点
-        const { next } = this.getNeighboringNodes(pathwayNode);
+        const { pre, next } = this.getNeighboringNodes(pathwayNode);
         const controllers = {} as NonNullable<
           PathwayNode<ResponsiveCrood>['controllers']
         >;
@@ -354,11 +389,12 @@ class VizPath {
           });
         }
 
-        if (pathwayNode?.instruction[0] === InstructionType.QUADRATIC_CURCE) {
-          controllers.pre = this._toResponsive({
-            x: pathwayNode.instruction[1],
-            y: pathwayNode.instruction[2],
-          });
+        if (
+          pathwayNode?.instruction[0] === InstructionType.QUADRATIC_CURCE &&
+          pre &&
+          pre.instruction[0]
+        ) {
+          controllers.pre = pre.controllers!.next! as ResponsiveCrood;
           controllers.pre.observe((x, y) => {
             pathwayNode.instruction[1] = x;
             pathwayNode.instruction[2] = y;
@@ -366,21 +402,33 @@ class VizPath {
           });
         }
 
-        if (next?.instruction[0] === InstructionType.BEZIER_CURVE) {
+        if (
+          next &&
+          [
+            InstructionType.BEZIER_CURVE,
+            InstructionType.QUADRATIC_CURCE,
+          ].includes(next.instruction[0])
+        ) {
           controllers.next = this._toResponsive({
-            x: next!.instruction[1],
-            y: next!.instruction[2],
+            x: next.instruction[1],
+            y: next.instruction[2],
           });
           controllers.next.observe((x, y) => {
-            next!.instruction[1] = x;
-            next!.instruction[2] = y;
+            next.instruction[1] = x;
+            next.instruction[2] = y;
             this._rerenderOriginPath(originPath);
           });
         }
 
         if (pathwayNode.controllers) {
-          if (pathwayNode.controllers.pre) this._observers.delete(pathwayNode.controllers.pre as ResponsiveCrood)
-          if (pathwayNode.controllers.next) this._observers.delete(pathwayNode.controllers.next as ResponsiveCrood)
+          if (pathwayNode.controllers.pre)
+            this._observers.delete(
+              pathwayNode.controllers.pre as ResponsiveCrood
+            );
+          if (pathwayNode.controllers.next)
+            this._observers.delete(
+              pathwayNode.controllers.next as ResponsiveCrood
+            );
         }
 
         pathwayNode.controllers = controllers;
@@ -408,15 +456,17 @@ class VizPath {
   /**
    * 重新渲染路径，修正路径位置及尺寸
    * @param pathway 路径信息
-   * 
+   *
    * @description
-   * 
+   *
    * fabric.Path对象直接改内部路径指令，其路径会渲染正确的，但却保持其原尺寸和偏移信息，导致对象信息错误，
    * 该方法使用initialize重新初始化路径，使其获取正确的尺寸，但偏移是错的，该方法同时修正偏移。
    */
   rerenderOriginPath(path: fabric.Path) {
     reinitializePath(path);
     path.canvas?.requestRenderAll();
+
+    this._fire('update', this.getPathway(path)!);
   }
 
   /**
@@ -428,7 +478,8 @@ class VizPath {
       return;
     }
 
-    const { refreshPathTriggerTime } = this.context.options;
+    const { refreshPathTriggerTime, refreshDeferDuration } =
+      this.context.options;
     if (refreshPathTriggerTime === 'manual') return;
 
     if (refreshPathTriggerTime === 'auto') {
@@ -442,7 +493,7 @@ class VizPath {
         setTimeout(() => {
           this.rerenderOriginPath(path);
           this._debounceRerenderPathMap.delete(path);
-        }, 100)
+        }, refreshDeferDuration)
       );
     }
   }
@@ -640,11 +691,14 @@ class VizPath {
 
         // 如果原本是闭合路径，且剩余节点多于两个，保留闭合状态
         if (isClosePath && _sections[0].length > 2) {
-          _sections[0].push([InstructionType.LINE, ..._sections[0][0].slice(-2)] as Instruction, [InstructionType.CLOSE]);
+          _sections[0].push(
+            [InstructionType.LINE, ..._sections[0][0].slice(-2)] as Instruction,
+            [InstructionType.CLOSE]
+          );
         }
 
         return _sections;
-      }
+      };
 
       /**
        * 删除多节点
@@ -659,9 +713,9 @@ class VizPath {
           indexes.length <= 1
             ? indexes
             : indexes.filter(
-              (i, idx, arr) =>
-                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
-            );
+                (i, idx, arr) =>
+                  arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
+              );
 
         for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
           const instructions = _sections[0];
@@ -697,11 +751,14 @@ class VizPath {
         }
 
         return _sections;
-      }
+      };
 
       return {
         pathway: this.pathway.find((i) => i.section === section)!,
-        section: indexes.length === 1 ? removeSingleNode(indexes[0]) : removeMulitpleNodes(indexes),
+        section:
+          indexes.length === 1
+            ? removeSingleNode(indexes[0])
+            : removeMulitpleNodes(indexes),
       };
     });
 
@@ -732,11 +789,13 @@ class VizPath {
 
     const newPathway = this._updatePathwayByCommands(
       this.pathway.find((i) => i.section === section)!,
-      [{
-        type: 'add',
-        index,
-        instruction: [InstructionType.LINE, newTarget.x, newTarget.y],
-      }]
+      [
+        {
+          type: 'add',
+          index,
+          instruction: [InstructionType.LINE, newTarget.x, newTarget.y],
+        },
+      ]
     );
 
     return newPathway[0].section[index + 1];
@@ -744,6 +803,9 @@ class VizPath {
 
   /**
    * 替换关键点所在指令
+   *
+   * @note 路径节点的引用不会发生变化
+   *
    * @param target 参考关键点
    * @param instruction 新指令
    */
@@ -763,7 +825,10 @@ class VizPath {
     }[] = [];
 
     if (index === 0 && this.isClosePath(section)) {
-      const newStartInstruction = [InstructionType.START, ...instruction.slice(-2) as number[]] as Instruction;
+      const newStartInstruction = [
+        InstructionType.START,
+        ...(instruction.slice(-2) as number[]),
+      ] as Instruction;
 
       updateCommands.push({
         type: 'update',
@@ -774,11 +839,7 @@ class VizPath {
       updateCommands.push({
         type: 'update',
         index: section.length - 2,
-        instruction: [
-          ...section[section.length - 2].instruction.slice(0, -2),
-          newStartInstruction[1],
-          newStartInstruction[2],
-        ] as unknown as Instruction,
+        instruction,
       });
     } else {
       updateCommands.push({
@@ -788,12 +849,10 @@ class VizPath {
       });
     }
 
-    const newPathway = this._updatePathwayByCommands(
+    this._updatePathwayByCommands(
       this.pathway.find((i) => i.section === section)!,
       updateCommands
     );
-
-    return newPathway[0].section[index];
   }
 
   /**
@@ -811,34 +870,34 @@ class VizPath {
   ) {
     const { section } = pathway;
 
-    const removePathwayNodes: PathwayNode<ResponsiveCrood>[] = [];
-
     queue.sort((a, b) => b.index - a.index);
 
     queue.forEach(({ type, index, instruction }) => {
       if (type === 'add') {
-        removePathwayNodes.push(...section.splice(index + 1, 0, {
+        section.splice(index + 1, 0, {
           section,
           instruction,
-        }));
+        });
       }
 
       if (type === 'update') {
-        removePathwayNodes.push(...section.splice(index, 1, {
-          section,
-          instruction,
-        }))
+        const pathwayNode = section[index];
+
+        if (pathwayNode.node) {
+          this.pathwayNodeMap.delete(pathwayNode.node);
+          this._observers.delete(pathwayNode.node);
+          if (pathwayNode.controllers?.pre)
+            this._observers.delete(pathwayNode.controllers.pre);
+          if (pathwayNode.controllers?.next)
+            this._observers.delete(pathwayNode.controllers.next);
+        }
+
+        pathwayNode.instruction = instruction;
+
+        delete pathwayNode.node;
+        delete pathwayNode.controllers;
       }
     });
-
-    removePathwayNodes.forEach(node => {
-      if (node.node) {
-        this.pathwayNodeMap.delete(node.node);
-        this._observers.delete(node.node);
-        if (node.controllers?.pre) this._observers.delete(node.controllers.pre);
-        if (node.controllers?.next) this._observers.delete(node.controllers.next);
-      }
-    })
 
     return this.draw([pathway]);
   }
@@ -896,7 +955,7 @@ class VizPath {
 
     this.events = {};
 
-    this.context.modules.forEach(module => {
+    this.context.modules.forEach((module) => {
       module.unload(this);
     });
 

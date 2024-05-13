@@ -4,6 +4,7 @@
 export { default as transform } from './transform';
 export { default as observe } from './observe';
 export { default as deepIterateGroup } from './deep-iterate-group';
+export { default as fireMouseUpAndSelect } from './fire-mouse-up-and-select';
 
 /**
  * 路径操作
