@@ -3,10 +3,11 @@ import babel from '@rollup/plugin-babel';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
+import terser from '@rollup/plugin-terser';
 import serve from 'rollup-plugin-serve';
 import livereload from 'rollup-plugin-livereload';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
-import terser from '@rollup/plugin-terser';
+import multiInput from 'rollup-plugin-multi-input';
 
 const build_umd = () => ({
   input: 'src/index.ts',
@@ -34,6 +35,10 @@ const build_umd = () => ({
     }),
     terser(),
   ],
+  onwarn: (warning, warn) => {
+    if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+    warn(warning);
+  }
 });
 
 const build_es_lib = () => ({
@@ -56,17 +61,20 @@ const build_es_lib = () => ({
       babelHelpers: 'bundled',
     }),
   ],
+  onwarn: (warning, warn) => {
+    if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+    warn(warning);
+  }
 });
 
 const build_es_theme = () => ({
-  input: 'src/themes/index.ts',
-  output: [
-    {
-      file: 'dist/themes/index.es.js',
-      format: 'es',
-    },
-  ],
+  input: 'src/themes/**/index.ts',
+  output: {
+    dir: 'dist',
+    format: 'es',
+  },
   plugins: [
+    multiInput.default(),
     resolve(),
     peerDepsExternal(),
     commonjs(),
@@ -78,6 +86,10 @@ const build_es_theme = () => ({
       babelHelpers: 'bundled',
     }),
   ],
+  onwarn: (warning, warn) => {
+    if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+    warn(warning);
+  }
 });
 
 const build_serve = () => {
@@ -104,6 +116,10 @@ const build_serve = () => {
         babelHelpers: 'bundled',
       }),
     ],
+    onwarn: (warning, warn) => {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+      warn(warning);
+    }
   };
   if (process.env.ROLLUP_WATCH) {
     config.plugins.push(

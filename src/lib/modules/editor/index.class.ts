@@ -3,7 +3,7 @@ import type Vizpath from '../../vizpath.class';
 import EditorModule from '../base.class';
 
 class Editor extends EditorModule {
-  static ID = Symbol('editor');
+  static ID = 'editor';
 
   /**
    * 挂载的画布

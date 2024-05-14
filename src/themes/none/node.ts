@@ -1,7 +1,7 @@
 import { fabric } from 'fabric';
-import type { Theme } from '..';
+import type { Theme } from 'src/lib/modules/editor-ui/index.class';
 
-const createDefaultNode: Theme['node'] = (decorator) => {
+const createNode: Theme['node'] = (decorator) => {
   const rect = new fabric.Rect({
     width: 6,
     height: 6,
@@ -10,22 +10,21 @@ const createDefaultNode: Theme['node'] = (decorator) => {
     strokeWidth: 1,
   });
 
-  const object = decorator(rect);
-  object.on('selected', () => {
-    rect.set({
-      fill: '#1884ec',
+  return decorator(rect, (context, object) => {
+    object.on('selected', () => {
+      rect.set({
+        fill: '#1884ec',
+      });
+      object.canvas?.requestRenderAll();
     });
-    object.canvas?.requestRenderAll();
-  });
-
-  object.on('deselected', () => {
-    rect.set({
-      fill: '#ffffff',
+  
+    object.on('deselected', () => {
+      rect.set({
+        fill: '#ffffff',
+      });
+      object.canvas?.requestRenderAll();
     });
-    object.canvas?.requestRenderAll();
   });
-
-  return object;
 };
 
-export default createDefaultNode;
+export default createNode;

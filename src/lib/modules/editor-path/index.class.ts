@@ -1,17 +1,17 @@
-import { fabric } from 'fabric';
-import { v4 as uuid } from 'uuid';
+import { fabric } from "fabric";
+import { v4 as uuid } from "uuid";
 import VizPath, {
   VizPathSymbalType,
   type ResponsiveCrood,
   type ResponsivePathway,
-} from '../../vizpath.class';
-import EditorModule from '../base.class';
-import Editor from '../editor/index.class';
-import EditorUI from '../editor-ui/index.class';
-import { parsePathJSON, reinitializePath } from '@utils';
+} from "../../vizpath.class";
+import EditorModule from "../base.class";
+import Editor from "../editor/index.class";
+import EditorUI, { type ThemeDecorator } from "../editor-ui/index.class";
+import { parsePathJSON, reinitializePath } from "@utils";
 
 class EditorPath extends EditorModule {
-  static ID = Symbol('editor-path');
+  static ID = "editor-path";
 
   paths: ResponsivePathway = [];
 
@@ -24,7 +24,7 @@ class EditorPath extends EditorModule {
     const matrix = [...object.calcOwnMatrix()];
 
     // 路径如果带有偏移则需要移除偏移带来的影响
-    if (object.type === 'path') {
+    if (object.type === "path") {
       const offset = fabric.util.transformPoint(
         (object as fabric.Path).pathOffset,
         [...matrix.slice(0, 4), 0, 0]
@@ -48,7 +48,7 @@ class EditorPath extends EditorModule {
   calcRelativeCrood(position: Position, object: fabric.Object): Crood {
     const matrix = [...object.calcOwnMatrix()];
 
-    if (object.type === 'path') {
+    if (object.type === "path") {
       const offset = fabric.util.transformPoint(
         (object as fabric.Path).pathOffset,
         [...matrix.slice(0, 4), 0, 0]
@@ -105,13 +105,11 @@ class EditorPath extends EditorModule {
         // 如果已经带有标志则是已经添加进画布的路径
         if (originPath[VizPath.symbol]) return;
 
-        const decorator = (customPath: fabric.Path) => {
-          const { layout, styles } = parsePathJSON(customPath);
-          const _path = originPath;
-
-          _path.set(layout);
-          _path.set(styles);
-          _path.set({
+        const decorator: ThemeDecorator<fabric.Path> = (
+          customPath,
+          callback
+        ) => {
+          customPath.set({
             name: uuid(),
             // 路径本身不可选中，后续通过操纵点和线条来更改路径
             selectable: false,
@@ -121,12 +119,17 @@ class EditorPath extends EditorModule {
             objectCaching: false,
           });
 
-          _path[VizPath.symbol] = VizPathSymbalType.PATH;
+          customPath[VizPath.symbol] = VizPathSymbalType.PATH;
 
-          return _path;
+          if (callback) callback(vizPath.context, customPath);
+
+          return customPath;
         };
-        (ui?.options.path ?? EditorUI.noneUI.path)(decorator, originPath);
-        if (!originPath[VizPath.symbol]) decorator(originPath);
+        (ui?.options.path ?? EditorUI.noneUI.path)(
+          decorator,
+          originPath
+        );
+        if (!originPath[VizPath.symbol]) decorator(item.originPath);
       });
 
       // 添加新的路径对象
@@ -146,7 +149,7 @@ class EditorPath extends EditorModule {
         });
       });
     };
-    vizPath.on('draw', handler);
+    vizPath.on("draw", handler);
   }
 
   /**
@@ -175,7 +178,16 @@ class EditorPath extends EditorModule {
         });
       });
     };
-    vizPath.on('clear', handler);
+    vizPath.on("clear", handler);
+    vizPath.on("clearAll", () => {
+      canvas.remove(...this.paths.map(i => i.originPath));
+      this.paths.forEach((item) => {
+        item.section.forEach(({ node }) => {
+          if (node) this.nodePathMap.delete(node);
+        });
+      });
+      this.paths = [];
+    });
   }
 
   load(vizPath: VizPath) {

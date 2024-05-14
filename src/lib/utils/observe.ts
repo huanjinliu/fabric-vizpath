@@ -10,6 +10,7 @@ const observe = <T extends Record<string, any>>(
     value: Pick<T, ArrayElement<typeof keys>>,
     oldValue: Pick<T, ArrayElement<typeof keys>>
   ) => void,
+  immediate = false,
 ) => {
   const data: any = {};
   const properties: PropertyDescriptorMap = {};
@@ -28,6 +29,8 @@ const observe = <T extends Record<string, any>>(
   });
 
   Object.defineProperties(point, properties);
+
+  if (immediate) callback(data, data);
 };
 
 export default observe;

@@ -1,7 +1,7 @@
 import type VizPath from "../vizpath.class";
 
 abstract class EditorModule {
-  static ID: symbol;
+  static ID: string;
 
   async prepare() {
   }

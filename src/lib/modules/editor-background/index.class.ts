@@ -4,7 +4,7 @@ import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 
 class EditorBackground extends EditorModule {
-  static ID = Symbol('editor-background');
+  static ID = 'editor-background';
 
   load(vizPath: Vizpath) {
     const editor = vizPath.context.find(Editor);

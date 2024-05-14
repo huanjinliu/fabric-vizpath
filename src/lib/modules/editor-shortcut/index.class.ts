@@ -19,7 +19,7 @@ type ShortcutOptions = {
 }
 
 class EditorShortcut extends EditorModule {
-  static ID = Symbol('editor-shortcut');
+  static ID = 'editor-shortcut';
 
   shortcuts: Shortcut[] = [];
 

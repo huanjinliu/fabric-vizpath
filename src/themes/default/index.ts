@@ -1,11 +1,11 @@
-import createDefaultPath from './path';
-import createDefaultNode from './node';
-import createDefaultPoint from './controller-point';
-import createDefaultLine from './controller-line';
+import createPath from './path';
+import createNode from './node';
+import createPoint from './controller-point';
+import createLine from './controller-line';
 
 export default {
-  path: createDefaultPath,
-  node: createDefaultNode,
-  controllerPoint: createDefaultPoint,
-  controllerLine: createDefaultLine,
+  path: createPath,
+  node: createNode,
+  controllerPoint: createPoint,
+  controllerLine: createLine,
 };

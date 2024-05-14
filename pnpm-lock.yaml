@@ -64,6 +64,9 @@ devDependencies:
   rollup-plugin-livereload:
     specifier: ^2.0.5
     version: 2.0.5
+  rollup-plugin-multi-input:
+    specifier: ^1.4.1
+    version: 1.4.1
   rollup-plugin-peer-deps-external:
     specifier: ^2.2.4
     version: 2.2.4(rollup@4.13.0)
@@ -2176,6 +2179,17 @@ packages:
       - utf-8-validate
     dev: true
 
+  /fast-glob@3.2.12:
+    resolution: {integrity: sha512-DVj4CQIYYow0BlaelwK1pHl5n5cRSJfM60UA0zK891sVInoPri2Ekj7+e1CT3/3qxXenpI+nBBmQAcJPJgaj4w==}
+    engines: {node: '>=8.6.0'}
+    dependencies:
+      '@nodelib/fs.stat': 2.0.5
+      '@nodelib/fs.walk': 1.2.8
+      glob-parent: 5.1.2
+      merge2: 1.4.1
+      micromatch: 4.0.5
+    dev: true
+
   /fast-glob@3.3.2:
     resolution: {integrity: sha512-oX2ruAFQwf/Orj8m737Y5adxDQO0LAB7/S5MnxCdTNDd4p6BsyIVsv9JQsATbTSq8KHRpLwIHbVlUNatxd+1Ow==}
     engines: {node: '>=8.6.0'}
@@ -2938,6 +2952,13 @@ packages:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+    dev: true
+
+  /rollup-plugin-multi-input@1.4.1:
+    resolution: {integrity: sha512-ybvotObZFFDEbqw6MDrYUa/TXmF+1qCVX3svpAddmIOLP3/to5zkSKP0MJV5bNBZfFFpblwChurz4tsPR/zJew==}
+    engines: {node: '>=16'}
+    dependencies:
+      fast-glob: 3.2.12
     dev: true
 
   /rollup-plugin-peer-deps-external@2.2.4(rollup@4.13.0):

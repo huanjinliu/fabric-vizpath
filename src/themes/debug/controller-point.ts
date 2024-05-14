@@ -1,40 +1,15 @@
 import { fabric } from 'fabric';
-import type { Theme } from '..';
+import type { Theme } from 'src/lib/modules/editor-ui/index.class';
 
-let arr = [
-  'red',
-  'orange',
-  'blue',
-  'green'
-]
-
-let index = 0;
-
-const createDefaultPoint: Theme['controllerPoint'] = (decorator) => {
+const createPoint: Theme['controllerPoint'] = () => {
   const circle = new fabric.Circle({
-    radius: 8,
-    // fill: '#bebebe',
-    fill: arr[(index++) % 4],
+    radius: 4,
+    fill: '#ffffff',
     stroke: '#bebebe',
     strokeWidth: 2,
   });
 
-  const object = decorator(circle);
-  // object.on('selected', () => {
-  //   circle.set({
-  //     stroke: '#333',
-  //   });
-  //   object.canvas?.requestRenderAll();
-  // });
-
-  // object.on('deselected', () => {
-  //   circle.set({
-  //     stroke: '#bebebe',
-  //   });
-  //   object.canvas?.requestRenderAll();
-  // });
-
-  return object;
+  return circle;
 };
 
-export default createDefaultPoint;
+export default createPoint;

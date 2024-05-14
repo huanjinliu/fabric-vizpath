@@ -9,7 +9,7 @@ import {
   EditorShortcut,
   utils,
 } from 'fabric-path-editor';
-import { debugTheme } from '@themes';
+import theme from 'fabric-path-editor/dist/themes/debug/index';
 
 const EXAMPLE_PATH_D = {
   point: 'M 100 100 z',
@@ -86,7 +86,7 @@ const EXAMPLE_PATH_D = {
 
   const operator = await vizPath
     .use(new Editor(fabricCanvas))
-    .use(new EditorUI(debugTheme))
+    .use(new EditorUI(theme))
     .use(new EditorBackground())
     .use(new EditorPath())
     .use(new EditorNode())
@@ -222,10 +222,10 @@ const EXAMPLE_PATH_D = {
   });
 
   // 操作测试
-  // const editorNode = vizPath.find(EditorNode);
-  // if (!editorNode) return;
+  const editorNode = vizPath.find(EditorNode);
+  if (!editorNode) return;
 
-  // editorNode.focus(editorNode.nodes[0]);
+  editorNode.focus(editorNode.nodes[0]);
 
   // const object = editorNode.add({ left: 100, top: 100 });
   // editorNode.focus(object);
