@@ -6391,32 +6391,29 @@
     controllerLine: createLine$1$1
   };
   var createPath$2 = function createPath(decorator, originPath) {
-    originPath.set({
-      stroke: '#1884ec',
-      strokeWidth: 2
-    });
     return originPath;
   };
   var createNode$2 = function createNode(decorator) {
-    var rect = new fabric.fabric.Rect({
-      width: 6,
-      height: 6,
-      fill: "#ffffff",
-      stroke: "#1784ec",
+    var circle = new fabric.fabric.Circle({
+      radius: 3,
+      fill: '#ffffff',
+      stroke: '#4b4b4b',
       strokeWidth: 1
     });
-    return decorator(rect, function (context, object) {
-      object.on('selected', function () {
+    return decorator(circle, function (context, object) {
+      object.on("selected", function () {
         var _a;
-        rect.set({
-          fill: '#1884ec'
+        object.set({
+          fill: "#4b4b4b",
+          stroke: '#ffffff'
         });
         (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
       });
-      object.on('deselected', function () {
+      object.on("deselected", function () {
         var _a;
-        rect.set({
-          fill: '#ffffff'
+        object.set({
+          fill: "#ffffff",
+          stroke: '#4b4b4b'
         });
         (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
       });
@@ -6426,47 +6423,15 @@
     var circle = new fabric.fabric.Circle({
       radius: 3,
       fill: '#ffffff',
-      stroke: '#1884ec',
-      strokeWidth: 1
+      stroke: '#4b4b4bcc',
+      strokeWidth: 1,
+      strokeDashArray: [1, 1]
     });
-    return decorator(circle, function (context, object) {
-      var getBelongNode = function getBelongNode() {
-        var editorNode = context.find(EditorNode$1);
-        if (!editorNode) return;
-        var controller = editorNode.controllers.find(function (i) {
-          return i.point === object;
-        });
-        return controller.node;
-      };
-      object.on('selected', function () {
-        var _a;
-        circle.set({
-          fill: '#1884ec'
-        });
-        var node = getBelongNode();
-        if (node) node.set({
-          fill: "#1884ec"
-        });
-        (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
-      });
-      object.on('deselected', function () {
-        var _a, _b;
-        circle.set({
-          fill: '#ffffff'
-        });
-        var node = getBelongNode();
-        if (node) {
-          node.set({
-            fill: ((_a = node.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === node ? "#1884ec" : "#ffffff"
-          });
-        }
-        (_b = object.canvas) === null || _b === void 0 ? void 0 : _b.requestRenderAll();
-      });
-    });
+    return circle;
   };
   var createLine$2 = function createLine() {
     var line = new fabric.fabric.Line([0, 0, 0, 0], {
-      stroke: '#1884ec',
+      stroke: '#bebebe',
       strokeWidth: 1
     });
     return line;
@@ -6488,9 +6453,25 @@
       return _this22;
     }
     _inherits(EditorUI, _EditorModule4);
-    return _createClass(EditorUI);
+    return _createClass(EditorUI, [{
+      key: "load",
+      value: function load(vizPath) {
+        var editor = vizPath.context.find(Editor$1);
+        var _this$options2 = this.options,
+          selectionColor = _this$options2.selectionColor,
+          selectionBorderColor = _this$options2.selectionBorderColor,
+          selectionDashArray = _this$options2.selectionDashArray,
+          selectionLineWidth = _this$options2.selectionLineWidth;
+        if (editor === null || editor === void 0 ? void 0 : editor.canvas) {
+          if (selectionColor) editor.canvas.selectionColor = selectionColor;
+          if (selectionBorderColor) editor.canvas.selectionBorderColor = selectionBorderColor;
+          if (selectionDashArray) editor.canvas.selectionDashArray = selectionDashArray;
+          if (selectionLineWidth) editor.canvas.selectionLineWidth = selectionLineWidth;
+        }
+      }
+    }]);
   }(EditorModule$1);
-  EditorUI$1.ID = 'editor-ui';
+  EditorUI$1.ID = "editor-ui";
   EditorUI$1.noneUI = noneTheme$1;
   EditorUI$1.defaultUI = defaultTheme$1;
   var EditorUI$1$1 = EditorUI$1;
@@ -10953,32 +10934,29 @@
   VizPath.symbol = Symbol('vizpath');
   var VizPath$1 = VizPath;
   var createPath = function createPath(decorator, originPath) {
-    originPath.set({
-      stroke: '#1884ec',
-      strokeWidth: 2
-    });
     return originPath;
   };
   var createNode = function createNode(decorator) {
-    var rect = new fabric.fabric.Rect({
-      width: 6,
-      height: 6,
-      fill: "#ffffff",
-      stroke: "#1784ec",
+    var circle = new fabric.fabric.Circle({
+      radius: 3,
+      fill: '#ffffff',
+      stroke: '#4b4b4b',
       strokeWidth: 1
     });
-    return decorator(rect, function (context, object) {
-      object.on('selected', function () {
+    return decorator(circle, function (context, object) {
+      object.on("selected", function () {
         var _a;
-        rect.set({
-          fill: '#1884ec'
+        object.set({
+          fill: "#4b4b4b",
+          stroke: '#ffffff'
         });
         (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
       });
-      object.on('deselected', function () {
+      object.on("deselected", function () {
         var _a;
-        rect.set({
-          fill: '#ffffff'
+        object.set({
+          fill: "#ffffff",
+          stroke: '#4b4b4b'
         });
         (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
       });
@@ -10988,47 +10966,15 @@
     var circle = new fabric.fabric.Circle({
       radius: 3,
       fill: '#ffffff',
-      stroke: '#1884ec',
-      strokeWidth: 1
+      stroke: '#4b4b4bcc',
+      strokeWidth: 1,
+      strokeDashArray: [1, 1]
     });
-    return decorator(circle, function (context, object) {
-      var getBelongNode = function getBelongNode() {
-        var editorNode = context.find(EditorNode);
-        if (!editorNode) return;
-        var controller = editorNode.controllers.find(function (i) {
-          return i.point === object;
-        });
-        return controller.node;
-      };
-      object.on('selected', function () {
-        var _a;
-        circle.set({
-          fill: '#1884ec'
-        });
-        var node = getBelongNode();
-        if (node) node.set({
-          fill: "#1884ec"
-        });
-        (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
-      });
-      object.on('deselected', function () {
-        var _a, _b;
-        circle.set({
-          fill: '#ffffff'
-        });
-        var node = getBelongNode();
-        if (node) {
-          node.set({
-            fill: ((_a = node.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === node ? "#1884ec" : "#ffffff"
-          });
-        }
-        (_b = object.canvas) === null || _b === void 0 ? void 0 : _b.requestRenderAll();
-      });
-    });
+    return circle;
   };
   var createLine$1 = function createLine$1() {
     var line = new fabric.fabric.Line([0, 0, 0, 0], {
-      stroke: '#1884ec',
+      stroke: '#bebebe',
       strokeWidth: 1
     });
     return line;
@@ -11050,9 +10996,25 @@
       return _this9;
     }
     _inherits(EditorUI, _EditorModule2);
-    return _createClass(EditorUI);
+    return _createClass(EditorUI, [{
+      key: "load",
+      value: function load(vizPath) {
+        var editor = vizPath.context.find(Editor);
+        var _this$options = this.options,
+          selectionColor = _this$options.selectionColor,
+          selectionBorderColor = _this$options.selectionBorderColor,
+          selectionDashArray = _this$options.selectionDashArray,
+          selectionLineWidth = _this$options.selectionLineWidth;
+        if (editor === null || editor === void 0 ? void 0 : editor.canvas) {
+          if (selectionColor) editor.canvas.selectionColor = selectionColor;
+          if (selectionBorderColor) editor.canvas.selectionBorderColor = selectionBorderColor;
+          if (selectionDashArray) editor.canvas.selectionDashArray = selectionDashArray;
+          if (selectionLineWidth) editor.canvas.selectionLineWidth = selectionLineWidth;
+        }
+      }
+    }]);
   }(EditorModule);
-  EditorUI.ID = 'editor-ui';
+  EditorUI.ID = "editor-ui";
   EditorUI.noneUI = noneTheme;
   EditorUI.defaultUI = defaultTheme;
   var EditorPath = /*#__PURE__*/function (_EditorModule3) {
@@ -12414,7 +12376,7 @@
       });
       const operator = await vizPath
           .use(new Editor$1(fabricCanvas))
-          .use(new EditorUI$1$1(defaultTheme))
+          .use(new EditorUI$1$1(noneTheme))
           .use(new EditorBackground())
           .use(new EditorPath$1$1())
           .use(new EditorNode$1())
@@ -12561,8 +12523,6 @@
               top: fabricCanvas.getHeight() / 2,
               originX: 'center',
               originY: 'center',
-              scaleX: 0.8,
-              scaleY: 0.8
           });
           pathways === null || pathways === void 0 ? void 0 : pathways.forEach((pathway) => {
               operator.draw(pathway);

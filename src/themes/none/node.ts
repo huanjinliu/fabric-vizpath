@@ -2,26 +2,21 @@ import { fabric } from 'fabric';
 import type { Theme } from 'src/lib/modules/editor-ui/index.class';
 
 const createNode: Theme['node'] = (decorator) => {
-  const rect = new fabric.Rect({
-    width: 6,
-    height: 6,
-    fill: "#ffffff",
-    stroke: "#1784ec",
+  const circle = new fabric.Circle({
+    radius: 3,
+    fill: '#ffffff',
+    stroke: '#4b4b4b',
     strokeWidth: 1,
   });
 
-  return decorator(rect, (context, object) => {
-    object.on('selected', () => {
-      rect.set({
-        fill: '#1884ec',
-      });
+  return decorator(circle, (context, object) => {
+    object.on("selected", () => {
+      object.set({ fill: "#4b4b4b", stroke: '#ffffff' });
       object.canvas?.requestRenderAll();
     });
   
-    object.on('deselected', () => {
-      rect.set({
-        fill: '#ffffff',
-      });
+    object.on("deselected", () => {
+      object.set({ fill: "#ffffff", stroke: '#4b4b4b' });
       object.canvas?.requestRenderAll();
     });
   });

@@ -9,7 +9,7 @@ import {
   EditorShortcut,
   utils,
 } from 'fabric-path-editor';
-import theme from 'fabric-path-editor/dist/themes/default/index';
+import theme from 'fabric-path-editor/dist/themes/none/index';
 
 const EXAMPLE_PATH_D = {
   point: 'M 100 100 z',
@@ -251,8 +251,6 @@ const EXAMPLE_PATH_D = {
       top: fabricCanvas.getHeight() / 2,
       originX: 'center',
       originY: 'center',
-      scaleX: 0.8,
-      scaleY: 0.8
     });
     pathways?.forEach((pathway) => {
       operator.draw(pathway);
