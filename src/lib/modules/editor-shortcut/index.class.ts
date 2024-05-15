@@ -4,18 +4,20 @@ import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import type VizPath from "../../vizpath.class";
 
+type CombinationKey = 'alt' | 'ctrl' | 'shift' | 'meta';
+
 type Shortcut = {
-  key: string[];
-  combinationKeys: string[];
-  onActivate: () => void;
-  onDeactivate?: () => void;
+  key?: string;
+  combinationKeys: CombinationKey[];
+  onActivate: (e: KeyboardEvent) => void;
+  onDeactivate?: (e: KeyboardEvent) => void;
 }
 
 type ShortcutOptions = {
   key?: string;
-  combinationKeys?: string[];
-  onActivate?: () => void;
-  onDeactivate?: () => void;
+  combinationKeys?: CombinationKey[];
+  onActivate?: (e: KeyboardEvent) => void;
+  onDeactivate?: (e: KeyboardEvent) => void;
 }
 
 class EditorShortcut extends EditorModule {
@@ -39,21 +41,20 @@ class EditorShortcut extends EditorModule {
       onDeactivate: shortcut.onDeactivate,
     } as Shortcut;
 
-    if (!shortcut.key) _shortcut.key = [];
-    else _shortcut.key = _shortcut.key = shortcut.key.split('|');
+    _shortcut.key = shortcut.key;
 
     if (!shortcut.combinationKeys) _shortcut.combinationKeys = [];
     else _shortcut.combinationKeys = [...shortcut.combinationKeys];
     
-    _shortcut.key.sort();
+    _shortcut.key;
     _shortcut.combinationKeys.sort();
 
     return _shortcut;
   }
 
-  private _handlePageDeactivate() {
+  private _handlePageDeactivate(e: KeyboardEvent) {
     if (this.activeShortcut) {
-      this.activeShortcut.onDeactivate?.();
+      this.activeShortcut.onDeactivate?.(e);
       this.activeShortcut = undefined;
     }
   }
@@ -61,17 +62,18 @@ class EditorShortcut extends EditorModule {
   private _handleShortcutKey(e: KeyboardEvent) {
     // 寻找所有匹配的按键
     const activateKeys = this.shortcuts.filter((shortcut) => {
-      const { key: keys = [], combinationKeys = [] } = shortcut;
+      const { key, combinationKeys = [] } = shortcut;
 
-      const validKey = keys.find(key => (
+      const activate = (
+        !key ||
         key.toUpperCase() === (e.key ?? '').toUpperCase() ||
         `KEY${key.toUpperCase()}` === e.code.toUpperCase()
-      ))
-      if (e.type === 'keyup' && validKey) return false;
+      );
+      if (e.type === 'keyup' && activate) return false;
 
       if (
         // 没有匹配任何快捷键
-        !validKey ||
+        !activate ||
         // 没有匹配任何组合键
         combinationKeys.some(
           (combinationPrefix) => !e[`${combinationPrefix}Key`]
@@ -91,13 +93,16 @@ class EditorShortcut extends EditorModule {
     });
 
     const shortcut = activateKeys[0];
-    if (this.activeShortcut === shortcut) return;
+    if (this.activeShortcut === shortcut) {
+      this.activeShortcut?.onActivate(e);
+      return;
+    }
 
-    this.activeShortcut?.onDeactivate?.();
+    this.activeShortcut?.onDeactivate?.(e);
 
     this.activeShortcut = shortcut;
 
-    this.activeShortcut?.onActivate();
+    this.activeShortcut?.onActivate(e);
   };
 
   add(shortcut: ShortcutOptions) {

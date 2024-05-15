@@ -57,6 +57,7 @@ class Editor extends EditorModule {
       width: container.clientWidth,
       height: container.clientHeight,
       selection: true,
+      skipOffscreen: false,
       preserveObjectStacking: true,
       selectionColor: canvas.selectionColor,
       selectionBorderColor: canvas.selectionBorderColor,

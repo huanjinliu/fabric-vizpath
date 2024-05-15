@@ -17,7 +17,7 @@ export enum InstructionType {
   LINE = 'L',
   QUADRATIC_CURCE = 'Q',
   BEZIER_CURVE = 'C',
-  CLOSE = 'z',
+  CLOSE = 'Z',
 }
 
 export type Instruction = [InstructionType, ...number[]];
@@ -132,6 +132,10 @@ class VizPathContext {
       //     );
       //   }
       // }
+      // ③ 闭合指令的字母全改为大小以保证统一处理
+      if (section[section.length - 1][0].toUpperCase() === InstructionType.CLOSE) {
+        section[section.length - 1][0] = InstructionType.CLOSE;
+      }
 
       // ④ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
       const isAutoClose =

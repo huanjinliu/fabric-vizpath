@@ -53,9 +53,9 @@ const loadSVGToPathFromURL = async (url: string) => {
               ['a', rx, ry, 0, 0, 1, -rx, -ry],
               ['v', -h + 2 * ry],
               ['a', rx, ry, 0, 0, 1, rx, -ry],
-              ['z'],
+              ['Z'],
             ]
-          : [['M', x, y], ['h', w], ['v', h], ['h', -w], ['v', -h], ['z']];
+          : [['M', x, y], ['h', w], ['v', h], ['h', -w], ['v', -h], ['Z']];
       return new fabric.Path(d as any);
     };
 
@@ -75,7 +75,7 @@ const loadSVGToPathFromURL = async (url: string) => {
         ['M', x - rx, y],
         ['A', rx, ry, 0, 0, 0, x + rx, y],
         ['A', rx, ry, 0, 0, 0, x - rx, y],
-        ['z'],
+        ['Z'],
       ];
       return new fabric.Path(d as any);
     };
@@ -87,7 +87,7 @@ const loadSVGToPathFromURL = async (url: string) => {
       d[0][0] = 'M';
 
       if (type === 'polygon') {
-        d.push(['z']);
+        d.push(['Z']);
       }
 
       return new fabric.Path(d);

@@ -713,9 +713,9 @@ class VizPath {
           indexes.length <= 1
             ? indexes
             : indexes.filter(
-                (i, idx, arr) =>
-                  arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
-              );
+              (i, idx, arr) =>
+                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
+            );
 
         for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
           const instructions = _sections[0];

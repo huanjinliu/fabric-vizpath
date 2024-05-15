@@ -237,15 +237,29 @@ class EditorNode extends EditorModule {
   private _addActiveSelectionObserve(group: fabric.ActiveSelection) {
     observe(group, ["left", "top", "angle"], () => {
       this.vizPath?.onceRerenderOriginPath(() => {
+        const hadFollowedCroods = new Set<ResponsiveCrood>([]);
         for (const object of group._objects as fabric.Object[]) {
+          const followControllers: ResponsiveCrood[] = [];
+          const pathwayNode = this.objectNodeMap.get(object)!;
+          const { nodes } =
+            this.vizPath?.getMoreNeighboringNodes(pathwayNode) ?? {};
+          nodes?.forEach(([position, direction, node]) => {
+            const crood = node.controllers![direction]!;
+            if (position !== "cur") return;
+            // 避免重复的控制点跟随更改
+            if (hadFollowedCroods.has(crood)) return;
+            followControllers.push(crood);
+            hadFollowedCroods.add(crood);
+          });
+
           const decomposeMatrix = fabric.util.qrDecompose(
             object.calcTransformMatrix(false)
           );
           const left = decomposeMatrix.translateX;
           const top = decomposeMatrix.translateY;
-
-          this.move(object, { left, top });
+          this.move(object, { left, top }, followControllers);
         }
+        hadFollowedCroods.clear();
       });
     });
   }
@@ -256,7 +270,17 @@ class EditorNode extends EditorModule {
   private _addActivePointObserve(object: fabric.Object) {
     observe(object, ["left", "top"], ({ left, top }) => {
       if (object.group) return;
-      this.move(object, { left: left!, top: top! });
+
+      const followControllers: ResponsiveCrood[] = [];
+      const pathwayNode = this.objectNodeMap.get(object)!;
+      const { nodes } =
+        this.vizPath?.getMoreNeighboringNodes(pathwayNode) ?? {};
+      nodes?.forEach(([position, direction, node]) => {
+        if (position !== "cur") return;
+        followControllers.push(node.controllers![direction]!);
+      });
+
+      this.move(object, { left: left!, top: top! }, followControllers);
     });
   }
 
@@ -410,69 +434,81 @@ class EditorNode extends EditorModule {
             id: point.name,
           }
         );
-        observe(point, ["left", "top"], ({ left, top }) => {
-          // 与中心点相对角度固定
-          const nodeCenter = nodeObject.getCenterPoint();
-          const pointCenter = point.getCenterPoint();
-          point.set({
-            angle: 45 + Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180 / Math.PI
-          });
-
-          // 响应式更改指令信息
-          if (point.canvas?.getActiveObject() === point) {
-            const crood = editorPath.calcRelativeCrood(
-              {
-                left: left!,
-                top: top!,
-              },
-              editorPath.nodePathMap.get(node)!.originPath
-            );
-            // 控制点角度对称变换
-            const mirrorController = this.controllers.find((i) => {
-              const antiDirection = { pre: "next", next: "pre" }[direction];
-              if (i.type !== antiDirection) return false;
-              return (
-                i.pathwayNode ===
-                neighboringNodes.find(
-                  (i) => i[0] === position && i[1] === antiDirection
-                )?.[2]
-              );
+        observe(
+          point,
+          ["left", "top"],
+          ({ left, top }) => {
+            // 与中心点相对角度固定
+            const nodeCenter = nodeObject.getCenterPoint();
+            const pointCenter = point.getCenterPoint();
+            point.set({
+              angle:
+                45 +
+                (Math.atan2(
+                  pointCenter.y - nodeCenter.y,
+                  pointCenter.x - nodeCenter.x
+                ) *
+                  180) /
+                  Math.PI,
             });
-            if (mirrorController) {
-              const { controller: _controller } = mirrorController;
-              const angle = Math.round(
-                this._calcCroodsAngle(_controller, node, controller)
-              );
-              // 旧控制点到关键点的距离
-              const d0 = this._calcCroodsDistance(controller, node);
-              // 旧镜像控制点到关键点的距离
-              const d1 = this._calcCroodsDistance(_controller, node);
-              // 旧控制点之间的距离
-              const d2 = this._calcCroodsDistance(_controller, controller);
-              // 新镜像控制点到关键点的距离
-              const new_d1 = this._calcCroodsDistance(
+
+            // 响应式更改指令信息
+            if (point.canvas?.getActiveObject() === point) {
+              const crood = editorPath.calcRelativeCrood(
                 {
-                  x: node.x - (crood.x - node.x),
-                  y: node.y - (crood.y - node.y),
+                  left: left!,
+                  top: top!,
                 },
-                node
+                editorPath.nodePathMap.get(node)!.originPath
               );
-              // 如果新镜像控制点到关键点的距离为0不跟随
-              // 如果不在同水平线且对称不跟随
-              if (
-                new_d1 !== 0 &&
-                ((angle === 180 && d2 > d1) || d2 - d1 <= Number.EPSILON)
-              ) {
-                const scale = d0 === d1 ? 1 : d1 / new_d1;
-                _controller.setCrood({
-                  x: node.x - (crood.x - node.x) * scale,
-                  y: node.y - (crood.y - node.y) * scale,
-                });
+              // 控制点角度对称变换
+              const mirrorController = this.controllers.find((i) => {
+                const antiDirection = { pre: "next", next: "pre" }[direction];
+                if (i.type !== antiDirection) return false;
+                return (
+                  i.pathwayNode ===
+                  neighboringNodes.find(
+                    (i) => i[0] === position && i[1] === antiDirection
+                  )?.[2]
+                );
+              });
+              if (mirrorController) {
+                const { controller: _controller } = mirrorController;
+                const angle = Math.round(
+                  this._calcCroodsAngle(_controller, node, controller)
+                );
+                // 旧控制点到关键点的距离
+                const d0 = this._calcCroodsDistance(controller, node);
+                // 旧镜像控制点到关键点的距离
+                const d1 = this._calcCroodsDistance(_controller, node);
+                // 旧控制点之间的距离
+                const d2 = this._calcCroodsDistance(_controller, controller);
+                // 新镜像控制点到关键点的距离
+                const new_d1 = this._calcCroodsDistance(
+                  {
+                    x: node.x - (crood.x - node.x),
+                    y: node.y - (crood.y - node.y),
+                  },
+                  node
+                );
+                // 如果新镜像控制点到关键点的距离为0不跟随
+                // 如果不在同水平线且对称不跟随
+                if (
+                  new_d1 !== 0 &&
+                  ((angle === 180 && d2 > d1) || d2 - d1 <= Number.EPSILON)
+                ) {
+                  const scale = d0 === d1 ? 1 : d1 / new_d1;
+                  _controller.setCrood({
+                    x: node.x - (crood.x - node.x) * scale,
+                    y: node.y - (crood.y - node.y) * scale,
+                  });
+                }
               }
+              controller.setCrood(crood, [point.name]);
             }
-            controller.setCrood(crood, [point.name]);
-          }
-        }, true);
+          },
+          true
+        );
       };
       const onRemovedPoint = () => {
         point.off("added", onAddedPoint);
@@ -907,7 +943,6 @@ class EditorNode extends EditorModule {
           [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
           [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
         }[newInstruction[0]];
-        // console.log(newInstructionType);
         newInstruction[0] = {
           [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
           [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
@@ -1047,7 +1082,8 @@ class EditorNode extends EditorModule {
     position: {
       left: number;
       top: number;
-    }
+    },
+    followControllers: ResponsiveCrood[] = []
   ) {
     const pathwayNode = this.objectNodeMap.get(object);
     if (!pathwayNode) return;
@@ -1055,7 +1091,7 @@ class EditorNode extends EditorModule {
     const { node, section } = pathwayNode;
 
     const editorPath = this.vizPath?.context.find(EditorPath);
-    if (!editorPath) return [];
+    if (!editorPath) return;
 
     const selectionGroup = object.group;
 
@@ -1088,28 +1124,39 @@ class EditorNode extends EditorModule {
       position,
       editorPath.nodePathMap.get(node!)!.originPath
     );
+
     // 需要跟随变化的曲线控制点
-    const followCroods: ResponsiveCrood[] = [];
-    const followTransform = {
-      translate: {
-        x: newCrood.x - node!.x,
-        y: newCrood.y - node!.y,
-      },
-      rotate: preAngle - newAngle,
-      scale: {
-        x: preScaleX / newScaleX,
-        y: preScaleY / newScaleY,
-      },
-    };
-
-    node!.setCrood(newCrood, [object!.name]);
-
-    const { nodes } = this.vizPath?.getMoreNeighboringNodes(pathwayNode) ?? {};
-    nodes?.forEach(([position, direction, node]) => {
-      if (position === "cur" && ["pre", "next"].includes(direction)) {
-        followCroods.push(node.controllers![direction]!);
-      }
+    followControllers.forEach((controller) => {
+      if (!controller) return;
+      const relativeDiff = transform(
+        {
+          x: controller.x - newCrood.x,
+          y: controller.y - newCrood.y,
+        },
+        [
+          {
+            translate: {
+              x: newCrood.x - node!.x,
+              y: newCrood.y - node!.y,
+            },
+          },
+          {
+            scale: {
+              x: preScaleX / newScaleX,
+              y: preScaleY / newScaleY,
+            },
+          },
+          {
+            rotate: preAngle - newAngle,
+          },
+        ]
+      );
+      controller.x = newCrood.x + relativeDiff.x;
+      controller.y = newCrood.y + relativeDiff.y;
     });
+
+    // 节点位置更新
+    node!.setCrood(newCrood, [object!.name]);
 
     // 如果『路径自动闭合（带有z指令）』，首尾两个节点需要同步操作
     if (
@@ -1123,25 +1170,6 @@ class EditorNode extends EditorModule {
       // 闭合节点不可能存在可视操作节点
       // if (section[section.length - 2].node === node) {}
     }
-
-    // 控制点跟随
-    followCroods.forEach((controller) => {
-      if (!controller) return;
-      const {
-        translate = { x: 0, y: 0 },
-        scale = { x: 1, y: 1 },
-        rotate = 0,
-      } = followTransform;
-      const relativeDiff = transform(
-        {
-          x: controller.x - newCrood.x,
-          y: controller.y - newCrood.y,
-        },
-        [{ translate }, { scale }, { rotate }]
-      );
-      controller.x = newCrood.x + relativeDiff.x;
-      controller.y = newCrood.y + relativeDiff.y;
-    });
 
     object.canvas?.requestRenderAll();
   }

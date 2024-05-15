@@ -9,7 +9,7 @@ import {
   EditorShortcut,
   utils,
 } from 'fabric-path-editor';
-import theme from 'fabric-path-editor/dist/themes/debug/index';
+import theme from 'fabric-path-editor/dist/themes/default/index';
 
 const EXAMPLE_PATH_D = {
   point: 'M 100 100 z',
@@ -91,14 +91,59 @@ const EXAMPLE_PATH_D = {
     .use(new EditorPath())
     .use(new EditorNode())
     .use(new EditorShortcut([
+      // 删除节点快捷键
       {
-        // 删除节点快捷键
-        key: 'backspace|delete',
-        onActivate: () => {
+        key: 'backspace',
+        combinationKeys: ['meta'],
+        onActivate: (e) => {
+          e.preventDefault();
+
           const editorNode = vizPath.find(EditorNode);
           if (!editorNode) return;
 
           if (editorNode.activeNodes.length) editorNode.remove(...editorNode.activeNodes);
+        },
+      },
+      // 全选节点快捷键
+      {
+        key: 'A',
+        combinationKeys: ['meta'],
+        onActivate: (e) => {
+          e.preventDefault();
+
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+
+          editorNode.focus(...editorNode.nodes);
+        },
+      },
+      // 取消节点选择
+      {
+        key: 'D',
+        combinationKeys: ['meta'],
+        onActivate: (e) => {
+          e.preventDefault();
+
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+
+          editorNode.focus();
+        },
+      },
+      // 更改关键点交互模式
+      {
+        combinationKeys: ['alt'],
+        onActivate: () => {
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+
+          editorNode.mode = 'convert';
+        },
+        onDeactivate: () => {
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+  
+          editorNode.mode = 'move';
         },
       },
     ]))
@@ -206,6 +251,8 @@ const EXAMPLE_PATH_D = {
       top: fabricCanvas.getHeight() / 2,
       originX: 'center',
       originY: 'center',
+      scaleX: 0.8,
+      scaleY: 0.8
     });
     pathways?.forEach((pathway) => {
       operator.draw(pathway);
