@@ -117,21 +117,6 @@ class VizPathContext {
         ] as Instruction;
       }
 
-      // ③ 如果是二阶曲线全部升级为三阶曲线便于后续处理
-      // for (let i = 1; i < section.length; i++) {
-      //   const instruction = section[i];
-      //   const preInstruction = section[i - 1];
-      //   if (instruction[0] === InstructionType.QUADRATIC_CURCE) {
-      //     instruction.splice(
-      //       0,
-      //       instruction.length,
-      //       ...getCubicFromQuadratic(
-      //         VizPath.getInstructionNodeCrood(preInstruction)!,
-      //         instruction
-      //       )
-      //     );
-      //   }
-      // }
       // ③ 闭合指令的字母全改为大小以保证统一处理
       if (section[section.length - 1][0].toUpperCase() === InstructionType.CLOSE) {
         section[section.length - 1][0] = InstructionType.CLOSE;
@@ -148,7 +133,7 @@ class VizPathContext {
         if (
           // 如果路径只有一个起始点且闭合[M,Z]
           section[0] === section[section.length - 2] ||
-          // 或者路径闭合但是最后一个关键点不完全等于起始点
+          // 或者路径闭合但是最后一个路径节点不完全等于起始点
           endPoint[0] !== startPoint[0] ||
           endPoint[1] !== startPoint[1]
         ) {

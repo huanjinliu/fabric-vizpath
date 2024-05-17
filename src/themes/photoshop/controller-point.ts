@@ -18,7 +18,7 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
       const controller = editorNode.controllers.find(
         (i) => i.point === object
       )!;
-      return controller.node;
+      return controller?.node;
     };
 
     object.on('selected', () => {

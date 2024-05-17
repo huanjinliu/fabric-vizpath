@@ -53,7 +53,7 @@ class VizPath {
   context: VizPathContext;
 
   /**
-   * 路径信息（包含路径分段、路径指令、关键点及控制点信息）
+   * 路径信息（包含路径分段、路径指令、路径节点及曲线变换点信息）
    */
   pathway: ResponsivePathway = [];
 
@@ -94,9 +94,9 @@ class VizPath {
   }
 
   /**
-   * 获取指令中的关键节点
+   * 获取指令中的路径节点
    *
-   * @note 闭合指令无关键节点
+   * @note 闭合指令无路径节点
    */
   static getInstructionNodeCrood(instruction: Instruction) {
     if (instruction[0] === InstructionType.CLOSE) return;
@@ -175,7 +175,10 @@ class VizPath {
       if (immediate) handler(crood.x, crood.y);
 
       const observers = this._observers.get(proxy) ?? [];
-      const index = observers.findIndex((observer) => observer.id === id);
+
+      const index = id
+        ? observers.findIndex((observer) => observer.id === id)
+        : -1;
       if (index === -1) observers.push({ handler, id });
       else observers.splice(index, 1, { handler, id });
 
@@ -265,15 +268,16 @@ class VizPath {
   }
 
   /**
-   * 获取前后的指令节点信息
+   * 获取前后的指令信息
    * @param pathwayNode 路径节点
    * @param cycle 闭合路径是否开启循环查找
    */
-  getNeighboringNodes<T extends Crood>(
+  getNeighboringInstructions<T extends Crood>(
     pathwayNode: PathwayNode<T>,
-    cycle = false
+    cycle = true
   ) {
     const { section } = pathwayNode;
+
     const index = section.indexOf(pathwayNode);
 
     let pre = section[index - 1];
@@ -304,50 +308,74 @@ class VizPath {
   }
 
   /**
-   * 获取更多周围的控制点信息（前、后、上一关键点后、下一关键点前），默认循环查找
+   * 获取前后的指令节点信息
+   * @param pathwayNode 路径节点
+   * @param cycle 闭合路径是否开启循环查找
    */
-  getMoreNeighboringNodes<T extends Crood>(pathwayNode: PathwayNode<T>) {
-    const nodes: [
-      position: 'cur' | 'pre' | 'next',
-      direction: 'pre' | 'next',
-      from: PathwayNode<T>
-    ][] = [];
+  getNeighboringNodes<T extends Crood>(
+    pathwayNode: PathwayNode<T>,
+    cycle = true
+  ) {
+    const { section } = pathwayNode;
 
-    const cur = pathwayNode;
-    const { pre, next } = this.getNeighboringNodes(cur, true);
+    const _cycle = this.isClosePath(section) && cycle;
+    const _index = section.indexOf(pathwayNode);
 
-    // 特殊情况1：当前是起始节点
-    if (cur.instruction[0] === InstructionType.START) {
-      if (pre) {
-        const { pre: ppre } = this.getNeighboringNodes(pre, true);
-        if (ppre) nodes.push(['pre', 'next', ppre]);
-        nodes.push(['cur', 'pre', pre]);
+    let pre: PathwayNode<T> | undefined;
+    let next: PathwayNode<T> | undefined;
+
+    if (_index !== -1) {
+      let i = _index;
+      while (!pre && section[i]) {
+        if (i !== _index && section[i].node) pre = section[i];
+        i--;
+        if (i === -1 && _cycle) i = section.length - 1;
+        if (i === _index) break;
       }
-      nodes.push(['cur', 'next', cur]);
-      if (next) nodes.push(['next', 'pre', next]);
-    }
-    // 特殊情况2：当前是自动闭合路径的闭合前节点
-    else if (next?.instruction[0] === InstructionType.CLOSE) {
-      const start = pathwayNode.section[0];
-      const nnext = pathwayNode.section[1];
-      if (pre) nodes.push(['pre', 'next', pre]);
-      nodes.push(['cur', 'pre', cur]);
-      nodes.push(['cur', 'next', start]);
-      if (nnext) nodes.push(['next', 'pre', nnext]);
-    }
-    // 正常情况
-    else {
-      if (pre) nodes.push(['pre', 'next', pre]);
-      nodes.push(['cur', 'pre', cur]);
-      nodes.push(['cur', 'next', cur]);
-      if (next) nodes.push(['next', 'pre', next]);
+      i = _index;
+      while (!next && section[i]) {
+        if (i !== _index && section[i].node) next = section[i];
+        i++;
+        if (i === section.length && _cycle) i = 0;
+        if (i === _index) break;
+      }
     }
 
-    return { nodes, from: pathwayNode };
+    return { pre, next } as Partial<{
+      pre: PathwayNode<T>;
+      next: PathwayNode<T>;
+    }>;
   }
 
   /**
-   * 绘制路径，建立节点与指令的关联关系，使之可以通过直接控制控制路径及点位信息来控制指令变化
+   * 获取周围的曲线变换点信息（前、后、上一路径节点后、下一路径节点前），默认循环查找
+   */
+  getNeighboringControllers<T extends Crood>(pathwayNode: PathwayNode<T>) {
+    const controllers: {
+      position: 'cur' | 'pre' | 'next';
+      direction: 'pre' | 'next';
+      from: PathwayNode<T>;
+    }[] = [];
+
+    controllers.push({ position: 'cur', direction: 'pre', from: pathwayNode });
+    controllers.push({ position: 'cur', direction: 'next', from: pathwayNode });
+
+    const { pre, next } = this.getNeighboringNodes(pathwayNode);
+    if (pre)
+      controllers.push({ position: 'pre', direction: 'next', from: pre });
+    if (next)
+      controllers.push({ position: 'next', direction: 'pre', from: next });
+
+    return controllers;
+  }
+
+  /**
+   * 绘制路径
+   *
+   * @note
+   *
+   * 闭合点和起始点的闭合重叠点均无路径节点和曲线变换点
+   *
    * @param pathway 路径信息
    */
   draw(pathway: Pathway) {
@@ -355,53 +383,103 @@ class VizPath {
     pathway.forEach((item) => {
       const drawPathway = item as ResponsivePathway[number];
       const { section, originPath } = item;
-      section.forEach((pathwayNode) => {
+      section.forEach((pathwayNode, index) => {
         const { instruction } = pathwayNode;
 
-        // 关键点
+        // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换点也会被起始点占用
+        const isStartSyncPoint =
+          section[index + 1] &&
+          section[index + 1].instruction?.[0] === InstructionType.CLOSE;
+
+        // 路径节点
         const node = VizPath.getInstructionNodeCrood(instruction);
         if (node && !pathwayNode.node) {
-          const responsiveNode = this._toResponsive(node);
-          responsiveNode.observe((x, y) => {
-            instruction[instruction.length - 2] = x;
-            instruction[instruction.length - 1] = y;
-            this._rerenderOriginPath(originPath);
-          });
-          pathwayNode.node = responsiveNode;
-          this.pathwayNodeMap.set(pathwayNode.node, pathwayNode);
+          if (isStartSyncPoint) {
+            (section[0].node as ResponsiveCrood)?.observe((x, y) => {
+              instruction[instruction.length - 2] = x;
+              instruction[instruction.length - 1] = y;
+              this._rerenderOriginPath(originPath);
+            });
+          } else {
+            const responsiveNode = this._toResponsive(node);
+            responsiveNode.observe((x, y) => {
+              instruction[instruction.length - 2] = x;
+              instruction[instruction.length - 1] = y;
+              this._rerenderOriginPath(originPath);
+            });
+            pathwayNode.node = responsiveNode;
+            this.pathwayNodeMap.set(pathwayNode.node, pathwayNode);
+          }
         }
 
-        // 指令控制点
-        const { pre, next } = this.getNeighboringNodes(pathwayNode);
+        // 指令曲线变换点
         const controllers = {} as NonNullable<
           PathwayNode<ResponsiveCrood>['controllers']
         >;
 
-        if (pathwayNode?.instruction[0] === InstructionType.BEZIER_CURVE) {
-          controllers.pre = this._toResponsive({
-            x: pathwayNode.instruction[3],
-            y: pathwayNode.instruction[4],
-          });
-          controllers.pre.observe((x, y) => {
-            pathwayNode.instruction[3] = x;
-            pathwayNode.instruction[4] = y;
-            this._rerenderOriginPath(originPath);
-          });
+        const { pre, next } = this.getNeighboringInstructions(pathwayNode);
+
+        // 前曲线变换点
+        if (isStartSyncPoint) {
+          if (pathwayNode?.instruction[0] === InstructionType.BEZIER_CURVE) {
+            const controller = this._toResponsive({
+              x: pathwayNode.instruction[3],
+              y: pathwayNode.instruction[4],
+            });
+            controller.observe((x, y) => {
+              pathwayNode.instruction[3] = x;
+              pathwayNode.instruction[4] = y;
+              this._rerenderOriginPath(originPath);
+            });
+            section[0].controllers = section[0].controllers ?? {};
+            section[0].controllers.pre = controller;
+          }
+
+          if (
+            pathwayNode?.instruction[0] === InstructionType.QUADRATIC_CURCE &&
+            pre &&
+            pre.instruction[0]
+          ) {
+            const controller = pre.controllers!.next! as ResponsiveCrood;
+            controller.observe((x, y) => {
+              pathwayNode.instruction[1] = x;
+              pathwayNode.instruction[2] = y;
+              this._rerenderOriginPath(originPath);
+            });
+            section[0].controllers = section[0].controllers ?? {};
+            section[0].controllers.pre = controller;
+          }
+        } else {
+          if (pathwayNode?.instruction[0] === InstructionType.BEZIER_CURVE) {
+            controllers.pre = this._toResponsive({
+              x: pathwayNode.instruction[3],
+              y: pathwayNode.instruction[4],
+            });
+            controllers.pre.observe((x, y) => {
+              pathwayNode.instruction[3] = x;
+              pathwayNode.instruction[4] = y;
+              this._rerenderOriginPath(originPath);
+            });
+          }
+
+          if (
+            pathwayNode?.instruction[0] === InstructionType.QUADRATIC_CURCE &&
+            pre &&
+            pre.instruction[0]
+          ) {
+            controllers.pre = pre.controllers!.next! as ResponsiveCrood;
+            controllers.pre.observe((x, y) => {
+              pathwayNode.instruction[1] = x;
+              pathwayNode.instruction[2] = y;
+              this._rerenderOriginPath(originPath);
+            });
+          }
         }
 
-        if (
-          pathwayNode?.instruction[0] === InstructionType.QUADRATIC_CURCE &&
-          pre &&
-          pre.instruction[0]
-        ) {
-          controllers.pre = pre.controllers!.next! as ResponsiveCrood;
-          controllers.pre.observe((x, y) => {
-            pathwayNode.instruction[1] = x;
-            pathwayNode.instruction[2] = y;
-            this._rerenderOriginPath(originPath);
-          });
+        if (pathwayNode.instruction[0] === InstructionType.START) {
+          console.log('next 1', controllers.next)
         }
-
+        // 后曲线变换点
         if (
           next &&
           [
@@ -431,7 +509,11 @@ class VizPath {
             );
         }
 
-        pathwayNode.controllers = controllers;
+        if (Object.keys(controllers).length) {
+          pathwayNode.controllers = controllers;
+        } else {
+          delete pathwayNode.controllers;
+        }
       });
 
       const index = this.pathway.indexOf(drawPathway);
@@ -591,7 +673,7 @@ class VizPath {
   }
 
   /**
-   * 移除关键点
+   * 移除路径节点
    *
    * @note
    *
@@ -713,9 +795,9 @@ class VizPath {
           indexes.length <= 1
             ? indexes
             : indexes.filter(
-              (i, idx, arr) =>
-                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
-            );
+                (i, idx, arr) =>
+                  arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
+              );
 
         for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
           const instructions = _sections[0];
@@ -774,9 +856,9 @@ class VizPath {
   }
 
   /**
-   * 新增关键点
-   * @param target 参考关键点
-   * @param newTarget 新添加的关键点位置
+   * 新增路径节点
+   * @param target 参考路径节点
+   * @param newTarget 新添加的路径节点位置
    */
   insert(target: ResponsiveCrood, newTarget: Crood) {
     const pathwayNode = this.pathwayNodeMap.get(target);
@@ -802,17 +884,14 @@ class VizPath {
   }
 
   /**
-   * 替换关键点所在指令
+   * 替换路径节点所在指令
    *
    * @note 路径节点的引用不会发生变化
    *
-   * @param target 参考关键点
+   * @param pathwayNode 指令对象
    * @param instruction 新指令
    */
-  replace(target: ResponsiveCrood, instruction: Instruction) {
-    const pathwayNode = this.pathwayNodeMap.get(target);
-    if (!pathwayNode) return;
-
+  replace(pathwayNode: PathwayNode<ResponsiveCrood>, instruction: Instruction) {
     const section = pathwayNode.section;
 
     const index = section.indexOf(pathwayNode);

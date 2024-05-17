@@ -5,6 +5,8 @@ export { default as transform } from './transform';
 export { default as observe } from './observe';
 export { default as deepIterateGroup } from './deep-iterate-group';
 export { default as fireMouseUpAndSelect } from './fire-mouse-up-and-select';
+export { default as calcCroodsAngle } from './calc-croods-angle';
+export { default as calcCroodsDistance } from './calc-croods-distance';
 
 /**
  * 路径操作

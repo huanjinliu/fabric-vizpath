@@ -1,4 +1,5 @@
 import { fabric } from 'fabric';
+import EditorNode from 'src/lib/modules/editor-node/index.class';
 import type { Theme } from 'src/lib/modules/editor-ui/index.class';
 
 const createNode: Theme['node'] = (decorator) => {
@@ -10,6 +11,9 @@ const createNode: Theme['node'] = (decorator) => {
   });
 
   return decorator(object, (context, group) => {
+    const editorNode = context.find(EditorNode);
+    if (!editorNode) return;
+
     group.on("mouseover", () => {
       object.set({ fill: "#7ef4ad" });
       group.canvas?.requestRenderAll();
@@ -17,7 +21,7 @@ const createNode: Theme['node'] = (decorator) => {
   
     group.on("mouseout", () => {
       object.set({
-        fill: group.canvas?.getActiveObject() === group ? "#29ca6e" : "#ffffff"
+        fill: editorNode.activeNodes.includes(group) ? "#29ca6e" : "#ffffff"
       });
       group.canvas?.requestRenderAll();
     });

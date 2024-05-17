@@ -17,7 +17,7 @@ const getCubicFromQuadratic = (p0: Crood, instruction: Instruction) => {
   // 二阶贝塞尔曲线的点
   const [p1, p2] = points;
 
-  // 计算三阶贝塞尔曲线的控制点
+  // 计算三阶贝塞尔曲线的曲线变换点
   const q1 = {
     x: (2 / 3) * p1.x + (1 / 3) * p0.x,
     y: (2 / 3) * p1.y + (1 / 3) * p0.y,

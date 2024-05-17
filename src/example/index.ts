@@ -9,7 +9,7 @@ import {
   EditorShortcut,
   utils,
 } from 'fabric-path-editor';
-import theme from 'fabric-path-editor/dist/themes/none/index';
+import theme from 'fabric-path-editor/dist/themes/default/index';
 
 const EXAMPLE_PATH_D = {
   point: 'M 100 100 z',
@@ -94,14 +94,18 @@ const EXAMPLE_PATH_D = {
       // 删除节点快捷键
       {
         key: 'backspace',
-        combinationKeys: ['meta'],
         onActivate: (e) => {
           e.preventDefault();
 
           const editorNode = vizPath.find(EditorNode);
           if (!editorNode) return;
 
-          if (editorNode.activeNodes.length) editorNode.remove(...editorNode.activeNodes);
+          // 如果当前有选中曲线控制点
+          if (editorNode.activePoint) {
+            editorNode.remove(editorNode.activePoint);
+          } else if (editorNode.activeNodes.length) {
+            editorNode.remove(...editorNode.activeNodes);
+          }
         },
       },
       // 全选节点快捷键
@@ -130,20 +134,39 @@ const EXAMPLE_PATH_D = {
           editorNode.focus();
         },
       },
-      // 更改关键点交互模式
+      // 更改路径节点交互模式
       {
         combinationKeys: ['alt'],
         onActivate: () => {
           const editorNode = vizPath.find(EditorNode);
           if (!editorNode) return;
 
-          editorNode.mode = 'convert';
+          editorNode.setting.mode = 'convert';
+          editorNode.setting.forcePointSymmetric = 'entire';
         },
         onDeactivate: () => {
           const editorNode = vizPath.find(EditorNode);
           if (!editorNode) return;
   
-          editorNode.mode = 'move';
+          editorNode.setting.mode = 'move';
+          editorNode.setting.forcePointSymmetric = 'none';
+        },
+      },
+      {
+        combinationKeys: ['alt', 'ctrl'],
+        onActivate: () => {
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+
+          editorNode.setting.mode = 'convert';
+          editorNode.setting.forcePointSymmetric = 'angle';
+        },
+        onDeactivate: () => {
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+  
+          editorNode.setting.mode = 'move';
+          editorNode.setting.forcePointSymmetric = 'none';
         },
       },
     ]))
@@ -159,7 +182,7 @@ const EXAMPLE_PATH_D = {
     // scaleY: 2,
   });
   operator.draw(pathway1);
-  // console.log(pathway1);
+  // console.log(pathway1[0].section);
 
   // ② 通过路径对象绘制
   // const pathway2 = VizPath.parsePathFromObject(path);
@@ -267,10 +290,10 @@ const EXAMPLE_PATH_D = {
   });
 
   // 操作测试
-  const editorNode = vizPath.find(EditorNode);
-  if (!editorNode) return;
+  // const editorNode = vizPath.find(EditorNode);
+  // if (!editorNode) return;
 
-  editorNode.focus(editorNode.nodes[0]);
+  // editorNode.focus(editorNode.nodes[3]);
 
   // const object = editorNode.add({ left: 100, top: 100 });
   // editorNode.focus(object);

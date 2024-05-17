@@ -11,14 +11,14 @@ const createPoint: Theme["controllerPoint"] = (decorator) => {
   });
 
   return decorator(circle, (context, object) => {
-    const getBelongNode = () => {
-      const editorNode = context.find(EditorNode);
-      if (!editorNode) return;
+    const editorNode = context.find(EditorNode);
+    if (!editorNode) return;
 
+    const getBelongNode = () => {
       const controller = editorNode.controllers.find(
         (i) => i.point === object
       )!;
-      return controller.node;
+      return controller?.node;
     };
 
     object.on("selected", () => {
@@ -36,7 +36,7 @@ const createPoint: Theme["controllerPoint"] = (decorator) => {
       const node = getBelongNode();
       if (node) {
         node.set({
-          fill: node.canvas?.getActiveObject() === node ? "#29ca6e" : "#ffffff"
+          fill: editorNode.activePoint === object ? "#29ca6e" : "#ffffff"
         });
       }
 

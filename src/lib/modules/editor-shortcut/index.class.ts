@@ -1,27 +1,27 @@
-import cloneDeep from 'lodash-es/cloneDeep';
-import isEqual from 'lodash-es/isEqual';
-import EditorModule from '../base.class';
-import Editor from '../editor/index.class';
+import cloneDeep from "lodash-es/cloneDeep";
+import isEqual from "lodash-es/isEqual";
+import EditorModule from "../base.class";
+import Editor from "../editor/index.class";
 import type VizPath from "../../vizpath.class";
 
-type CombinationKey = 'alt' | 'ctrl' | 'shift' | 'meta';
+type CombinationKey = "alt" | "ctrl" | "shift" | "meta";
 
 type Shortcut = {
   key?: string;
   combinationKeys: CombinationKey[];
   onActivate: (e: KeyboardEvent) => void;
   onDeactivate?: (e: KeyboardEvent) => void;
-}
+};
 
 type ShortcutOptions = {
   key?: string;
   combinationKeys?: CombinationKey[];
   onActivate?: (e: KeyboardEvent) => void;
   onDeactivate?: (e: KeyboardEvent) => void;
-}
+};
 
 class EditorShortcut extends EditorModule {
-  static ID = 'editor-shortcut';
+  static ID = "editor-shortcut";
 
   shortcuts: Shortcut[] = [];
 
@@ -29,7 +29,9 @@ class EditorShortcut extends EditorModule {
 
   constructor(shortcuts: ShortcutOptions[] = []) {
     super();
-    this.shortcuts = shortcuts.map(this._tryGetValidShortcut.bind(this)).filter(Boolean) as typeof this.shortcuts;
+    this.shortcuts = shortcuts
+      .map(this._tryGetValidShortcut.bind(this))
+      .filter(Boolean) as typeof this.shortcuts;
   }
 
   private _tryGetValidShortcut(shortcut: ShortcutOptions) {
@@ -45,7 +47,7 @@ class EditorShortcut extends EditorModule {
 
     if (!shortcut.combinationKeys) _shortcut.combinationKeys = [];
     else _shortcut.combinationKeys = [...shortcut.combinationKeys];
-    
+
     _shortcut.key;
     _shortcut.combinationKeys.sort();
 
@@ -64,25 +66,38 @@ class EditorShortcut extends EditorModule {
     const activateKeys = this.shortcuts.filter((shortcut) => {
       const { key, combinationKeys = [] } = shortcut;
 
-      const activate = (
+      const activateKey =
         !key ||
-        key.toUpperCase() === (e.key ?? '').toUpperCase() ||
-        `KEY${key.toUpperCase()}` === e.code.toUpperCase()
-      );
-      if (e.type === 'keyup' && activate) return false;
+        (key.toUpperCase() === (e.key ?? "").toUpperCase() ||
+          `KEY${key.toUpperCase()}` === e.code.toUpperCase());
 
       if (
-        // 没有匹配任何快捷键
-        !activate ||
-        // 没有匹配任何组合键
-        combinationKeys.some(
-          (combinationPrefix) => !e[`${combinationPrefix}Key`]
+        // 按下键的情况
+        e.type === "keydown" &&
+        // 匹配快捷键
+        activateKey &&
+        // 匹配全部组合键
+        combinationKeys.every(
+          (combinationPrefix) => e[`${combinationPrefix}Key`]
         )
       ) {
-        return false;
+        return true;
       }
 
-      return true;
+      if (
+        // 松开键的情况
+        e.type === "keyup" &&
+        // 匹配空快捷键
+        !key &&
+        // 匹配全部组合键
+        combinationKeys.every(
+          (combinationPrefix) => e[`${combinationPrefix}Key`]
+        )
+      ) {
+        return true;
+      }
+
+      return false;
     });
 
     activateKeys.sort((a, b) => {
@@ -103,14 +118,15 @@ class EditorShortcut extends EditorModule {
     this.activeShortcut = shortcut;
 
     this.activeShortcut?.onActivate(e);
-  };
+  }
 
   add(shortcut: ShortcutOptions) {
     const _shortcut = this._tryGetValidShortcut(shortcut);
     if (!_shortcut) return;
 
-    const index = this.shortcuts.findIndex(item => {
-      isEqual(item.key, _shortcut.key) && isEqual(item.combinationKeys, _shortcut.combinationKeys)
+    const index = this.shortcuts.findIndex((item) => {
+      isEqual(item.key, _shortcut.key) &&
+        isEqual(item.combinationKeys, _shortcut.combinationKeys);
     });
     if (index !== -1) {
       this.shortcuts.splice(index, 1, _shortcut);
@@ -120,8 +136,9 @@ class EditorShortcut extends EditorModule {
   }
 
   remove(key: string, combinationKeys: string[] = []) {
-    const index = this.shortcuts.findIndex(item => {
-      isEqual(item.key, [key].flat(1).sort()) && isEqual(item.combinationKeys, combinationKeys.sort())
+    const index = this.shortcuts.findIndex((item) => {
+      isEqual(item.key, [key].flat(1).sort()) &&
+        isEqual(item.combinationKeys, combinationKeys.sort());
     });
     if (index !== -1) {
       this.shortcuts.splice(index, 1);
@@ -132,9 +149,9 @@ class EditorShortcut extends EditorModule {
     const editor = vizPath.context.find(Editor);
     if (!editor) return;
 
-    editor.off('global', 'keydown', this._handleShortcutKey.bind(this));
-    editor.off('global', 'keyup', this._handleShortcutKey.bind(this));
-    editor.off('global', 'blur', this._handlePageDeactivate.bind(this));
+    editor.off("global", "keydown", this._handleShortcutKey.bind(this));
+    editor.off("global", "keyup", this._handleShortcutKey.bind(this));
+    editor.off("global", "blur", this._handlePageDeactivate.bind(this));
 
     this.shortcuts.length = 0;
     this.activeShortcut = undefined;
@@ -144,9 +161,9 @@ class EditorShortcut extends EditorModule {
     const editor = vizPath.context.find(Editor);
     if (!editor) return;
 
-    editor.on('global', 'keydown', this._handleShortcutKey.bind(this));
-    editor.on('global', 'keyup', this._handleShortcutKey.bind(this));
-    editor.on('global', 'blur', this._handlePageDeactivate.bind(this));
+    editor.on("global", "keydown", this._handleShortcutKey.bind(this));
+    editor.on("global", "keyup", this._handleShortcutKey.bind(this));
+    editor.on("global", "blur", this._handlePageDeactivate.bind(this));
   }
 }
 
