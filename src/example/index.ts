@@ -24,7 +24,7 @@ const EXAMPLE_PATH_D = {
     'M,-108.5,-211.5 C,-175.5,-211.5,-228.5,-157.5,-228.5,-91.5 C,-228.5,43.5,-92.5,78.5,-0.5,211.5 C,87.5,79.5,228.5,38.5,228.5,-91.5 C,228.5,-157.5,174.5,-211.5,108.5,-211.5 C,60.5,-211.5,18.5,-183.5,-0.5,-142.5 C,-19.5,-183.5,-60.5,-211.5,-108.5,-211.5 z',
   banana:
     'M 8,223 c 0,0 143,3 185,-181 c 2,-11 -1,-20 1,-33 h 16 c 0,0 -3,17 1,30 c 21,68 -4,242 -204,196 L 8,223 z M 8,230 c 0,0 188,40 196,-160',
-  test: 'M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100',
+  test: 'M -150 50 z M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100',
 };
 
 (async () => {
@@ -167,6 +167,23 @@ const EXAMPLE_PATH_D = {
   
           editorNode.setting.mode = 'move';
           editorNode.setting.forcePointSymmetric = 'none';
+        },
+      },
+      // 更改为添加模式
+      {
+        combinationKeys: ['shift'],
+        onActivate: () => {
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+
+          editorNode.setting.mode = 'add';
+        },
+        onDeactivate: () => {
+          const editorNode = vizPath.find(EditorNode);
+          if (!editorNode) return;
+  
+          editorNode.setting.mode = 'move';
+          console.log(editorNode.setting.mode);
         },
       },
     ]))

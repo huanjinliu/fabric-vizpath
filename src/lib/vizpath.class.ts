@@ -268,6 +268,18 @@ class VizPath {
   }
 
   /**
+   * 是否是路径端点
+   */
+  isTerminalNode(node: PathwayNode) {
+    // 闭合路径必然不存在端点
+    if (this.isClosePath(node.section)) return false;
+
+    const index = node.section.indexOf(node);
+
+    return index === 0 || index === node.section.length - 1;
+  }
+
+  /**
    * 获取前后的指令信息
    * @param pathwayNode 路径节点
    * @param cycle 闭合路径是否开启循环查找
@@ -477,7 +489,7 @@ class VizPath {
         }
 
         if (pathwayNode.instruction[0] === InstructionType.START) {
-          console.log('next 1', controllers.next)
+          console.log('next 1', controllers.next);
         }
         // 后曲线变换点
         if (
@@ -771,8 +783,8 @@ class VizPath {
         if (next.length >= 1) _sections.unshift(next);
         if (pre.length >= 1) _sections.unshift(pre);
 
-        // 如果原本是闭合路径，且剩余节点多于两个，保留闭合状态
-        if (isClosePath && _sections[0].length > 2) {
+        // 如果原本是闭合路径，且剩余节点多于1个，保留闭合状态
+        if (isClosePath && _sections[0].length > 1) {
           _sections[0].push(
             [InstructionType.LINE, ..._sections[0][0].slice(-2)] as Instruction,
             [InstructionType.CLOSE]
@@ -932,6 +944,49 @@ class VizPath {
       this.pathway.find((i) => i.section === section)!,
       updateCommands
     );
+  }
+
+  /**
+   * 闭合路径
+   */
+  close(pathwayNode: PathwayNode<ResponsiveCrood>) {
+    const pathway = this.getPathway(pathwayNode.section);
+    if (!pathway) return;
+
+    // 自闭合的路径无需再做闭合处理
+    if (this.isClosePath(pathway.section)) return;
+
+    // 少于2个节点时无法实现闭合
+    if (pathway.section.length < 2) return;
+
+    const updateCommands: {
+      type: 'add' | 'update';
+      index: number;
+      instruction: Instruction;
+    }[] = [];
+
+    const startNode = pathway.section[0].node!;
+    const endNode = pathway.section[pathway.section.length - 1].node!;
+
+    // 需要考虑添加闭合重叠点
+    if (
+      startNode.x !== endNode.x ||
+      startNode.y !== endNode.y
+    ) {
+      updateCommands.push({
+        type: 'add',
+        index: pathway.section.length - 1,
+        instruction: [InstructionType.LINE, startNode.x, startNode.y],
+      });
+    }
+
+    updateCommands.push({
+      type: 'add',
+      index: pathway.section.length + updateCommands.length - 1,
+      instruction: [InstructionType.CLOSE],
+    })
+
+    this._updatePathwayByCommands(pathway, updateCommands);
   }
 
   /**

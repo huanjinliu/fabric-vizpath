@@ -6,13 +6,18 @@ import {
   deepIterateGroup,
   fireMouseUpAndSelect,
   observe,
+  reversePath,
   transform,
 } from '@utils';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import VizPath, { VizPathSymbalType } from '../../vizpath.class';
 import EditorPath from '../editor-path/index.class';
-import { InstructionType, type Instruction, type PathwayNode } from '../..';
+import VizPathContext, {
+  InstructionType,
+  type Instruction,
+  type PathwayNode,
+} from '../..';
 import type { ResponsiveCrood } from '../../vizpath.class';
 import EditorUI, { type ThemeDecorator } from '../editor-ui/index.class';
 
@@ -47,9 +52,9 @@ class EditorNode extends EditorModule {
      */
     forcePointSymmetric: 'none' | 'angle' | 'entire';
   } = {
-      mode: Mode.MOVE,
-      forcePointSymmetric: 'none',
-    };
+    mode: Mode.MOVE,
+    forcePointSymmetric: 'none',
+  };
 
   vizPath: VizPath | null = null;
 
@@ -87,10 +92,10 @@ class EditorNode extends EditorModule {
     points: fabric.Object[];
     lines: fabric.Line[];
   } = {
-      nodes: [],
-      points: [],
-      lines: [],
-    };
+    nodes: [],
+    points: [],
+    lines: [],
+  };
 
   private _initPathNodes() {
     const objects: fabric.Object[] = [];
@@ -182,7 +187,7 @@ class EditorNode extends EditorModule {
         object.off('added', onAddedNode);
         object.off('removed', onRemovedNode);
         node.unobserve(object.name);
-        observe(object, ['left', 'top'], () => { });
+        observe(object, ['left', 'top'], () => {});
         this._abandonedPool.nodes.push(object);
       };
 
@@ -410,7 +415,7 @@ class EditorNode extends EditorModule {
                   pointCenter.x - nodeCenter.x
                 ) *
                   180) /
-                Math.PI,
+                  Math.PI,
             });
 
             // 响应式更改指令信息
@@ -468,7 +473,7 @@ class EditorNode extends EditorModule {
         point.off('removed', onRemovedPoint);
 
         controller.unobserve(point.name);
-        observe(point, ['left', 'top'], () => { });
+        observe(point, ['left', 'top'], () => {});
         this._abandonedPool.points.push(point);
       };
       point.on('added', onAddedPoint);
@@ -942,101 +947,105 @@ class EditorNode extends EditorModule {
   /**
    * 初始路径点添加事件
    */
-  // private _initAddEvents() {
-  //   if (!this.editor) return;
+  private _initAddEvents() {
+    if (!this.editor) return;
 
-  //   const editorPath = this.vizPath?.context.find(EditorPath);
-  //   if (!editorPath) return;
+    const editorPath = this.vizPath?.context.find(EditorPath);
+    if (!editorPath) return;
 
-  //   let newNode: PathwayNode<ResponsiveCrood> | undefined;
-  //   let newNodeObject: fabric.Object | undefined;
-  //   this.editor.on('canvas', 'mouse:down:before', (event) => {
-  //     const { target, pointer } = event;
-  //     if (target) return;
+    let newNode: PathwayNode<ResponsiveCrood> | undefined;
+    let newNodeObject: fabric.Object | undefined;
+    this.editor.on('canvas', 'mouse:down:before', (event) => {
+      if (this.setting.mode !== Mode.ADD) return;
 
-  //     if (this.setting.mode !== Mode.ADD) return;
+      const { target, pointer } = event;
+      if (target) {
+        if (this.activeNodes.length === 1)
+          this.link(
+            this.objectNodeMap.get(this.activeNodes[0]!)!,
+            this.objectNodeMap.get(target)!
+          );
+        return;
+      }
 
-  //     newNodeObject = this.add({ left: pointer.x, top: pointer.y });
-  //     newNode = this.objectNodeMap.get(newNodeObject!);
-  //   });
-  //   this.editor.on('canvas', 'mouse:down', (event) => {
-  //     if (!newNodeObject) return;
-  //     this.focus(newNodeObject);
-  //     this.editor!.canvas!.selection = false;
-  //   });
-  //   this.editor.on('canvas', 'mouse:move', (event) => {
-  //     const { e, target, pointer } = event;
+      newNodeObject = this.add({ left: pointer.x, top: pointer.y });
+      newNode = this.objectNodeMap.get(newNodeObject!);
+    });
+    this.editor.on('canvas', 'mouse:down', (event) => {
+      if (!newNodeObject) return;
+      this.focus(newNodeObject);
+    });
+    // this.editor.on('canvas', 'mouse:move', (event) => {
+    //   const { e, target, pointer } = event;
 
-  //     if (newNode && newNodeObject) {
-  //       // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-  //       if (newNodeObject.containsPoint(event.pointer)) return;
+    //   if (newNode && newNodeObject) {
+    //     // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+    //     if (newNodeObject.containsPoint(event.pointer)) return;
 
-  //       const position = { left: pointer.x, top: pointer.y };
-  //       const antiPosition = {
-  //         left: newNodeObject.left! - (pointer.x - newNodeObject.left!),
-  //         top: newNodeObject.top! - (pointer.y - newNodeObject.top!),
-  //       };
-  //       const newCrood = editorPath.calcRelativeCrood(
-  //         position,
-  //         editorPath.nodePathMap.get(newNode.node!)!.originPath
-  //       );
+    //     const position = { left: pointer.x, top: pointer.y };
+    //     const antiPosition = {
+    //       left: newNodeObject.left! - (pointer.x - newNodeObject.left!),
+    //       top: newNodeObject.top! - (pointer.y - newNodeObject.top!),
+    //     };
+    //     const newCrood = editorPath.calcRelativeCrood(
+    //       position,
+    //       editorPath.nodePathMap.get(newNode.node!)!.originPath
+    //     );
 
-  //       this.vizPath?.replace(newNode.node!, [
-  //         InstructionType.QUADRATIC_CURCE,
-  //         newCrood.x,
-  //         newCrood.y,
-  //         newNode.node?.x,
-  //         newNode.node?.y,
-  //       ] as Instruction);
-  //       newNodeObject = this.nodeObjectMap.get(newNode!)!;
+    //     this.vizPath?.replace(newNode.node!, [
+    //       InstructionType.QUADRATIC_CURCE,
+    //       newCrood.x,
+    //       newCrood.y,
+    //       newNode.node?.x,
+    //       newNode.node?.y,
+    //     ] as Instruction);
+    //     newNodeObject = this.nodeObjectMap.get(newNode!)!;
 
-  //       // const { next } = this.vizPath?.getNeighboringNodes(newNode!) ?? {};
-  //       // if (next) {
-  //       //   const nextHandlerCrood = editorPath.calcRelativeCrood(
-  //       //     position,
-  //       //     editorPath.nodePathMap.get(next.node!)!.originPath
-  //       //   );
-  //       //   this.vizPath?.replace(next.node!, [
-  //       //     InstructionType.QUADRATIC_CURCE,
-  //       //     nextHandlerCrood.x,
-  //       //     nextHandlerCrood.y,
-  //       //     next.node?.x,
-  //       //     next.node?.y,
-  //       //   ] as Instruction);
-  //       // }
+    //     // const { next } = this.vizPath?.getNeighboringNodes(newNode!) ?? {};
+    //     // if (next) {
+    //     //   const nextHandlerCrood = editorPath.calcRelativeCrood(
+    //     //     position,
+    //     //     editorPath.nodePathMap.get(next.node!)!.originPath
+    //     //   );
+    //     //   this.vizPath?.replace(next.node!, [
+    //     //     InstructionType.QUADRATIC_CURCE,
+    //     //     nextHandlerCrood.x,
+    //     //     nextHandlerCrood.y,
+    //     //     next.node?.x,
+    //     //     next.node?.y,
+    //     //   ] as Instruction);
+    //     // }
 
-  //       const { point } = this.controllers.find((i) => i.type === 'pre') ?? {};
-  //       if (point) fireMouseUpAndSelect(point);
+    //     const { point } = this.controllers.find((i) => i.type === 'pre') ?? {};
+    //     if (point) fireMouseUpAndSelect(point);
 
-  //       newNodeObject = undefined;
-  //       newNode = undefined;
-  //       this.editor!.canvas!.selection = true;
-  //     }
-  //   });
-  //   this.editor.on('canvas', 'mouse:up', () => {
-  //     newNodeObject = undefined;
-  //     newNode = undefined;
-  //     this.editor!.canvas!.selection = true;
-  //   });
-  // }
+    //     newNodeObject = undefined;
+    //     newNode = undefined;
+    //   }
+    // });
+    this.editor.on('canvas', 'mouse:up', () => {
+      newNodeObject = undefined;
+      newNode = undefined;
+    });
+  }
 
   /**
    * 删除节点或变换点
-   * 
+   *
    * @note
-   * 
+   *
    * 只有以下两种情况是有效删除操作：
-   * 
+   *
    * 1） 删除1~n个路径节点:
-   * 
+   *
    * ① 删除单一点时，删除节点，并将存在前后邻近节点的前提下连接前后节点。
-   * 
+   *
    * ② 删除多点时，删除点与点间的连线实现拆分路径效果。
-   * 
+   *
    * ③ 删除的点包含路径上所有点时，直接删除整个路径
-   * 
+   *
    * 2）删除1个变换点，实现曲线路径降级为直线路径
-   * 
+   *
    * @param objects 点对象(路径节点、变换点)列表
    */
   remove(...objects: fabric.Object[]) {
@@ -1045,8 +1054,12 @@ class EditorNode extends EditorModule {
     const canvas = this.editor?.canvas;
     if (!canvas) return;
 
-    const nodeObjects = objects.filter(i => i[VizPath.symbol] === VizPathSymbalType.NODE);
-    const pointObjects = objects.filter(i => i[VizPath.symbol] === VizPathSymbalType.CONTROLLER_POINT);
+    const nodeObjects = objects.filter(
+      (i) => i[VizPath.symbol] === VizPathSymbalType.NODE
+    );
+    const pointObjects = objects.filter(
+      (i) => i[VizPath.symbol] === VizPathSymbalType.CONTROLLER_POINT
+    );
 
     if (nodeObjects.length) {
       const removeNodes: ResponsiveCrood[] = [];
@@ -1059,34 +1072,54 @@ class EditorNode extends EditorModule {
         removeNodes.push(node);
       });
       this.vizPath.remove(...removeNodes);
-    }
-    else if (pointObjects.length === 1) {
-      const { type, pathwayNode } = this.controllers.find(i => i.point === pointObjects[0])!;
+    } else if (pointObjects.length === 1) {
+      const { type, pathwayNode } = this.controllers.find(
+        (i) => i.point === pointObjects[0]
+      )!;
       this.degrade(pathwayNode, type);
     }
   }
 
   /**
    * 路径降级
+   *
+   * @note
+   *
+   * 二阶贝塞尔曲线会降级为直线；三阶贝塞尔曲线会先降级为二阶贝塞尔曲线，再降级才会转化为直线。
    */
-  degrade(pathwayNode: PathwayNode<ResponsiveCrood>, direction: 'pre' | 'next' | 'both') {
+  degrade(
+    pathwayNode: PathwayNode<ResponsiveCrood>,
+    direction: 'pre' | 'next' | 'both'
+  ) {
     if (!this.vizPath) return;
 
-    const { pre, next } = this.vizPath.getNeighboringInstructions(pathwayNode, true);
+    const { pre, next } = this.vizPath.getNeighboringInstructions(
+      pathwayNode,
+      true
+    );
 
     const directionNodeMap = {
-      pre: pathwayNode.instruction[0] === InstructionType.START ? pre : pathwayNode,
+      pre:
+        pathwayNode.instruction[0] === InstructionType.START
+          ? pre
+          : pathwayNode,
       next,
     };
 
-    const targets: [direction: 'pre' | 'next', pathwayNode: PathwayNode<ResponsiveCrood>][] = [];
+    const targets: [
+      direction: 'pre' | 'next',
+      pathwayNode: PathwayNode<ResponsiveCrood>
+    ][] = [];
 
     if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
-      targets.push(['pre', directionNodeMap.pre])
+      targets.push(['pre', directionNodeMap.pre]);
     }
 
-    if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
-      targets.push(['next', directionNodeMap.next])
+    if (
+      (direction === 'both' || direction === 'next') &&
+      directionNodeMap.next
+    ) {
+      targets.push(['next', directionNodeMap.next]);
     }
 
     targets.forEach(([direction, pathwayNode]) => {
@@ -1094,11 +1127,11 @@ class EditorNode extends EditorModule {
       newInstruction[0] = {
         [InstructionType.QUADRATIC_CURCE]: InstructionType.LINE,
         [InstructionType.BEZIER_CURVE]: InstructionType.QUADRATIC_CURCE,
-      }[newInstruction[0]]
+      }[newInstruction[0]];
       newInstruction.splice({ pre: -4, next: 1 }[direction], 2);
-  
+
       this.vizPath!.replace(pathwayNode, newInstruction);
-    })
+    });
   }
 
   move(
@@ -1112,7 +1145,7 @@ class EditorNode extends EditorModule {
     const pathwayNode = this.objectNodeMap.get(object);
     if (!pathwayNode) return;
 
-    const { node, section } = pathwayNode;
+    const { node } = pathwayNode;
 
     const editorPath = this.vizPath?.context.find(EditorPath);
     if (!editorPath) return;
@@ -1129,12 +1162,12 @@ class EditorNode extends EditorModule {
       scaleY: newScaleY,
       angle: newAngle,
     } = selectionGroup
-        ? {
+      ? {
           scaleX: 1 / selectionGroup.scaleX!,
           scaleY: 1 / selectionGroup.scaleY!,
           angle: -selectionGroup.angle!,
         }
-        : { scaleX: 1, scaleY: 1, angle: 0 };
+      : { scaleX: 1, scaleY: 1, angle: 0 };
 
     object
       .set({
@@ -1185,28 +1218,96 @@ class EditorNode extends EditorModule {
     object.canvas?.requestRenderAll();
   }
 
+  /**
+   * 添加新的路径节点
+   *
+   * @note
+   *
+   * 1）在选中单一路径节点后，将在该点后添加新的路径节点
+   *
+   * 2）在未选中节点/选中多个节点时，将直接以该参数位置创建新的起始点以开启一段新的路径
+   *
+   * @param position 新节点的画布绝对位置
+   */
   add(position: { left: number; top: number }) {
-    if (!this.vizPath) return;
+    const vizPath = this.vizPath;
+    if (!vizPath) return;
 
-    if (this.activeNodes.length !== 1) return;
+    if (this.activeNodes.length === 1) {
+      const editorPath = vizPath.context.find(EditorPath);
+      if (!editorPath) return;
 
-    const editorPath = this.vizPath?.context.find(EditorPath);
-    if (!editorPath) return;
+      const node = this.activeNodes[0];
 
-    const node = this.activeNodes[0];
+      const pathwayNode = this.objectNodeMap.get(node);
+      if (!pathwayNode) return;
 
-    const pathwayNode = this.objectNodeMap.get(node);
-    if (!pathwayNode) return;
+      const newCrood = editorPath.calcRelativeCrood(
+        position,
+        editorPath.nodePathMap.get(pathwayNode.node!)!.originPath
+      );
 
-    const newCrood = editorPath.calcRelativeCrood(
-      position,
-      editorPath.nodePathMap.get(pathwayNode.node!)!.originPath
+      const addPathwayNode = vizPath.insert(pathwayNode.node!, newCrood);
+      if (!addPathwayNode) return;
+
+      return this.nodeObjectMap.get(addPathwayNode);
+    } else {
+      const pathway = VizPathContext.parsePathFromObject(
+        new fabric.Path('M 0 0', position)
+      );
+      const responsivePathway = vizPath.draw(pathway);
+      return this.nodeObjectMap.get(responsivePathway[0].section[0]);
+    }
+  }
+
+  /**
+   * 连接两个节点，可以实现路径闭合和路径拼接，仅在两点都是路径端点（即首尾点）时生效。
+   *
+   * @param source 当前点
+   * @param target 目标点
+   */
+  link(
+    source: PathwayNode<ResponsiveCrood>,
+    target: PathwayNode<ResponsiveCrood>
+  ) {
+    const vizPath = this.vizPath;
+    if (!vizPath) return;
+
+    if (!vizPath.isTerminalNode(source) || !vizPath.isTerminalNode(target))
+      return;
+
+    // 自身合并，直接加'z'闭合指令即可
+    if (source.section === target.section) {
+      vizPath.close(source);
+      return;
+    }
+
+    // 不同路径需要进行合并
+    let sourcePath = source.section.map((i) => i.instruction);
+    let targetPath = target.section.map((i) => i.instruction);
+    let mergePath: Instruction[] | undefined;
+
+    if (source.instruction === sourcePath[0]) {
+      sourcePath = reversePath(sourcePath);
+    }
+    if (target.instruction === targetPath[targetPath.length - 1]) {
+      targetPath = reversePath(targetPath);
+    }
+    targetPath.splice(0, 1, [
+      InstructionType.LINE,
+      targetPath[0][1],
+      targetPath[0][2]
+    ]);
+    mergePath = sourcePath.concat(targetPath);
+
+    // 合并后添加回路径段集合
+    vizPath.clear(source.section);
+    vizPath.clear(target.section);
+    vizPath.draw(
+      VizPathContext.parsePathFromPathD(
+        (fabric.util as any).joinPath(mergePath)
+      )
     );
-
-    const addPathwayNode = this.vizPath.insert(pathwayNode.node!, newCrood);
-    if (!addPathwayNode) return;
-
-    return this.nodeObjectMap.get(addPathwayNode);
   }
 
   focus(...selectedObjects: fabric.Object[]) {
@@ -1293,8 +1394,8 @@ class EditorNode extends EditorModule {
     this._initSelectEvents();
     this._initDrawEvents();
     this._initClearEvents();
+    this._initAddEvents();
     // this._initConvertEvents();
-    // this._initAddEvents();
   }
 }
 

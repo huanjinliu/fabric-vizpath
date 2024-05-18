@@ -122,7 +122,12 @@ class VizPathContext {
         section[section.length - 1][0] = InstructionType.CLOSE;
       }
 
-      // ④ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
+      // ④ 小于两个点的闭合路径直接解除闭合
+      if (section.length <= 2 && section[section.length - 1][0] === InstructionType.CLOSE) {
+        section.pop();
+      }
+
+      // ⑤ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
       const isAutoClose =
         section[section.length - 1][0] === InstructionType.CLOSE;
       if (isAutoClose) {

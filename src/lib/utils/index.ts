@@ -15,4 +15,5 @@ export { default as loadSVGToPathFromURL } from './fabric-shape-to-path';
 export { default as parsePathJSON } from './parse-path-json';
 export { default as clearPathOffset } from './clear-path-offset';
 export { default as reinitializePath } from './reinitialize-path';
+export { default as reversePath } from './reverse-path';
 export { default as getCubicFromQuadratic } from './get-cubic-from-quadratic';
