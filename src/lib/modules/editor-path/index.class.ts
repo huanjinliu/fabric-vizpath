@@ -8,7 +8,7 @@ import VizPath, {
 import EditorModule from "../base.class";
 import Editor from "../editor/index.class";
 import EditorUI, { type ThemeDecorator } from "../editor-ui/index.class";
-import { parsePathJSON, reinitializePath } from "@utils";
+import { parsePathJSON, repairPath } from "@utils";
 
 class EditorPath extends EditorModule {
   static ID = "editor-path";
@@ -77,7 +77,7 @@ class EditorPath extends EditorModule {
    * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
    */
   updatePathStatus(path: fabric.Path) {
-    reinitializePath(path);
+    repairPath(path);
 
     path.canvas?.requestRenderAll();
   }

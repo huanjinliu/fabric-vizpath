@@ -1273,6 +1273,9 @@ class EditorNode extends EditorModule {
     const vizPath = this.vizPath;
     if (!vizPath) return;
 
+    const editorPath = vizPath.context.find(EditorPath);
+    if (!editorPath) return;
+
     if (!vizPath.isTerminalNode(source) || !vizPath.isTerminalNode(target))
       return;
 
@@ -1298,16 +1301,31 @@ class EditorNode extends EditorModule {
       targetPath[0][1],
       targetPath[0][2]
     ]);
+    targetPath.map((item) => {
+      const instruction = item;
+      for (let i = 0; i < instruction.length - 1; i += 2) {
+        const position = editorPath.calcAbsolutePosition(
+          new fabric.Point(
+            instruction[i + 1] as number,
+            instruction[i + 2] as number
+          ),
+          vizPath.getPathway(target.section)!.originPath
+        )
+        const crood = editorPath.calcRelativeCrood(
+          position,
+          vizPath.getPathway(source.section)!.originPath
+        )
+        instruction[i + 1] = crood.x;
+        instruction[i + 2] = crood.y;
+      }
+    })
     mergePath = sourcePath.concat(targetPath);
 
     // 合并后添加回路径段集合
-    vizPath.clear(source.section);
-    vizPath.clear(target.section);
-    vizPath.draw(
-      VizPathContext.parsePathFromPathD(
-        (fabric.util as any).joinPath(mergePath)
-      )
-    );
+    vizPath.onceRerenderOriginPath(() => {
+      vizPath.clear(target.section);
+      vizPath.replacePathwaySections(vizPath.getPathway(source.section)!, [mergePath] as Instruction[][]);
+    });
   }
 
   focus(...selectedObjects: fabric.Object[]) {

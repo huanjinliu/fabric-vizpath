@@ -7,7 +7,7 @@ import {
   InstructionType,
   type PathwayNode,
 } from '.';
-import { parsePathJSON, reinitializePath } from '@utils';
+import { parsePathJSON, reinitializePath, repairPath } from '@utils';
 
 export enum VizPathSymbalType {
   PATH = 'path',
@@ -200,48 +200,47 @@ class VizPath {
   }
 
   /**
-   * 输出路径
+   * 提取当前路径的信息
    */
-  toPaths(pathway: ResponsivePathway = this.pathway) {
-    // return pathway.map(({ section, originPath }) => {
-    //   // let matrix = [...originPath.calcOwnMatrix()];
-    //   const startInstruction = section[0].node!;
-    //   let matrix = [1, 0, 0, 1, -startInstruction.x, -startInstruction.y];
-    //   // matrix = fabric.util.invertTransform(matrix)
-    //   // console.log(matrix);
-    //   // matrix[4] -= originPath.pathOffset.x;
-    //   // matrix[5] -= originPath.pathOffset.y;
+  exportPathwayD(
+    pathway: ResponsivePathway = this.pathway,
+    withoutMatrix = false
+  ) {
+    return pathway
+      .map(({ section, originPath }) => {
+        const matrix = [...originPath.calcOwnMatrix()] as Matrix;
+        const instructions = section.map((item) => {
+          if (withoutMatrix) return item.instruction;
+          const instruction = [...item.instruction];
+          for (let i = 0; i < instruction.length - 1; i += 2) {
+            const point = fabric.util.transformPoint(
+              new fabric.Point(
+                instruction[i + 1] as number,
+                instruction[i + 2] as number
+              ),
+              matrix
+            );
+            const offset = fabric.util.transformPoint(
+              originPath.pathOffset,
+              [...matrix.slice(0, 4), 0, 0]
+            );
 
-    //   const instructions = section.map((item) => {
-    //     const instruction = [...item.instruction];
-    //     for (let i = 0; i < instruction.length - 1; i += 2) {
-    //       const { x, y } = fabric.util.transformPoint(
-    //         new fabric.Point(
-    //           instruction[i + 1] as number,
-    //           instruction[i + 2] as number
-    //         ),
-    //         matrix
-    //       );
-    //       instruction[i + 1] = x;
-    //       instruction[i + 2] = y;
-    //     }
-    //     return instruction;
-    //   });
-
-    //   return instructions;
-    // });
-    return pathway.map(({ section }) => section.map((i) => i.instruction));
+            instruction[i + 1] = point.x - offset.x;
+            instruction[i + 2] = point.y - offset.y;
+          }
+          return instruction;
+        });
+        return (fabric.util as any).joinPath(instructions);
+      })
+      .join(' ');
   }
 
   /**
    * 输出路径指令
    */
-  toPathD(pathway: ResponsivePathway = this.pathway) {
-    // console.log(
-    //   (fabric.util as any).joinPath(pathway.map(({ section }) => section.map((i) => i.instruction)))
-    // )
-    return (fabric.util as any).joinPath(this.toPaths(pathway));
-  }
+  // toPathD(pathway: ResponsivePathway = this.pathway) {
+  //   return (fabric.util as any).joinPath(this.toPaths(pathway)) as string;
+  // }
 
   /**
    * 获取路径或指令列表所在的路径
@@ -488,9 +487,6 @@ class VizPath {
           }
         }
 
-        if (pathwayNode.instruction[0] === InstructionType.START) {
-          console.log('next 1', controllers.next);
-        }
         // 后曲线变换点
         if (
           next &&
@@ -557,7 +553,7 @@ class VizPath {
    * 该方法使用initialize重新初始化路径，使其获取正确的尺寸，但偏移是错的，该方法同时修正偏移。
    */
   rerenderOriginPath(path: fabric.Path) {
-    reinitializePath(path);
+    repairPath(path);
     path.canvas?.requestRenderAll();
 
     this._fire('update', this.getPathway(path)!);
@@ -596,9 +592,14 @@ class VizPath {
    * 在回调中执行，可以让过程中的路径重渲染操作只执行一次
    */
   onceRerenderOriginPath(callback: () => void) {
-    this._onceRerenderPaths = new Set();
+    // 外层设置了一次渲染则直接进行回调即可
+    if (this._onceRerenderPaths) {
+      callback();
+      return;
+    }
+    this._onceRerenderPaths = new Set([]);
     callback();
-    const paths = Array.from(this._onceRerenderPaths);
+    const paths = Array.from(this._onceRerenderPaths.values());
     this._onceRerenderPaths = null;
     paths.forEach(this._rerenderOriginPath.bind(this));
   }
@@ -606,7 +607,7 @@ class VizPath {
   /**
    * 使用新的路径信息绘制旧路径，多个路径段则会使原路径拆分成多个
    */
-  private _replacePathwaySection(
+  replacePathwaySections(
     pathway: ResponsivePathway[number],
     sections: Instruction[][]
   ) {
@@ -621,7 +622,7 @@ class VizPath {
       );
       path.set({ ...styles, ...layout });
       path.path = section as unknown as fabric.Point[];
-      reinitializePath(path);
+      repairPath(path);
 
       const _section: PathwayNode[] = [];
       section.forEach((instruction) => {
@@ -637,8 +638,11 @@ class VizPath {
       };
     });
 
-    this.clear(originPath);
-    return this.draw(newPathway);
+    this.onceRerenderOriginPath(() => {
+      this.clear(originPath);
+      this.draw(newPathway);
+      this._rerenderOriginPath(originPath);
+    });
   }
 
   /**
@@ -858,7 +862,7 @@ class VizPath {
 
     sections.forEach((i) => {
       if (i.section.length) {
-        this._replacePathwaySection(i.pathway, i.section);
+        this.replacePathwaySections(i.pathway, i.section);
       } else {
         this.clear(i.pathway.originPath);
       }
@@ -969,10 +973,7 @@ class VizPath {
     const endNode = pathway.section[pathway.section.length - 1].node!;
 
     // 需要考虑添加闭合重叠点
-    if (
-      startNode.x !== endNode.x ||
-      startNode.y !== endNode.y
-    ) {
+    if (startNode.x !== endNode.x || startNode.y !== endNode.y) {
       updateCommands.push({
         type: 'add',
         index: pathway.section.length - 1,
@@ -984,7 +985,7 @@ class VizPath {
       type: 'add',
       index: pathway.section.length + updateCommands.length - 1,
       instruction: [InstructionType.CLOSE],
-    })
+    });
 
     this._updatePathwayByCommands(pathway, updateCommands);
   }
@@ -1037,6 +1038,22 @@ class VizPath {
   }
 
   /**
+   * 使用路径更新本地路径对象
+   */
+  updateLocalPath(pathway: ResponsivePathway, path: fabric.Path) {
+    const d = this.exportPathwayD(pathway);
+
+    path.set({
+      scaleX: 1,
+      scaleY: 1,
+      angle: 0,
+    });
+    path.initialize(d as any);
+
+    path.canvas?.renderAll();
+  }
+
+  /**
    * 清除路径
    */
   clear(target: PathwayNode[] | fabric.Path) {
@@ -1059,6 +1076,8 @@ class VizPath {
     });
 
     this.pathway.splice(index, 1);
+
+    this._rerenderOriginPath(pathway.originPath);
 
     this._fire('clear', [pathway]);
   }

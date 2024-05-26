@@ -7,7 +7,7 @@ import {
   getCubicFromQuadratic,
   loadSVGToPathFromURL,
   parsePathJSON,
-  reinitializePath,
+  repairPath,
 } from '@utils';
 import type EditorModule from './modules/base.class';
 
@@ -107,7 +107,7 @@ class VizPathContext {
     const pathway: Pathway = sections.map(({ section, originPath }) => {
       // ① 清除组合元素对路径的偏移影响
       clearPathOffset(originPath);
-      reinitializePath(originPath);
+      repairPath(originPath);
 
       // ② 修正头指令，头指令必须是M开始指令，其他的也没效果
       if (section[0][0] !== InstructionType.START) {

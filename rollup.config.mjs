@@ -1,3 +1,5 @@
+import path from 'path';
+import fs from 'fs';
 import resolve from '@rollup/plugin-node-resolve';
 import babel from '@rollup/plugin-babel';
 import commonjs from '@rollup/plugin-commonjs';
@@ -7,7 +9,6 @@ import terser from '@rollup/plugin-terser';
 import serve from 'rollup-plugin-serve';
 import livereload from 'rollup-plugin-livereload';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
-import multiInput from 'rollup-plugin-multi-input';
 
 const build_umd = () => ({
   input: 'src/index.ts',
@@ -38,7 +39,7 @@ const build_umd = () => ({
   onwarn: (warning, warn) => {
     if (warning.code === 'CIRCULAR_DEPENDENCY') return;
     warn(warning);
-  }
+  },
 });
 
 const build_es_lib = () => ({
@@ -64,33 +65,40 @@ const build_es_lib = () => ({
   onwarn: (warning, warn) => {
     if (warning.code === 'CIRCULAR_DEPENDENCY') return;
     warn(warning);
-  }
+  },
 });
 
-const build_es_theme = () => ({
-  input: 'src/themes/**/index.ts',
-  output: {
-    dir: 'dist',
-    format: 'es',
-  },
-  plugins: [
-    multiInput.default(),
-    resolve(),
-    peerDepsExternal(),
-    commonjs(),
-    json(),
-    typescript({
-      declaration: false,
-    }),
-    babel({
-      babelHelpers: 'bundled',
-    }),
-  ],
-  onwarn: (warning, warn) => {
-    if (warning.code === 'CIRCULAR_DEPENDENCY') return;
-    warn(warning);
-  }
-});
+const build_es_theme = () => {
+  const themeBaseDir = 'src/themes';
+  const themes = fs.readdirSync(path.resolve(themeBaseDir));
+  return {
+    input: themes.reduce((map, theme) => {
+      map[`themes/${theme}/index`] = `${themeBaseDir}/${theme}/index.ts`;
+      return map;
+    }, {}),
+    output: {
+      dir: 'dist',
+      format: 'es',
+      preserveModules: true,
+    },
+    plugins: [
+      resolve(),
+      peerDepsExternal(),
+      commonjs(),
+      json(),
+      typescript({
+        declaration: false,
+      }),
+      babel({
+        babelHelpers: 'bundled',
+      }),
+    ],
+    onwarn: (warning, warn) => {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+      warn(warning);
+    },
+  };
+};
 
 const build_serve = () => {
   const config = {
@@ -119,7 +127,7 @@ const build_serve = () => {
     onwarn: (warning, warn) => {
       if (warning.code === 'CIRCULAR_DEPENDENCY') return;
       warn(warning);
-    }
+    },
   };
   if (process.env.ROLLUP_WATCH) {
     config.plugins.push(
