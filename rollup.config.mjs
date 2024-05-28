@@ -1,25 +1,25 @@
-import path from 'path';
-import fs from 'fs';
-import resolve from '@rollup/plugin-node-resolve';
-import babel from '@rollup/plugin-babel';
-import commonjs from '@rollup/plugin-commonjs';
-import typescript from '@rollup/plugin-typescript';
-import json from '@rollup/plugin-json';
-import terser from '@rollup/plugin-terser';
-import serve from 'rollup-plugin-serve';
-import livereload from 'rollup-plugin-livereload';
-import peerDepsExternal from 'rollup-plugin-peer-deps-external';
+import path from "path";
+import fs from "fs";
+import resolve from "@rollup/plugin-node-resolve";
+import babel from "@rollup/plugin-babel";
+import commonjs from "@rollup/plugin-commonjs";
+import typescript from "@rollup/plugin-typescript";
+import json from "@rollup/plugin-json";
+import terser from "@rollup/plugin-terser";
+import serve from "rollup-plugin-serve";
+import livereload from "rollup-plugin-livereload";
+import peerDepsExternal from "rollup-plugin-peer-deps-external";
 
 const build_umd = () => ({
-  input: 'src/index.ts',
+  input: "src/index.ts",
   output: [
     {
-      file: 'dist/index.js',
-      format: 'umd',
+      file: "dist/index.js",
+      format: "umd",
       sourcemap: true,
-      name: 'FabricPathEditor',
+      name: "FabricPathEditor",
       globals: {
-        fabric: 'fabric',
+        fabric: "fabric",
       },
     },
   ],
@@ -29,25 +29,25 @@ const build_umd = () => ({
     commonjs(),
     json(),
     typescript({
-      exclude: ['src/example/*'],
+      exclude: ["src/example/*"],
     }),
     babel({
-      babelHelpers: 'bundled',
+      babelHelpers: "bundled",
     }),
     terser(),
   ],
   onwarn: (warning, warn) => {
-    if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+    if (warning.code === "CIRCULAR_DEPENDENCY") return;
     warn(warning);
   },
 });
 
 const build_es_lib = () => ({
-  input: 'src/index.ts',
+  input: "src/index.ts",
   output: [
     {
-      file: 'dist/index.es.js',
-      format: 'es',
+      file: "dist/index.es.js",
+      format: "es",
     },
   ],
   plugins: [
@@ -59,26 +59,30 @@ const build_es_lib = () => ({
       declaration: false,
     }),
     babel({
-      babelHelpers: 'bundled',
+      babelHelpers: "bundled",
     }),
   ],
   onwarn: (warning, warn) => {
-    if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+    if (warning.code === "CIRCULAR_DEPENDENCY") return;
     warn(warning);
   },
 });
 
 const build_es_theme = () => {
-  const themeBaseDir = 'src/themes';
+  const themeBaseDir = "src/themes";
   const themes = fs.readdirSync(path.resolve(themeBaseDir));
+  const inputs = themes.reduce((map, theme) => {
+    const themeEntranceFile = `${themeBaseDir}/${theme}/index.ts`;
+    if (fs.existsSync(path.join(process.cwd(), themeEntranceFile))) {
+      map[`themes/${theme}/index`] = themeEntranceFile;
+    }
+    return map;
+  }, {});
   return {
-    input: themes.reduce((map, theme) => {
-      map[`themes/${theme}/index`] = `${themeBaseDir}/${theme}/index.ts`;
-      return map;
-    }, {}),
+    input: inputs,
     output: {
-      dir: 'dist',
-      format: 'es',
+      dir: "dist",
+      format: "es",
       preserveModules: true,
     },
     plugins: [
@@ -90,11 +94,11 @@ const build_es_theme = () => {
         declaration: false,
       }),
       babel({
-        babelHelpers: 'bundled',
+        babelHelpers: "bundled",
       }),
     ],
     onwarn: (warning, warn) => {
-      if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+      if (warning.code === "CIRCULAR_DEPENDENCY") return;
       warn(warning);
     },
   };
@@ -102,13 +106,13 @@ const build_es_theme = () => {
 
 const build_serve = () => {
   const config = {
-    input: 'src/example/index.ts',
+    input: "src/example/index.ts",
     output: [
       {
-        file: 'docs/index.js',
-        format: 'iife',
+        file: "docs/index.js",
+        format: "iife",
         globals: {
-          fabric: 'fabric',
+          fabric: "fabric",
         },
       },
     ],
@@ -121,11 +125,11 @@ const build_serve = () => {
         declaration: false,
       }),
       babel({
-        babelHelpers: 'bundled',
+        babelHelpers: "bundled",
       }),
     ],
     onwarn: (warning, warn) => {
-      if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+      if (warning.code === "CIRCULAR_DEPENDENCY") return;
       warn(warning);
     },
   };
@@ -133,11 +137,11 @@ const build_serve = () => {
     config.plugins.push(
       serve({
         open: true,
-        contentBase: 'docs/',
+        contentBase: "docs/",
         verbose: true,
       }),
       livereload({
-        watch: ['docs'],
+        watch: ["docs"],
         verbose: false,
       })
     );
@@ -149,7 +153,7 @@ const configs = {
   umd: build_umd(),
   es_lib: build_es_lib(),
   es_theme: build_es_theme(),
-  serve: process.env.ENV === 'dev' ? build_serve() : undefined,
+  serve: process.env.ENV === "dev" ? build_serve() : undefined,
 };
 
 export default Object.values(configs).filter(Boolean);

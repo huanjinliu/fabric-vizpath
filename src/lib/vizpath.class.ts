@@ -202,31 +202,26 @@ class VizPath {
   /**
    * 提取当前路径的信息
    */
-  exportPathwayD(
-    pathway: ResponsivePathway = this.pathway,
-    withoutMatrix = false
-  ) {
+  exportPathwayD(pathway: ResponsivePathway = this.pathway) {
     return pathway
       .map(({ section, originPath }) => {
         const matrix = [...originPath.calcOwnMatrix()] as Matrix;
+        const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
         const instructions = section.map((item) => {
-          if (withoutMatrix) return item.instruction;
           const instruction = [...item.instruction];
           for (let i = 0; i < instruction.length - 1; i += 2) {
-            const point = fabric.util.transformPoint(
-              new fabric.Point(
-                instruction[i + 1] as number,
-                instruction[i + 2] as number
-              ),
-              matrix
-            );
+            const point = fabric.util.transformPoint(new fabric.Point(
+              instruction[i + 1] as number,
+              instruction[i + 2] as number
+            ), matrix);
             const offset = fabric.util.transformPoint(
               originPath.pathOffset,
-              [...matrix.slice(0, 4), 0, 0]
+              matrixWithoutTranslate
             );
-
-            instruction[i + 1] = point.x - offset.x;
-            instruction[i + 2] = point.y - offset.y;
+            point.x -= offset.x;
+            point.y -= offset.y;
+            instruction[i + 1] = point.x;
+            instruction[i + 2] = point.y;
           }
           return instruction;
         });
@@ -1035,22 +1030,6 @@ class VizPath {
     });
 
     return this.draw([pathway]);
-  }
-
-  /**
-   * 使用路径更新本地路径对象
-   */
-  updateLocalPath(pathway: ResponsivePathway, path: fabric.Path) {
-    const d = this.exportPathwayD(pathway);
-
-    path.set({
-      scaleX: 1,
-      scaleY: 1,
-      angle: 0,
-    });
-    path.initialize(d as any);
-
-    path.canvas?.renderAll();
   }
 
   /**

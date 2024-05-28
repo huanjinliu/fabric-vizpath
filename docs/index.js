@@ -3390,13 +3390,14 @@
     path.initialize(_d);
     path.path = instructions;
     // 计算路径偏移差值
-    var distance = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - (path.width - oldInfo.width) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - (path.height - oldInfo.height) / 2 - oldInfo.pathOffset.y), [].concat(_toConsumableArray(path.calcOwnMatrix().slice(0, 4)), [0, 0]));
+    var repairOffset = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - (path.width - oldInfo.width) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - (path.height - oldInfo.height) / 2 - oldInfo.pathOffset.y), [].concat(_toConsumableArray(path.calcOwnMatrix().slice(0, 4)), [0, 0]));
     // 设置回正确的偏移位置
     path.set({
-      left: oldInfo.left + distance.x,
-      top: oldInfo.top + distance.y
+      left: oldInfo.left + repairOffset.x,
+      top: oldInfo.top + repairOffset.y
     });
     path.setCoords();
+    return repairOffset;
   };
 
   /**
@@ -3572,19 +3573,20 @@
       key: "exportPathwayD",
       value: function exportPathwayD() {
         var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
-        var withoutMatrix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
         return pathway.map(function (_ref3) {
           var section = _ref3.section,
             originPath = _ref3.originPath;
           var matrix = _toConsumableArray(originPath.calcOwnMatrix());
+          var matrixWithoutTranslate = [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]);
           var instructions = section.map(function (item) {
-            if (withoutMatrix) return item.instruction;
             var instruction = _toConsumableArray(item.instruction);
             for (var i = 0; i < instruction.length - 1; i += 2) {
               var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(instruction[i + 1], instruction[i + 2]), matrix);
-              var offset = fabric.fabric.util.transformPoint(originPath.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
-              instruction[i + 1] = point.x - offset.x;
-              instruction[i + 2] = point.y - offset.y;
+              var offset = fabric.fabric.util.transformPoint(originPath.pathOffset, matrixWithoutTranslate);
+              point.x -= offset.x;
+              point.y -= offset.y;
+              instruction[i + 1] = point.x;
+              instruction[i + 2] = point.y;
             }
             return instruction;
           });
@@ -4280,22 +4282,6 @@
           }
         });
         return this.draw([pathway]);
-      }
-      /**
-       * 使用路径更新本地路径对象
-       */
-    }, {
-      key: "updateLocalPath",
-      value: function updateLocalPath(pathway, path) {
-        var _a;
-        var d = this.exportPathwayD(pathway);
-        path.set({
-          scaleX: 1,
-          scaleY: 1,
-          angle: 0
-        });
-        path.initialize(d);
-        (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
       }
       /**
        * 清除路径
@@ -10095,13 +10081,14 @@
     path.initialize(_d);
     path.path = instructions;
     // 计算路径偏移差值
-    var distance = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - (path.width - oldInfo.width) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - (path.height - oldInfo.height) / 2 - oldInfo.pathOffset.y), [].concat(_toConsumableArray(path.calcOwnMatrix().slice(0, 4)), [0, 0]));
+    var repairOffset = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - (path.width - oldInfo.width) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - (path.height - oldInfo.height) / 2 - oldInfo.pathOffset.y), [].concat(_toConsumableArray(path.calcOwnMatrix().slice(0, 4)), [0, 0]));
     // 设置回正确的偏移位置
     path.set({
-      left: oldInfo.left + distance.x,
-      top: oldInfo.top + distance.y
+      left: oldInfo.left + repairOffset.x,
+      top: oldInfo.top + repairOffset.y
     });
     path.setCoords();
+    return repairOffset;
   };
 
   var VizPathSymbalType;
@@ -10240,19 +10227,20 @@
       key: "exportPathwayD",
       value: function exportPathwayD() {
         var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
-        var withoutMatrix = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
         return pathway.map(function (_ref) {
           var section = _ref.section,
             originPath = _ref.originPath;
           var matrix = _toConsumableArray(originPath.calcOwnMatrix());
+          var matrixWithoutTranslate = [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]);
           var instructions = section.map(function (item) {
-            if (withoutMatrix) return item.instruction;
             var instruction = _toConsumableArray(item.instruction);
             for (var i = 0; i < instruction.length - 1; i += 2) {
               var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(instruction[i + 1], instruction[i + 2]), matrix);
-              var offset = fabric.fabric.util.transformPoint(originPath.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
-              instruction[i + 1] = point.x - offset.x;
-              instruction[i + 2] = point.y - offset.y;
+              var offset = fabric.fabric.util.transformPoint(originPath.pathOffset, matrixWithoutTranslate);
+              point.x -= offset.x;
+              point.y -= offset.y;
+              instruction[i + 1] = point.x;
+              instruction[i + 2] = point.y;
             }
             return instruction;
           });
@@ -10948,22 +10936,6 @@
           }
         });
         return this.draw([pathway]);
-      }
-      /**
-       * 使用路径更新本地路径对象
-       */
-    }, {
-      key: "updateLocalPath",
-      value: function updateLocalPath(pathway, path) {
-        var _a;
-        var d = this.exportPathwayD(pathway);
-        path.set({
-          scaleX: 1,
-          scaleY: 1,
-          angle: 0
-        });
-        path.initialize(d);
-        (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
       }
       /**
        * 清除路径
@@ -13402,24 +13374,46 @@
       });
       fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
       let path = new fabric.fabric.Path(EXAMPLE_PATH_D.test, {
-          left: fabricCanvas.getWidth() / 2,
-          top: fabricCanvas.getHeight() / 2,
           objectCaching: false,
           noScaleCache: false,
+          // fill: 'transparent'，
           fill: '#59d571',
           stroke: '#5c7461',
           strokeWidth: 2,
           originX: 'center',
           originY: 'center',
-          // angle: 60,
-          scaleX: 1.2,
-          scaleY: 1.2,
+          left: fabricCanvas.getWidth() / 2,
+          top: fabricCanvas.getHeight() / 2,
+          angle: 45,
+          scaleX: 0.8,
+          scaleY: 0.8,
       });
       fabricCanvas.add(path);
+      // let pathText = new fabric.Text(
+      //   'The shortest way to do many things is to only one thing at a time.',
+      //   {
+      //     fontSize: 20,
+      //     // @ts-ignore
+      //     path: path as any,
+      //     pathAlign: 'center',
+      //     pathSide: 'left',
+      //     left: fabricCanvas.getWidth() / 2,
+      //     top: fabricCanvas.getHeight() / 2,
+      //     originX: 'center',
+      //     originY: 'center',
+      //     objectCaching: false,
+      //     noScaleCache: false,
+      //     // backgroundColor: 'pink',
+      //     angle: 45,
+      //     scaleX: 0.5,
+      //     scaleY: 0.5,
+      //   }
+      // );
+      // fabricCanvas.add(pathText);
       fabricCanvas.renderAll();
       const vizPath = new VizPathContext$1({
           refreshPathTriggerTime: 'auto',
-          refreshDeferDuration: 10
+          refreshDeferDuration: 10,
       });
       const operator = await vizPath
           .use(new Editor$1(fabricCanvas))
@@ -13524,19 +13518,65 @@
           .initialize();
       // ① 通过路径指令直接绘制
       // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.test, {
-      //   left: fabricCanvas.getWidth() / 2,
-      //   top: fabricCanvas.getHeight() / 2,
-      //   originX: 'center',
-      //   originY: 'center',
-      //   // scaleX: 2,
-      //   // scaleY: 2,
+      //   left: pathText.left,
+      //   top: pathText.top,
+      //   originX: pathText.originX,
+      //   originY: pathText.originY,
+      //   angle: pathText.angle,
+      //   scaleX: pathText.scaleX,
+      //   scaleY: pathText.scaleY,
       // });
       // operator.draw(pathway1);
+      // operator.on('update', () => {
+      //   const d = operator.exportPathwayD(operator.pathway);
+      //   // 更新旧的路径信息
+      //   path.initialize(d as any);
+      //   pathText.initialize(pathText.text as any);
+      //   // 创建参考路径对象并设置新的对象位置
+      //   const referencePath = new fabric.Path(d);
+      //   pathText.setPositionByOrigin(
+      //     referencePath.getCenterPoint(),
+      //     'center',
+      //     'center'
+      //   );
+      //   // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
+      //   pathText.set({
+      //     scaleX: 1,
+      //     scaleY: 1,
+      //     angle: 0,
+      //   })
+      //   fabricCanvas.requestRenderAll();
+      // });
       // ② 通过路径对象绘制
       const pathway2 = VizPathContext$1.parsePathFromObject(path);
       operator.draw(pathway2);
-      operator.on('update', (pathway) => {
-          operator.updateLocalPath(operator.pathway, path);
+      operator.on('update', () => {
+          var _a;
+          const d = operator.exportPathwayD(operator.pathway);
+          path.set({
+              scaleX: 1,
+              scaleY: 1,
+              angle: 0,
+          });
+          path.initialize(d);
+          (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
+          // const d = operator.exportPathwayD(operator.pathway);
+          // // 更新旧的路径信息
+          // path.initialize(d as any);
+          // // 创建参考路径对象并设置新的对象位置
+          // const referencePath = new fabric.Path(d);
+          // path.setPositionByOrigin(
+          //   referencePath.getCenterPoint(),
+          //   'center',
+          //   'center'
+          // );
+          // // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
+          // path.set({
+          //   scaleX: 1,
+          //   scaleY: 1,
+          //   angle: 0,
+          // })
+          // fabricCanvas.renderAll();
       });
       // ③ 通过URL绘制
       // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';

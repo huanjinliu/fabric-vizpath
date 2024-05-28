@@ -62,26 +62,49 @@ const EXAMPLE_PATH_D = {
   fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
   let path = new fabric.Path(EXAMPLE_PATH_D.test, {
-    left: fabricCanvas.getWidth() / 2,
-    top: fabricCanvas.getHeight() / 2,
     objectCaching: false,
     noScaleCache: false,
+    // fill: 'transparent'，
     fill: '#59d571',
     stroke: '#5c7461',
     strokeWidth: 2,
     originX: 'center',
     originY: 'center',
-    // angle: 60,
-    scaleX: 1.2,
-    scaleY: 1.2,
+    left: fabricCanvas.getWidth() / 2,
+    top: fabricCanvas.getHeight() / 2,
+    angle: 45,
+    scaleX: 0.8,
+    scaleY: 0.8,
   });
-
   fabricCanvas.add(path);
+
+  // let pathText = new fabric.Text(
+  //   'The shortest way to do many things is to only one thing at a time.',
+  //   {
+  //     fontSize: 20,
+  //     // @ts-ignore
+  //     path: path as any,
+  //     pathAlign: 'center',
+  //     pathSide: 'left',
+  //     left: fabricCanvas.getWidth() / 2,
+  //     top: fabricCanvas.getHeight() / 2,
+  //     originX: 'center',
+  //     originY: 'center',
+  //     objectCaching: false,
+  //     noScaleCache: false,
+  //     // backgroundColor: 'pink',
+  //     angle: 45,
+  //     scaleX: 0.5,
+  //     scaleY: 0.5,
+  //   }
+  // );
+  // fabricCanvas.add(pathText);
+
   fabricCanvas.renderAll();
 
   const vizPath = new VizPath({
     refreshPathTriggerTime: 'auto',
-    refreshDeferDuration: 10
+    refreshDeferDuration: 10,
   });
 
   const operator = await vizPath
@@ -90,122 +113,179 @@ const EXAMPLE_PATH_D = {
     .use(new EditorBackground())
     .use(new EditorPath())
     .use(new EditorNode())
-    .use(new EditorShortcut([
-      // 删除节点快捷键
-      {
-        key: 'backspace',
-        onActivate: (e) => {
-          e.preventDefault();
+    .use(
+      new EditorShortcut([
+        // 删除节点快捷键
+        {
+          key: 'backspace',
+          onActivate: (e) => {
+            e.preventDefault();
 
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
 
-          // 如果当前有选中曲线控制点
-          if (editorNode.activePoint) {
-            editorNode.remove(editorNode.activePoint);
-          } else if (editorNode.activeNodes.length) {
-            editorNode.remove(...editorNode.activeNodes);
-          }
+            // 如果当前有选中曲线控制点
+            if (editorNode.activePoint) {
+              editorNode.remove(editorNode.activePoint);
+            } else if (editorNode.activeNodes.length) {
+              editorNode.remove(...editorNode.activeNodes);
+            }
+          },
         },
-      },
-      // 全选节点快捷键
-      {
-        key: 'A',
-        combinationKeys: ['meta'],
-        onActivate: (e) => {
-          e.preventDefault();
+        // 全选节点快捷键
+        {
+          key: 'A',
+          combinationKeys: ['meta'],
+          onActivate: (e) => {
+            e.preventDefault();
 
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
 
-          editorNode.focus(...editorNode.nodes);
+            editorNode.focus(...editorNode.nodes);
+          },
         },
-      },
-      // 取消节点选择
-      {
-        key: 'D',
-        combinationKeys: ['meta'],
-        onActivate: (e) => {
-          e.preventDefault();
+        // 取消节点选择
+        {
+          key: 'D',
+          combinationKeys: ['meta'],
+          onActivate: (e) => {
+            e.preventDefault();
 
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
 
-          editorNode.focus();
+            editorNode.focus();
+          },
         },
-      },
-      // 更改路径节点交互模式
-      {
-        combinationKeys: ['alt'],
-        onActivate: () => {
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
+        // 更改路径节点交互模式
+        {
+          combinationKeys: ['alt'],
+          onActivate: () => {
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
 
-          editorNode.setting.mode = 'convert';
-          editorNode.setting.forcePointSymmetric = 'entire';
-        },
-        onDeactivate: () => {
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
-  
-          editorNode.setting.mode = 'move';
-          editorNode.setting.forcePointSymmetric = 'none';
-        },
-      },
-      {
-        combinationKeys: ['alt', 'ctrl'],
-        onActivate: () => {
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
+            editorNode.setting.mode = 'convert';
+            editorNode.setting.forcePointSymmetric = 'entire';
+          },
+          onDeactivate: () => {
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
 
-          editorNode.setting.mode = 'convert';
-          editorNode.setting.forcePointSymmetric = 'angle';
+            editorNode.setting.mode = 'move';
+            editorNode.setting.forcePointSymmetric = 'none';
+          },
         },
-        onDeactivate: () => {
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
-  
-          editorNode.setting.mode = 'move';
-          editorNode.setting.forcePointSymmetric = 'none';
-        },
-      },
-      // 更改为添加模式
-      {
-        combinationKeys: ['shift'],
-        onActivate: () => {
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
+        {
+          combinationKeys: ['alt', 'ctrl'],
+          onActivate: () => {
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
 
-          editorNode.setting.mode = 'add';
+            editorNode.setting.mode = 'convert';
+            editorNode.setting.forcePointSymmetric = 'angle';
+          },
+          onDeactivate: () => {
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
+
+            editorNode.setting.mode = 'move';
+            editorNode.setting.forcePointSymmetric = 'none';
+          },
         },
-        onDeactivate: () => {
-          const editorNode = vizPath.find(EditorNode);
-          if (!editorNode) return;
-  
-          editorNode.setting.mode = 'move';
+        // 更改为添加模式
+        {
+          combinationKeys: ['shift'],
+          onActivate: () => {
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
+
+            editorNode.setting.mode = 'add';
+          },
+          onDeactivate: () => {
+            const editorNode = vizPath.find(EditorNode);
+            if (!editorNode) return;
+
+            editorNode.setting.mode = 'move';
+          },
         },
-      },
-    ]))
+      ])
+    )
     .initialize();
 
   // ① 通过路径指令直接绘制
   // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.test, {
-  //   left: fabricCanvas.getWidth() / 2,
-  //   top: fabricCanvas.getHeight() / 2,
-  //   originX: 'center',
-  //   originY: 'center',
-  //   // scaleX: 2,
-  //   // scaleY: 2,
+  //   left: pathText.left,
+  //   top: pathText.top,
+  //   originX: pathText.originX,
+  //   originY: pathText.originY,
+  //   angle: pathText.angle,
+  //   scaleX: pathText.scaleX,
+  //   scaleY: pathText.scaleY,
   // });
   // operator.draw(pathway1);
+
+  // operator.on('update', () => {
+  //   const d = operator.exportPathwayD(operator.pathway);
+
+  //   // 更新旧的路径信息
+  //   path.initialize(d as any);
+  //   pathText.initialize(pathText.text as any);
+
+  //   // 创建参考路径对象并设置新的对象位置
+  //   const referencePath = new fabric.Path(d);
+  //   pathText.setPositionByOrigin(
+  //     referencePath.getCenterPoint(),
+  //     'center',
+  //     'center'
+  //   );
+  //   // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
+  //   pathText.set({
+  //     scaleX: 1,
+  //     scaleY: 1,
+  //     angle: 0,
+  //   })
+
+  //   fabricCanvas.requestRenderAll();
+  // });
 
   // ② 通过路径对象绘制
   const pathway2 = VizPath.parsePathFromObject(path);
   operator.draw(pathway2);
 
-  operator.on('update', (pathway) => {
-    operator.updateLocalPath(operator.pathway, path);
-  })
+  operator.on('update', () => {
+    const d = operator.exportPathwayD(operator.pathway);
+
+    path.set({
+      scaleX: 1,
+      scaleY: 1,
+      angle: 0,
+    });
+    path.initialize(d as any);
+
+    path.canvas?.renderAll();
+
+    // const d = operator.exportPathwayD(operator.pathway);
+
+    // // 更新旧的路径信息
+    // path.initialize(d as any);
+
+    // // 创建参考路径对象并设置新的对象位置
+    // const referencePath = new fabric.Path(d);
+    // path.setPositionByOrigin(
+    //   referencePath.getCenterPoint(),
+    //   'center',
+    //   'center'
+    // );
+    // // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
+    // path.set({
+    //   scaleX: 1,
+    //   scaleY: 1,
+    //   angle: 0,
+    // })
+
+    // fabricCanvas.renderAll();
+  });
 
   // ③ 通过URL绘制
   // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';
@@ -247,8 +327,8 @@ const EXAMPLE_PATH_D = {
     });
     pathways?.forEach((pathway) => {
       operator.draw(pathway);
-    })
-  }
+    });
+  };
 
   // 操作按钮
   btnDelete.addEventListener('click', () => {
@@ -256,7 +336,8 @@ const EXAMPLE_PATH_D = {
     if (!editorNode) return;
 
     // if (editorNode.activePoint) editorNode.remove(editorNode.activePoint);
-    if (editorNode.activeNodes.length) editorNode.remove(...editorNode.activeNodes);
+    if (editorNode.activeNodes.length)
+      editorNode.remove(...editorNode.activeNodes);
   });
 
   // 操作测试
