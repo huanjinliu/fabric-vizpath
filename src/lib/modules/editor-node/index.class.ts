@@ -729,220 +729,199 @@ class EditorNode extends EditorModule {
   /**
    * 获取路径节点进行转换的配置
    */
-  // private _getConvertibleNodes(node: PathwayNode<ResponsiveCrood>) {
-  //   if (!this.vizPath) return [];
+  private _getConvertibleNodes(node: PathwayNode<ResponsiveCrood>) {
+    if (!this.vizPath) return [];
 
-  //   const { instruction } = node;
-  //   const { pre, next } = this.vizPath.getNeighboringInstructions(node);
+    const { instruction } = node;
+    const { pre, next } = this.vizPath.getNeighboringInstructions(node);
 
-  //   const convertibleNodes: ['pre' | 'next', PathwayNode<ResponsiveCrood>][] =
-  //     [];
+    const convertibleNodes: ['pre' | 'next', PathwayNode<ResponsiveCrood>][] =
+      [];
 
-  //   switch (instruction[0]) {
-  //     case InstructionType.START:
-  //       if (
-  //         pre?.instruction[0] === InstructionType.LINE ||
-  //         pre?.instruction[0] === InstructionType.QUADRATIC_CURCE
-  //       ) {
-  //         convertibleNodes.push(['pre', pre]);
-  //       }
-  //       if (
-  //         next?.instruction[0] === InstructionType.LINE ||
-  //         next?.instruction[0] === InstructionType.QUADRATIC_CURCE
-  //       ) {
-  //         convertibleNodes.push(['next', next]);
-  //       }
-  //       break;
-  //     case InstructionType.LINE:
-  //       convertibleNodes.push(['pre', node]);
-  //       if (
-  //         next?.instruction[0] === InstructionType.LINE ||
-  //         next?.instruction[0] === InstructionType.QUADRATIC_CURCE
-  //       ) {
-  //         convertibleNodes.push(['next', next]);
-  //       }
-  //       break;
-  //     case InstructionType.QUADRATIC_CURCE:
-  //       convertibleNodes.push(['pre', node]);
-  //       if (
-  //         next?.instruction[0] === InstructionType.LINE ||
-  //         next?.instruction[0] === InstructionType.QUADRATIC_CURCE
-  //       ) {
-  //         convertibleNodes.push(['next', next]);
-  //       }
-  //       break;
-  //     case InstructionType.BEZIER_CURVE:
-  //       if (
-  //         next?.instruction[0] === InstructionType.LINE ||
-  //         next?.instruction[0] === InstructionType.QUADRATIC_CURCE
-  //       ) {
-  //         convertibleNodes.push(['next', next]);
-  //       }
-  //       break;
-  //     default:
-  //       break;
-  //   }
+    switch (instruction[0]) {
+      case InstructionType.START:
+        if (
+          pre?.instruction[0] === InstructionType.LINE ||
+          pre?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['pre', pre]);
+        }
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      case InstructionType.LINE:
+        convertibleNodes.push(['pre', node]);
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      case InstructionType.QUADRATIC_CURCE:
+        convertibleNodes.push(['pre', node]);
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      case InstructionType.BEZIER_CURVE:
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      default:
+        break;
+    }
 
-  //   return convertibleNodes;
-  // }
+    return convertibleNodes;
+  }
 
   /**
    * 初始路径指令转换事件
    */
-  // private _initConvertEvents() {
-  //   if (!this.editor) return;
+  private _initConvertEvents() {
+    if (!this.editor) return;
 
-  //   const editorPath = this.vizPath?.context.find(EditorPath);
-  //   if (!editorPath) return;
+    const editorPath = this.vizPath?.context.find(EditorPath);
+    if (!editorPath) return;
 
-  //   let target: fabric.Object | undefined;
-  //   let originActiveObject: fabric.Object | undefined;
+    let target: fabric.Object | undefined;
 
-  //   this.editor.on('canvas', 'mouse:down:before', (event) => {
-  //     if (this.setting.mode !== Mode.CONVERT) return;
+    this.editor.on('canvas', 'mouse:down:before', (event) => {
+      if (this.setting.mode !== Mode.CONVERT) return;
 
-  //     if (event.target?.[VizPath.symbol] !== VizPathSymbalType.NODE) return;
+      if (event.target?.[VizPath.symbol] !== VizPathSymbalType.NODE) return;
 
-  //     if (this.activeNodes.length !== 1) return;
+      if (this.activeNodes.length > 1) return;
 
-  //     const activeObject = this.activeNodes[0];
-  //     const object = event.target;
-  //     // 降级
-  //     if (activeObject === object && this.controllers.filter((i) => i.node === object).length) {
-  //       this.controllers.forEach((i) => {
-  //         if (!i.node === event.target) return;
+      const activeObject = this.activeNodes[0];
+      const object = event.target;
 
-  //         const { next } = this.vizPath!.getNeighboringNodes(i.pathwayNode, true);
+      const currentNode = this.objectNodeMap.get(object)!;
 
-  //         const newInstruction = [
-  //           InstructionType.LINE,
-  //           i.pathwayNode.node!.x,
-  //           i.pathwayNode.node!.y,
-  //         ] as Instruction;
-  //         this.vizPath!.replace(i.pathwayNode, newInstruction);
+      // 判断指令升降级
+      if (activeObject && object !== activeObject) {
+        const activeNode = this.objectNodeMap.get(activeObject)!;
+        const { pre, next } = this.vizPath!.getNeighboringNodes(activeNode);
 
-  //         if (next && next.node) {
-  //           const newNextInstruction = [
-  //             InstructionType.LINE,
-  //             next.node!.x,
-  //             next.node!.y,
-  //           ] as Instruction;
+        if (this.controllers.filter((i) => i.node === object).length === 0) {
+          let upgradeDirection: 'pre' | 'next' | undefined;
+          if (currentNode === pre) upgradeDirection = 'next';
+          if (currentNode === next) upgradeDirection = 'pre';
+          if (upgradeDirection) {
+            this.upgrade(currentNode, upgradeDirection);
+            const controller = this.controllers.find(i => i.pathwayNode === currentNode && i.type === upgradeDirection);
+            if (controller) {
+              this.focus(controller.point);
+              fireMouseUpAndSelect(controller.point);
+              return;
+            }
+          }
+        }
+      }
 
-  //           if (next) this.vizPath!.replace(next, newNextInstruction);
-  //         }
-  //       })
-  //       target = event.target.set({ lockMovementX: true, lockMovementY: true });
-  //     }
-  //     // 符合条件则升级
-  //     else {
-  //       const activeNode = this.objectNodeMap.get(activeObject)!;
-  //       const currentNode = this.objectNodeMap.get(object)!;
-  //       const { pre, next } = this.vizPath!.getNeighboringNodes(activeNode);
-  //       if (currentNode !== pre && currentNode !== next) return;
-  //       if (this.controllers.filter((i) => i.node === object).length === 0) {
-  //         target = event.target.set({ lockMovementX: true, lockMovementY: true });
-  //         originActiveObject = this.activeNodes[0];
-  //       }
-  //     }
-  //   });
+      this.degrade(currentNode, 'both', true);
 
-  //   this.editor.on('canvas', 'mouse:down', (event) => {
-  //     if (!target) return;
+      target = object.set({ lockMovementX: true, lockMovementY: true });
+    });
 
-  //     if (originActiveObject && target !== originActiveObject) {
-  //       this.focus(originActiveObject);
-  //     }
-  //   });
+    this.editor.on('canvas', 'mouse:move', (event) => {
+      const canvas = this.editor?.canvas;
+      if (!canvas) return;
 
-  //   this.editor.on('canvas', 'mouse:move', (event) => {
-  //     if (!target) return;
+      const { pointer } = event;
 
-  //     // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-  //     if (target.containsPoint(event.pointer)) return;
+      if (!target) return;
 
-  //     this.focus(target);
+      // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+      if (target.containsPoint(event.pointer)) return;
 
-  //     const canvas = this.editor?.canvas;
-  //     if (!canvas) return;
+      const targetNode = this.objectNodeMap.get(target)!;
 
-  //     const { pointer } = event;
+      const originPath = editorPath.nodePathMap.get(
+        targetNode.node!
+      )!.originPath;
+      const convertibleNodes = this._getConvertibleNodes(targetNode);
+      const neighboringNodes = this.vizPath!.getNeighboringNodes(
+        targetNode,
+        true
+      );
 
-  //     const targetNode = this.objectNodeMap.get(target)!;
-  //     const originPath = editorPath.nodePathMap.get(
-  //       targetNode.node!
-  //     )!.originPath;
-  //     const convertibleNodes = this._getConvertibleNodes(targetNode);
-  //     const neighboringNodes = this.vizPath!.getNeighboringNodes(
-  //       targetNode,
-  //       true
-  //     );
+      const position = editorPath.calcRelativeCrood(
+        { left: pointer.x, top: pointer.y },
+        originPath
+      );
+      const antiPosition = editorPath.calcRelativeCrood(
+        {
+          left: target.left! - (pointer.x - target.left!),
+          top: target.top! - (pointer.y - target.top!),
+        },
+        originPath
+      );
 
-  //     const position = editorPath.calcRelativeCrood(
-  //       { left: pointer.x, top: pointer.y },
-  //       originPath
-  //     );
-  //     const antiPosition = editorPath.calcRelativeCrood(
-  //       {
-  //         left: target.left! - (pointer.x - target.left!),
-  //         top: target.top! - (pointer.y - target.top!),
-  //       },
-  //       originPath
-  //     );
+      // 根据夹角大小排序，夹角越小意味鼠标越接近
+      if (convertibleNodes.length > 1) {
+        convertibleNodes.sort((a, b) => {
+          return (
+            calcCroodsAngle(
+              position,
+              targetNode.node!,
+              neighboringNodes[a[0]]!.node!
+            ) -
+            calcCroodsAngle(
+              position,
+              targetNode.node!,
+              neighboringNodes[b[0]]!.node!
+            )
+          );
+        });
+      }
 
-  //     // 根据夹角大小排序，夹角越小意味鼠标越接近
-  //     if (convertibleNodes.length > 1) {
-  //       convertibleNodes.sort((a, b) => {
-  //         return (
-  //           calcCroodsAngle(
-  //             position,
-  //             targetNode.node!,
-  //             neighboringNodes[a[0]]!.node!
-  //           ) -
-  //           calcCroodsAngle(
-  //             position,
-  //             targetNode.node!,
-  //             neighboringNodes[b[0]]!.node!
-  //           )
-  //         );
-  //       });
-  //     }
+      convertibleNodes.forEach((item, index) => {
+        const newCrood = [position, antiPosition][index];
+        const newInstruction = [...item[1].instruction] as Instruction;
+        newInstruction[0] = {
+          [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
+          [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
+        }[newInstruction[0]];
+        newInstruction.splice(
+          item[0] === 'pre' ? -2 : 1,
+          0,
+          newCrood.x,
+          newCrood.y
+        );
+        this.vizPath?.replace(item[1], newInstruction);
+      });
 
-  //     convertibleNodes.forEach((item, index) => {
-  //       const newCrood = [position, antiPosition][index];
-  //       const newInstruction = [...item[1].instruction] as Instruction;
-  //       newInstruction[0] = {
-  //         [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
-  //         [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
-  //       }[newInstruction[0]];
-  //       newInstruction.splice(
-  //         item[0] === 'pre' ? -2 : 1,
-  //         0,
-  //         newCrood.x,
-  //         newCrood.y
-  //       );
-  //       this.vizPath?.replace(item[1], newInstruction);
-  //     });
+      const targetController = this.controllers.find((i) => {
+        return (
+          i.pathwayNode === targetNode && i.type === convertibleNodes[0]?.[0]
+        );
+      });
 
-  //     const targetController = this.controllers.find((i) => {
-  //       return (
-  //         i.pathwayNode === targetNode && i.type === convertibleNodes[0]?.[0]
-  //       );
-  //     });
+      if (targetController) {
+        this.focus(targetController.point);
+        fireMouseUpAndSelect(targetController.point);
+      }
+    });
 
-  //     if (targetController) {
-  //       this.focus(targetController.point);
-  //       fireMouseUpAndSelect(targetController.point);
-  //     }
-  //   });
-
-  //   this.editor.on('canvas', 'mouse:up', () => {
-  //     if (target) {
-  //       target.set({ lockMovementX: false, lockMovementY: false });
-  //       target = undefined;
-  //       originActiveObject = undefined;
-  //     }
-  //   });
-  // }
+    this.editor.on('canvas', 'mouse:up', () => {
+      if (target) {
+        target.set({ lockMovementX: false, lockMovementY: false });
+        target = undefined;
+      }
+    });
+  }
 
   /**
    * 初始路径点添加事件
@@ -1081,15 +1060,79 @@ class EditorNode extends EditorModule {
   }
 
   /**
+   * 路径升级
+   *
+   * @note
+   *
+   * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
+   */
+  upgrade(
+    pathwayNode: PathwayNode<ResponsiveCrood>,
+    direction: 'pre' | 'next' | 'both' = 'both'
+  ) {
+    if (!this.vizPath) return;
+
+    const { instruction, node } = pathwayNode;
+
+    const { pre, next } = this.vizPath.getNeighboringInstructions(
+      pathwayNode,
+      true
+    );
+
+    const directionNodeMap = {
+      pre:
+        instruction[0] === InstructionType.START
+          ? pre
+          : pathwayNode,
+      next,
+    };
+
+    const targets: [
+      direction: 'pre' | 'next',
+      pathwayNode: PathwayNode<ResponsiveCrood>
+    ][] = [];
+
+    if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
+      targets.push(['pre', directionNodeMap.pre]);
+    }
+
+    if (
+      (direction === 'both' || direction === 'next') &&
+      directionNodeMap.next
+    ) {
+      targets.push(['next', directionNodeMap.next]);
+    }
+
+    targets.forEach(([direction, pathwayNode]) => {
+      const oldInstruction = pathwayNode.instruction;
+      if (oldInstruction[0] === InstructionType.BEZIER_CURVE) return;
+
+      const newInstruction = [...oldInstruction] as Instruction;
+      newInstruction[0] = {
+        [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
+        [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
+      }[newInstruction[0]];
+      newInstruction.splice({ pre: -2, next: 1 }[direction], 0, node!.x, node!.y);
+
+      this.vizPath!.replace(pathwayNode, newInstruction);
+    });
+  }
+
+  /**
    * 路径降级
    *
    * @note
    *
    * 二阶贝塞尔曲线会降级为直线；三阶贝塞尔曲线会先降级为二阶贝塞尔曲线，再降级才会转化为直线。
+   * 
+   * @param pathwayNode 节点信息
+   * @param [direction='both'] 降级范围
+   * @param [lowest=false] 是否直接降到直线级别
    */
   degrade(
     pathwayNode: PathwayNode<ResponsiveCrood>,
-    direction: 'pre' | 'next' | 'both'
+    direction: 'pre' | 'next' | 'both' = 'both',
+    lowest = false
   ) {
     if (!this.vizPath) return;
 
@@ -1123,12 +1166,26 @@ class EditorNode extends EditorModule {
     }
 
     targets.forEach(([direction, pathwayNode]) => {
-      const newInstruction = [...pathwayNode.instruction] as Instruction;
-      newInstruction[0] = {
-        [InstructionType.QUADRATIC_CURCE]: InstructionType.LINE,
-        [InstructionType.BEZIER_CURVE]: InstructionType.QUADRATIC_CURCE,
-      }[newInstruction[0]];
-      newInstruction.splice({ pre: -4, next: 1 }[direction], 2);
+      const oldInstruction = pathwayNode.instruction;
+      if (
+        [InstructionType.START, InstructionType.LINE].includes(
+          oldInstruction[0]
+        )
+      )
+        return;
+
+      const newInstruction = [...oldInstruction] as Instruction;
+
+      if (lowest) {
+        newInstruction[0] = InstructionType.LINE;
+        newInstruction.splice(1, newInstruction.length - 3);
+      } else {
+        newInstruction[0] = {
+          [InstructionType.QUADRATIC_CURCE]: InstructionType.LINE,
+          [InstructionType.BEZIER_CURVE]: InstructionType.QUADRATIC_CURCE,
+        }[newInstruction[0]];
+        newInstruction.splice({ pre: -4, next: 1 }[direction], 2);
+      }
 
       this.vizPath!.replace(pathwayNode, newInstruction);
     });
@@ -1299,7 +1356,7 @@ class EditorNode extends EditorModule {
     targetPath.splice(0, 1, [
       InstructionType.LINE,
       targetPath[0][1],
-      targetPath[0][2]
+      targetPath[0][2],
     ]);
     targetPath.map((item) => {
       const instruction = item;
@@ -1310,21 +1367,23 @@ class EditorNode extends EditorModule {
             instruction[i + 2] as number
           ),
           vizPath.getPathway(target.section)!.originPath
-        )
+        );
         const crood = editorPath.calcRelativeCrood(
           position,
           vizPath.getPathway(source.section)!.originPath
-        )
+        );
         instruction[i + 1] = crood.x;
         instruction[i + 2] = crood.y;
       }
-    })
+    });
     mergePath = sourcePath.concat(targetPath);
 
     // 合并后添加回路径段集合
     vizPath.onceRerenderOriginPath(() => {
       vizPath.clear(target.section);
-      vizPath.replacePathwaySections(vizPath.getPathway(source.section)!, [mergePath] as Instruction[][]);
+      vizPath.replacePathwaySections(vizPath.getPathway(source.section)!, [
+        mergePath,
+      ] as Instruction[][]);
     });
   }
 
@@ -1413,7 +1472,7 @@ class EditorNode extends EditorModule {
     this._initDrawEvents();
     this._initClearEvents();
     this._initAddEvents();
-    // this._initConvertEvents();
+    this._initConvertEvents();
   }
 }
 
