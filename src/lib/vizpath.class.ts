@@ -203,7 +203,7 @@ class VizPath {
    * 提取当前路径的信息
    */
   exportPathwayD(pathway: ResponsivePathway = this.pathway) {
-    return pathway
+    const ds = pathway
       .map(({ section, originPath }) => {
         const matrix = [...originPath.calcOwnMatrix()] as Matrix;
         const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
@@ -226,8 +226,8 @@ class VizPath {
           return instruction;
         });
         return (fabric.util as any).joinPath(instructions);
-      })
-      .join(' ');
+      });
+    return ds.join(' ');
   }
 
   /**
@@ -774,7 +774,7 @@ class VizPath {
           next.push(...pre);
           pre.length = 0;
         } else {
-          if (next[0]) next[0][0] = InstructionType.LINE;
+          if (pre.length > 0 && next[0]) next[0][0] = InstructionType.LINE;
           pre.push(...next);
           next.length = 0;
         }
@@ -806,9 +806,9 @@ class VizPath {
           indexes.length <= 1
             ? indexes
             : indexes.filter(
-                (i, idx, arr) =>
-                  arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
-              );
+              (i, idx, arr) =>
+                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
+            );
 
         for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
           const instructions = _sections[0];

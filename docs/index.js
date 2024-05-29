@@ -3573,7 +3573,7 @@
       key: "exportPathwayD",
       value: function exportPathwayD() {
         var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
-        return pathway.map(function (_ref3) {
+        var ds = pathway.map(function (_ref3) {
           var section = _ref3.section,
             originPath = _ref3.originPath;
           var matrix = _toConsumableArray(originPath.calcOwnMatrix());
@@ -3591,7 +3591,8 @@
             return instruction;
           });
           return fabric.fabric.util.joinPath(instructions);
-        }).join(' ');
+        });
+        return ds.join(' ');
       }
       /**
        * 输出路径指令
@@ -4090,7 +4091,7 @@
               next.push.apply(next, _toConsumableArray(pre));
               pre.length = 0;
             } else {
-              if (next[0]) next[0][0] = InstructionType$1.LINE;
+              if (pre.length > 0 && next[0]) next[0][0] = InstructionType$1.LINE;
               pre.push.apply(pre, _toConsumableArray(next));
               next.length = 0;
             }
@@ -10227,7 +10228,7 @@
       key: "exportPathwayD",
       value: function exportPathwayD() {
         var pathway = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.pathway;
-        return pathway.map(function (_ref) {
+        var ds = pathway.map(function (_ref) {
           var section = _ref.section,
             originPath = _ref.originPath;
           var matrix = _toConsumableArray(originPath.calcOwnMatrix());
@@ -10245,7 +10246,8 @@
             return instruction;
           });
           return fabric.fabric.util.joinPath(instructions);
-        }).join(' ');
+        });
+        return ds.join(' ');
       }
       /**
        * 输出路径指令
@@ -10744,7 +10746,7 @@
               next.push.apply(next, _toConsumableArray(pre));
               pre.length = 0;
             } else {
-              if (next[0]) next[0][0] = InstructionType.LINE;
+              if (pre.length > 0 && next[0]) next[0][0] = InstructionType.LINE;
               pre.push.apply(pre, _toConsumableArray(next));
               next.length = 0;
             }
@@ -13380,36 +13382,33 @@
           fill: '#59d571',
           stroke: '#5c7461',
           strokeWidth: 2,
-          originX: 'center',
-          originY: 'center',
+          // originX: 'center',
+          // originY: 'center',
+          // left: fabricCanvas.getWidth() / 2,
+          // top: fabricCanvas.getHeight() / 2,
+          // angle: 45,
+          // scaleX: 0.8,
+          // scaleY: 0.8,
+      });
+      // fabricCanvas.add(path);
+      let pathText = new fabric.fabric.Text('The shortest way to do many things is to only one thing at a time.', {
+          fontSize: 20,
+          // @ts-ignore
+          path: path,
+          pathAlign: 'center',
+          pathSide: 'left',
           left: fabricCanvas.getWidth() / 2,
           top: fabricCanvas.getHeight() / 2,
-          angle: 45,
-          scaleX: 0.8,
-          scaleY: 0.8,
+          originX: 'center',
+          originY: 'center',
+          objectCaching: false,
+          noScaleCache: false,
+          // backgroundColor: 'pink',
+          // angle: 45,
+          // scaleX: 0.5,
+          // scaleY: 0.5,
       });
-      fabricCanvas.add(path);
-      // let pathText = new fabric.Text(
-      //   'The shortest way to do many things is to only one thing at a time.',
-      //   {
-      //     fontSize: 20,
-      //     // @ts-ignore
-      //     path: path as any,
-      //     pathAlign: 'center',
-      //     pathSide: 'left',
-      //     left: fabricCanvas.getWidth() / 2,
-      //     top: fabricCanvas.getHeight() / 2,
-      //     originX: 'center',
-      //     originY: 'center',
-      //     objectCaching: false,
-      //     noScaleCache: false,
-      //     // backgroundColor: 'pink',
-      //     angle: 45,
-      //     scaleX: 0.5,
-      //     scaleY: 0.5,
-      //   }
-      // );
-      // fabricCanvas.add(pathText);
+      fabricCanvas.add(pathText);
       fabricCanvas.renderAll();
       const vizPath = new VizPathContext$1({
           refreshPathTriggerTime: 'auto',
@@ -13517,67 +13516,62 @@
       ]))
           .initialize();
       // ① 通过路径指令直接绘制
-      // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.test, {
-      //   left: pathText.left,
-      //   top: pathText.top,
-      //   originX: pathText.originX,
-      //   originY: pathText.originY,
-      //   angle: pathText.angle,
-      //   scaleX: pathText.scaleX,
-      //   scaleY: pathText.scaleY,
-      // });
-      // operator.draw(pathway1);
-      // operator.on('update', () => {
-      //   const d = operator.exportPathwayD(operator.pathway);
-      //   // 更新旧的路径信息
-      //   path.initialize(d as any);
-      //   pathText.initialize(pathText.text as any);
-      //   // 创建参考路径对象并设置新的对象位置
-      //   const referencePath = new fabric.Path(d);
-      //   pathText.setPositionByOrigin(
-      //     referencePath.getCenterPoint(),
-      //     'center',
-      //     'center'
-      //   );
-      //   // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
-      //   pathText.set({
-      //     scaleX: 1,
-      //     scaleY: 1,
-      //     angle: 0,
-      //   })
-      //   fabricCanvas.requestRenderAll();
-      // });
-      // ② 通过路径对象绘制
-      const pathway2 = VizPathContext$1.parsePathFromObject(path);
-      operator.draw(pathway2);
+      const pathway1 = VizPathContext$1.parsePathFromPathD(EXAMPLE_PATH_D.test, {
+          left: pathText.left,
+          top: pathText.top,
+          originX: pathText.originX,
+          originY: pathText.originY,
+          angle: pathText.angle,
+          scaleX: pathText.scaleX,
+          scaleY: pathText.scaleY,
+      });
+      operator.draw(pathway1);
       operator.on('update', () => {
-          var _a;
           const d = operator.exportPathwayD(operator.pathway);
-          path.set({
+          // 更新旧的路径信息
+          path.initialize(d);
+          pathText.initialize(pathText.text);
+          // 创建参考路径对象并设置新的对象位置
+          const referencePath = new fabric.fabric.Path(d);
+          pathText.setPositionByOrigin(referencePath.getCenterPoint(), 'center', 'center');
+          // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
+          pathText.set({
               scaleX: 1,
               scaleY: 1,
               angle: 0,
           });
-          path.initialize(d);
-          (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();
-          // const d = operator.exportPathwayD(operator.pathway);
-          // // 更新旧的路径信息
-          // path.initialize(d as any);
-          // // 创建参考路径对象并设置新的对象位置
-          // const referencePath = new fabric.Path(d);
-          // path.setPositionByOrigin(
-          //   referencePath.getCenterPoint(),
-          //   'center',
-          //   'center'
-          // );
-          // // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
-          // path.set({
-          //   scaleX: 1,
-          //   scaleY: 1,
-          //   angle: 0,
-          // })
-          // fabricCanvas.renderAll();
+          fabricCanvas.requestRenderAll();
       });
+      // ② 通过路径对象绘制
+      // const pathway2 = VizPath.parsePathFromObject(path);
+      // operator.draw(pathway2);
+      // operator.on('update', () => {
+      //   const d = operator.exportPathwayD(operator.pathway);
+      //   path.set({
+      //     scaleX: 1,
+      //     scaleY: 1,
+      //     angle: 0,
+      //   });
+      //   path.initialize(d as any);
+      //   path.canvas?.renderAll();
+      //   // const d = operator.exportPathwayD(operator.pathway);
+      //   // // 更新旧的路径信息
+      //   // path.initialize(d as any);
+      //   // // 创建参考路径对象并设置新的对象位置
+      //   // const referencePath = new fabric.Path(d);
+      //   // path.setPositionByOrigin(
+      //   //   referencePath.getCenterPoint(),
+      //   //   'center',
+      //   //   'center'
+      //   // );
+      //   // // 提取出的路径信息会将缩放和旋转数据一并计算在内，所以需要重置状态
+      //   // path.set({
+      //   //   scaleX: 1,
+      //   //   scaleY: 1,
+      //   //   angle: 0,
+      //   // })
+      //   // fabricCanvas.renderAll();
+      // });
       // ③ 通过URL绘制
       // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';
       // const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
