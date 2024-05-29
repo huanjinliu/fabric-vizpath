@@ -201,12 +201,14 @@ const EXAMPLE_PATH_D = {
             if (!editorNode) return;
 
             editorNode.setting.mode = 'add';
+            editorNode.setting.forcePointSymmetric = 'entire';
           },
           onDeactivate: () => {
             const editorNode = vizPath.find(EditorNode);
             if (!editorNode) return;
 
             editorNode.setting.mode = 'move';
+            editorNode.setting.forcePointSymmetric = 'none';
           },
         },
       ])

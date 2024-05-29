@@ -820,7 +820,10 @@ class EditorNode extends EditorModule {
           if (currentNode === next) upgradeDirection = 'pre';
           if (upgradeDirection) {
             this.upgrade(currentNode, upgradeDirection);
-            const controller = this.controllers.find(i => i.pathwayNode === currentNode && i.type === upgradeDirection);
+            const controller = this.controllers.find(
+              (i) =>
+                i.pathwayNode === currentNode && i.type === upgradeDirection
+            );
             if (controller) {
               this.focus(controller.point);
               fireMouseUpAndSelect(controller.point);
@@ -932,79 +935,57 @@ class EditorNode extends EditorModule {
     const editorPath = this.vizPath?.context.find(EditorPath);
     if (!editorPath) return;
 
-    let newNode: PathwayNode<ResponsiveCrood> | undefined;
-    let newNodeObject: fabric.Object | undefined;
+    let target: fabric.Object | undefined;
     this.editor.on('canvas', 'mouse:down:before', (event) => {
       if (this.setting.mode !== Mode.ADD) return;
 
-      const { target, pointer } = event;
-      if (target) {
-        if (this.activeNodes.length === 1)
+      if (event.target) {
+        if (
+          this.activeNodes.length === 1 &&
+          event.target[VizPath.symbol] === VizPathSymbalType.NODE
+        ) {
           this.link(
             this.objectNodeMap.get(this.activeNodes[0]!)!,
-            this.objectNodeMap.get(target)!
+            this.objectNodeMap.get(event.target)!
           );
+        }
         return;
       }
 
-      newNodeObject = this.add({ left: pointer.x, top: pointer.y });
-      newNode = this.objectNodeMap.get(newNodeObject!);
+      const { pointer } = event;
+      target = this.add({ left: pointer.x, top: pointer.y });
+      this.editor!.canvas!.selection = false;
     });
-    this.editor.on('canvas', 'mouse:down', (event) => {
-      if (!newNodeObject) return;
-      this.focus(newNodeObject);
+    this.editor.on('canvas', 'mouse:move', (event) => {
+      if (!target) return;
+
+      if (this.setting.mode !== Mode.ADD) {
+        target = undefined;
+        this.editor!.canvas!.selection = true;
+        return;
+      }
+
+      // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+      if (target.containsPoint(event.pointer)) return;
+
+      const currentNode = this.objectNodeMap.get(target)!;
+
+      this.focus(target);
+      this.upgrade(currentNode, 'both');
+
+      const controller =
+        this.controllers.find(
+          (i) => i.pathwayNode === currentNode && i.type === 'next'
+        ) ?? this.controllers.find((i) => i.pathwayNode === currentNode);
+
+      if (controller) {
+        this.focus(controller.point);
+        fireMouseUpAndSelect(controller.point);
+      }
     });
-    // this.editor.on('canvas', 'mouse:move', (event) => {
-    //   const { e, target, pointer } = event;
-
-    //   if (newNode && newNodeObject) {
-    //     // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-    //     if (newNodeObject.containsPoint(event.pointer)) return;
-
-    //     const position = { left: pointer.x, top: pointer.y };
-    //     const antiPosition = {
-    //       left: newNodeObject.left! - (pointer.x - newNodeObject.left!),
-    //       top: newNodeObject.top! - (pointer.y - newNodeObject.top!),
-    //     };
-    //     const newCrood = editorPath.calcRelativeCrood(
-    //       position,
-    //       editorPath.nodePathMap.get(newNode.node!)!.originPath
-    //     );
-
-    //     this.vizPath?.replace(newNode.node!, [
-    //       InstructionType.QUADRATIC_CURCE,
-    //       newCrood.x,
-    //       newCrood.y,
-    //       newNode.node?.x,
-    //       newNode.node?.y,
-    //     ] as Instruction);
-    //     newNodeObject = this.nodeObjectMap.get(newNode!)!;
-
-    //     // const { next } = this.vizPath?.getNeighboringNodes(newNode!) ?? {};
-    //     // if (next) {
-    //     //   const nextHandlerCrood = editorPath.calcRelativeCrood(
-    //     //     position,
-    //     //     editorPath.nodePathMap.get(next.node!)!.originPath
-    //     //   );
-    //     //   this.vizPath?.replace(next.node!, [
-    //     //     InstructionType.QUADRATIC_CURCE,
-    //     //     nextHandlerCrood.x,
-    //     //     nextHandlerCrood.y,
-    //     //     next.node?.x,
-    //     //     next.node?.y,
-    //     //   ] as Instruction);
-    //     // }
-
-    //     const { point } = this.controllers.find((i) => i.type === 'pre') ?? {};
-    //     if (point) fireMouseUpAndSelect(point);
-
-    //     newNodeObject = undefined;
-    //     newNode = undefined;
-    //   }
-    // });
     this.editor.on('canvas', 'mouse:up', () => {
-      newNodeObject = undefined;
-      newNode = undefined;
+      target = undefined;
+      this.editor!.canvas!.selection = true;
     });
   }
 
@@ -1080,10 +1061,7 @@ class EditorNode extends EditorModule {
     );
 
     const directionNodeMap = {
-      pre:
-        instruction[0] === InstructionType.START
-          ? pre
-          : pathwayNode,
+      pre: instruction[0] === InstructionType.START ? pre : pathwayNode,
       next,
     };
 
@@ -1112,7 +1090,12 @@ class EditorNode extends EditorModule {
         [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
         [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
       }[newInstruction[0]];
-      newInstruction.splice({ pre: -2, next: 1 }[direction], 0, node!.x, node!.y);
+      newInstruction.splice(
+        { pre: -2, next: 1 }[direction],
+        0,
+        node!.x,
+        node!.y
+      );
 
       this.vizPath!.replace(pathwayNode, newInstruction);
     });
@@ -1124,7 +1107,7 @@ class EditorNode extends EditorModule {
    * @note
    *
    * 二阶贝塞尔曲线会降级为直线；三阶贝塞尔曲线会先降级为二阶贝塞尔曲线，再降级才会转化为直线。
-   * 
+   *
    * @param pathwayNode 节点信息
    * @param [direction='both'] 降级范围
    * @param [lowest=false] 是否直接降到直线级别

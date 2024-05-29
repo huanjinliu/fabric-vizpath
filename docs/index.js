@@ -6135,69 +6135,48 @@
         if (!this.editor) return;
         var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath$1$1);
         if (!editorPath) return;
-        var newNodeObject;
+        var target;
         this.editor.on('canvas', 'mouse:down:before', function (event) {
           if (_this21.setting.mode !== Mode$1.ADD) return;
-          var target = event.target,
-            pointer = event.pointer;
-          if (target) {
-            if (_this21.activeNodes.length === 1) _this21.link(_this21.objectNodeMap.get(_this21.activeNodes[0]), _this21.objectNodeMap.get(target));
+          if (event.target) {
+            if (_this21.activeNodes.length === 1 && event.target[VizPath$1.symbol] === VizPathSymbalType$1.NODE) {
+              _this21.link(_this21.objectNodeMap.get(_this21.activeNodes[0]), _this21.objectNodeMap.get(event.target));
+            }
             return;
           }
-          newNodeObject = _this21.add({
+          var pointer = event.pointer;
+          target = _this21.add({
             left: pointer.x,
             top: pointer.y
           });
-          _this21.objectNodeMap.get(newNodeObject);
+          _this21.editor.canvas.selection = false;
         });
-        this.editor.on('canvas', 'mouse:down', function (event) {
-          if (!newNodeObject) return;
-          _this21.focus(newNodeObject);
+        this.editor.on('canvas', 'mouse:move', function (event) {
+          var _a;
+          if (!target) return;
+          if (_this21.setting.mode !== Mode$1.ADD) {
+            target = undefined;
+            _this21.editor.canvas.selection = true;
+            return;
+          }
+          // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+          if (target.containsPoint(event.pointer)) return;
+          var currentNode = _this21.objectNodeMap.get(target);
+          _this21.focus(target);
+          _this21.upgrade(currentNode, 'both');
+          var controller = (_a = _this21.controllers.find(function (i) {
+            return i.pathwayNode === currentNode && i.type === 'next';
+          })) !== null && _a !== void 0 ? _a : _this21.controllers.find(function (i) {
+            return i.pathwayNode === currentNode;
+          });
+          if (controller) {
+            _this21.focus(controller.point);
+            fireMouseUpAndSelect$1(controller.point);
+          }
         });
-        // this.editor.on('canvas', 'mouse:move', (event) => {
-        //   const { e, target, pointer } = event;
-        //   if (newNode && newNodeObject) {
-        //     // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-        //     if (newNodeObject.containsPoint(event.pointer)) return;
-        //     const position = { left: pointer.x, top: pointer.y };
-        //     const antiPosition = {
-        //       left: newNodeObject.left! - (pointer.x - newNodeObject.left!),
-        //       top: newNodeObject.top! - (pointer.y - newNodeObject.top!),
-        //     };
-        //     const newCrood = editorPath.calcRelativeCrood(
-        //       position,
-        //       editorPath.nodePathMap.get(newNode.node!)!.originPath
-        //     );
-        //     this.vizPath?.replace(newNode.node!, [
-        //       InstructionType.QUADRATIC_CURCE,
-        //       newCrood.x,
-        //       newCrood.y,
-        //       newNode.node?.x,
-        //       newNode.node?.y,
-        //     ] as Instruction);
-        //     newNodeObject = this.nodeObjectMap.get(newNode!)!;
-        //     // const { next } = this.vizPath?.getNeighboringNodes(newNode!) ?? {};
-        //     // if (next) {
-        //     //   const nextHandlerCrood = editorPath.calcRelativeCrood(
-        //     //     position,
-        //     //     editorPath.nodePathMap.get(next.node!)!.originPath
-        //     //   );
-        //     //   this.vizPath?.replace(next.node!, [
-        //     //     InstructionType.QUADRATIC_CURCE,
-        //     //     nextHandlerCrood.x,
-        //     //     nextHandlerCrood.y,
-        //     //     next.node?.x,
-        //     //     next.node?.y,
-        //     //   ] as Instruction);
-        //     // }
-        //     const { point } = this.controllers.find((i) => i.type === 'pre') ?? {};
-        //     if (point) fireMouseUpAndSelect(point);
-        //     newNodeObject = undefined;
-        //     newNode = undefined;
-        //   }
-        // });
         this.editor.on('canvas', 'mouse:up', function () {
-          newNodeObject = undefined;
+          target = undefined;
+          _this21.editor.canvas.selection = true;
         });
       }
       /**
@@ -12906,69 +12885,48 @@
         if (!this.editor) return;
         var editorPath = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(EditorPath);
         if (!editorPath) return;
-        var newNodeObject;
+        var target;
         this.editor.on('canvas', 'mouse:down:before', function (event) {
           if (_this10.setting.mode !== Mode.ADD) return;
-          var target = event.target,
-            pointer = event.pointer;
-          if (target) {
-            if (_this10.activeNodes.length === 1) _this10.link(_this10.objectNodeMap.get(_this10.activeNodes[0]), _this10.objectNodeMap.get(target));
+          if (event.target) {
+            if (_this10.activeNodes.length === 1 && event.target[VizPath.symbol] === VizPathSymbalType.NODE) {
+              _this10.link(_this10.objectNodeMap.get(_this10.activeNodes[0]), _this10.objectNodeMap.get(event.target));
+            }
             return;
           }
-          newNodeObject = _this10.add({
+          var pointer = event.pointer;
+          target = _this10.add({
             left: pointer.x,
             top: pointer.y
           });
-          _this10.objectNodeMap.get(newNodeObject);
+          _this10.editor.canvas.selection = false;
         });
-        this.editor.on('canvas', 'mouse:down', function (event) {
-          if (!newNodeObject) return;
-          _this10.focus(newNodeObject);
+        this.editor.on('canvas', 'mouse:move', function (event) {
+          var _a;
+          if (!target) return;
+          if (_this10.setting.mode !== Mode.ADD) {
+            target = undefined;
+            _this10.editor.canvas.selection = true;
+            return;
+          }
+          // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+          if (target.containsPoint(event.pointer)) return;
+          var currentNode = _this10.objectNodeMap.get(target);
+          _this10.focus(target);
+          _this10.upgrade(currentNode, 'both');
+          var controller = (_a = _this10.controllers.find(function (i) {
+            return i.pathwayNode === currentNode && i.type === 'next';
+          })) !== null && _a !== void 0 ? _a : _this10.controllers.find(function (i) {
+            return i.pathwayNode === currentNode;
+          });
+          if (controller) {
+            _this10.focus(controller.point);
+            fireMouseUpAndSelect(controller.point);
+          }
         });
-        // this.editor.on('canvas', 'mouse:move', (event) => {
-        //   const { e, target, pointer } = event;
-        //   if (newNode && newNodeObject) {
-        //     // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-        //     if (newNodeObject.containsPoint(event.pointer)) return;
-        //     const position = { left: pointer.x, top: pointer.y };
-        //     const antiPosition = {
-        //       left: newNodeObject.left! - (pointer.x - newNodeObject.left!),
-        //       top: newNodeObject.top! - (pointer.y - newNodeObject.top!),
-        //     };
-        //     const newCrood = editorPath.calcRelativeCrood(
-        //       position,
-        //       editorPath.nodePathMap.get(newNode.node!)!.originPath
-        //     );
-        //     this.vizPath?.replace(newNode.node!, [
-        //       InstructionType.QUADRATIC_CURCE,
-        //       newCrood.x,
-        //       newCrood.y,
-        //       newNode.node?.x,
-        //       newNode.node?.y,
-        //     ] as Instruction);
-        //     newNodeObject = this.nodeObjectMap.get(newNode!)!;
-        //     // const { next } = this.vizPath?.getNeighboringNodes(newNode!) ?? {};
-        //     // if (next) {
-        //     //   const nextHandlerCrood = editorPath.calcRelativeCrood(
-        //     //     position,
-        //     //     editorPath.nodePathMap.get(next.node!)!.originPath
-        //     //   );
-        //     //   this.vizPath?.replace(next.node!, [
-        //     //     InstructionType.QUADRATIC_CURCE,
-        //     //     nextHandlerCrood.x,
-        //     //     nextHandlerCrood.y,
-        //     //     next.node?.x,
-        //     //     next.node?.y,
-        //     //   ] as Instruction);
-        //     // }
-        //     const { point } = this.controllers.find((i) => i.type === 'pre') ?? {};
-        //     if (point) fireMouseUpAndSelect(point);
-        //     newNodeObject = undefined;
-        //     newNode = undefined;
-        //   }
-        // });
         this.editor.on('canvas', 'mouse:up', function () {
-          newNodeObject = undefined;
+          target = undefined;
+          _this10.editor.canvas.selection = true;
         });
       }
       /**
@@ -13628,12 +13586,14 @@
                   if (!editorNode)
                       return;
                   editorNode.setting.mode = 'add';
+                  editorNode.setting.forcePointSymmetric = 'entire';
               },
               onDeactivate: () => {
                   const editorNode = vizPath.find(EditorNode$1);
                   if (!editorNode)
                       return;
                   editorNode.setting.mode = 'move';
+                  editorNode.setting.forcePointSymmetric = 'none';
               },
           },
       ]))
