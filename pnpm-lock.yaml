@@ -10,9 +10,11 @@ specifiers:
   '@rollup/plugin-node-resolve': ^15.2.3
   '@rollup/plugin-terser': ^0.4.4
   '@rollup/plugin-typescript': ^11.1.6
+  '@types/bezier-js': ^4.1.3
   '@types/fabric': ^5.3.7
   '@types/lodash-es': ^4.17.12
   '@types/uuid': ^9.0.8
+  bezier-js: ^6.1.4
   fabric: ^5.3.0
   lodash-es: ^4.17.21
   rollup: ^4.9.6
@@ -39,9 +41,11 @@ devDependencies:
   '@rollup/plugin-node-resolve': 15.2.3_rollup@4.13.0
   '@rollup/plugin-terser': 0.4.4_rollup@4.13.0
   '@rollup/plugin-typescript': 11.1.6_rf7dg5eyhgcu7huxvzkrvqbhii
+  '@types/bezier-js': 4.1.3
   '@types/fabric': 5.3.7
   '@types/lodash-es': 4.17.12
   '@types/uuid': 9.0.8
+  bezier-js: 6.1.4
   fabric: 5.3.0
   rollup: 4.13.0
   rollup-plugin-clear: 2.0.7
@@ -1603,6 +1607,10 @@ packages:
     dev: true
     optional: true
 
+  /@types/bezier-js/4.1.3:
+    resolution: {integrity: sha512-FNVVCu5mx/rJCWBxLTcL7oOajmGtWtBTDjq6DSUWUI12GeePivrZZXz+UgE0D6VYsLEjvExRO03z4hVtu3pTEQ==}
+    dev: true
+
   /@types/estree/1.0.5:
     resolution: {integrity: sha512-/kYRxGDLWzHOB7q+wtSUQlFrtcdUccpfy+X+9iMBpHK8QLLhx2wIPYuS5DYtR9Wa/YlZAbIovy7qVdB1Aq6Lyw==}
     dev: true
@@ -1788,6 +1796,11 @@ packages:
 
   /balanced-match/1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
+    dev: true
+
+  /bezier-js/6.1.4:
+    resolution: {integrity: sha512-PA0FW9ZpcHbojUCMu28z9Vg/fNkwTj5YhusSAjHHDfHDGLxJ6YUKrAN2vk1fP2MMOxVw4Oko16FMlRGVBGqLKg==}
+    requiresBuild: true
     dev: true
 
   /binary-extensions/2.2.0:

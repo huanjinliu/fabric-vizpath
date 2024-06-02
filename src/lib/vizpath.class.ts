@@ -7,7 +7,8 @@ import {
   InstructionType,
   type PathwayNode,
 } from '.';
-import { parsePathJSON, reinitializePath, repairPath } from '@utils';
+import { parsePathJSON, repairPath } from '@utils';
+import round from 'lodash-es/round';
 
 export enum VizPathSymbalType {
   PATH = 'path',
@@ -202,40 +203,43 @@ class VizPath {
   /**
    * 提取当前路径的信息
    */
-  exportPathwayD(pathway: ResponsivePathway = this.pathway) {
-    const ds = pathway
-      .map(({ section, originPath }) => {
-        const matrix = [...originPath.calcOwnMatrix()] as Matrix;
-        const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
-        const instructions = section.map((item) => {
-          const instruction = [...item.instruction];
-          for (let i = 0; i < instruction.length - 1; i += 2) {
-            const point = fabric.util.transformPoint(new fabric.Point(
+  exportPathway(pathway: ResponsivePathway = this.pathway) {
+    const ds = pathway.map(({ section, originPath }) => {
+      const matrix = [...originPath.calcOwnMatrix()] as Matrix;
+      const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
+      const instructions = section.map((item) => {
+        const instruction = [...item.instruction];
+        for (let i = 0; i < instruction.length - 1; i += 2) {
+          const point = fabric.util.transformPoint(
+            new fabric.Point(
               instruction[i + 1] as number,
               instruction[i + 2] as number
-            ), matrix);
-            const offset = fabric.util.transformPoint(
-              originPath.pathOffset,
-              matrixWithoutTranslate
-            );
-            point.x -= offset.x;
-            point.y -= offset.y;
-            instruction[i + 1] = point.x;
-            instruction[i + 2] = point.y;
-          }
-          return instruction;
-        });
-        return (fabric.util as any).joinPath(instructions);
+            ),
+            matrix
+          );
+          const offset = fabric.util.transformPoint(
+            originPath.pathOffset,
+            matrixWithoutTranslate
+          );
+          point.x -= offset.x;
+          point.y -= offset.y;
+          instruction[i + 1] = round(point.x, 3);
+          instruction[i + 2] = round(point.y, 3);
+        }
+        return instruction;
       });
-    return ds.join(' ');
+      return instructions;
+    });
+    return ds;
   }
 
   /**
-   * 输出路径指令
+   * 提取当前路径的信息
    */
-  // toPathD(pathway: ResponsivePathway = this.pathway) {
-  //   return (fabric.util as any).joinPath(this.toPaths(pathway)) as string;
-  // }
+  exportPathwayD(pathway: ResponsivePathway = this.pathway) {
+    const sections = this.exportPathway(pathway);
+    return sections.map((fabric.util as any).joinPath).join(' ');
+  }
 
   /**
    * 获取路径或指令列表所在的路径
@@ -806,9 +810,9 @@ class VizPath {
           indexes.length <= 1
             ? indexes
             : indexes.filter(
-              (i, idx, arr) =>
-                arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
-            );
+                (i, idx, arr) =>
+                  arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i)
+              );
 
         for (let i = removeIndexes.length - 1, startIndex = 0; i >= 0; i--) {
           const instructions = _sections[0];

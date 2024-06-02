@@ -8,12 +8,17 @@ class Editor extends EditorModule {
   /**
    * 挂载的画布
    */
-  private _mountCanvas: fabric.Canvas;
+  mountCanvas: fabric.Canvas | null = null;
 
   /**
    * 交互所在fabric画布
    */
   canvas: fabric.Canvas | null = null;
+
+  /**
+   * 是否隔离
+   */
+  isolation = false;
 
   /**
    * 监听事件
@@ -28,21 +33,16 @@ class Editor extends EditorModule {
    * 构造函数
    * @param options 更多配置
    */
-  constructor(canvas: fabric.Canvas) {
+  constructor(mountCanvas: fabric.Canvas, isolation = false) {
     super();
-    this._mountCanvas = canvas;
+    this.mountCanvas = mountCanvas;
+    this.isolation = isolation;
   }
 
   /**
    * 基于挂载画布构建编辑器画布
    */
   private _createEditorCanvas(canvas: fabric.Canvas) {
-    if (!(canvas instanceof fabric.Canvas)) {
-      throw new TypeError(
-        'Please use fabric.Canvas instead of fabric.StaticCanvas.'
-      );
-    }
-
     const container = canvas.getElement().parentNode as HTMLDivElement;
     if (!container) {
       throw new TypeError(
@@ -50,36 +50,45 @@ class Editor extends EditorModule {
       );
     }
 
-    const editorCanvas = document.createElement('canvas');
-    container.appendChild(editorCanvas);
+    // 如果使用隔离画布则会参考配置构造新画布使与原画布隔离
+    if (this.isolation) {
+      const editorCanvas = document.createElement('canvas');
+      container.appendChild(editorCanvas);
 
-    const editorFabricCanvas = new fabric.Canvas(editorCanvas, {
-      width: container.clientWidth,
-      height: container.clientHeight,
-      selection: true,
-      skipOffscreen: false,
-      preserveObjectStacking: true,
-      selectionColor: canvas.selectionColor,
-      selectionBorderColor: canvas.selectionBorderColor,
-      selectionDashArray: canvas.selectionDashArray,
-      selectionLineWidth: canvas.selectionLineWidth,
-    });
+      const editorFabricCanvas = new fabric.Canvas(editorCanvas, {
+        // 跟随尺寸
+        width: container.clientWidth,
+        height: container.clientHeight,
+        // 允许画布多选
+        selection: true,
+        // 画布渲染不跳过离屏元素
+        skipOffscreen: false,
+        // 保持选中元素的层级关系
+        preserveObjectStacking: true,
+        // 保留多选框配置
+        selectionColor: canvas.selectionColor,
+        selectionBorderColor: canvas.selectionBorderColor,
+        selectionDashArray: canvas.selectionDashArray,
+        selectionLineWidth: canvas.selectionLineWidth,
+      });
 
-    editorFabricCanvas.setViewportTransform(
-      canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
-    );
+      // 保留画布变换
+      editorFabricCanvas.setViewportTransform(
+        canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
+      );
 
-    return editorFabricCanvas;
+      // 更多画布配置需要使用者外部配置
+
+      return editorFabricCanvas;
+    }
+
+    return canvas;
   }
 
   /**
    * 添加事件监听
    */
-  on(
-    type: 'global' | 'canvas',
-    eventName: string,
-    handler: (e: any) => void
-  ) {
+  on(type: 'global' | 'canvas', eventName: string, handler: (e: any) => void) {
     if (!this.canvas) return;
 
     if (type === 'global') {
@@ -104,7 +113,7 @@ class Editor extends EditorModule {
     const canvas = this.canvas;
     if (!canvas) return;
 
-    this.listeners = this.listeners.filter(listener => {
+    this.listeners = this.listeners.filter((listener) => {
       if (handler && handler !== listener.handler) return true;
       if (eventName === listener.eventName) {
         if (type === 'global') {
@@ -116,11 +125,37 @@ class Editor extends EditorModule {
         return false;
       }
       return true;
-    })
+    });
   }
 
-  load(editor: Vizpath) {
-    this.canvas = this._createEditorCanvas(this._mountCanvas);
+  unload() {
+    // 如果是隔离画布要销毁克隆画布
+    if (this.isolation) {
+      this.canvas?.dispose();
+    } else {
+      this.listeners.forEach(({ type, eventName, handler }) => {
+        this.off(type, eventName, handler);
+      });
+    }
+
+    this.mountCanvas = null;
+    this.canvas = null;
+    this.isolation = false;
+    this.listeners.length = 0;
+  }
+
+  async load() {
+    if (!this.mountCanvas) {
+      throw new TypeError('Please use valid canvas object.');
+    }
+
+    if (!(this.mountCanvas instanceof fabric.Canvas)) {
+      throw new TypeError(
+        'Please use fabric.Canvas instead of fabric.StaticCanvas.'
+      );
+    }
+
+    this.canvas = this._createEditorCanvas(this.mountCanvas);
   }
 }
 

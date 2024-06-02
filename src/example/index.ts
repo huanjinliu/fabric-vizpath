@@ -8,6 +8,7 @@ import {
   EditorUI,
   EditorShortcut,
   utils,
+  EditorBezier,
 } from 'fabric-path-editor';
 import theme from 'fabric-path-editor/dist/themes/default/index';
 
@@ -113,6 +114,7 @@ const EXAMPLE_PATH_D = {
     .use(new EditorBackground())
     .use(new EditorPath())
     .use(new EditorNode())
+    .use(new EditorBezier())
     .use(
       new EditorShortcut([
         // 删除节点快捷键
