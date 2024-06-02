@@ -49,29 +49,29 @@ class EditorBezier extends EditorModule {
 
       if (!target || !editorNode.nodes.includes(target)) return;
 
-      const controls = editorNode.controllers.filter((i) => i.node === target);
+      const curveDots = editorNode.curveDots.filter((i) => i.node === target);
 
       // 如果有控制点直接降级为直线
-      if (controls.length) {
+      if (curveDots.length) {
         editorNode.degrade(target, 'both', true);
         return;
       }
       // 否则则升级为曲线
-      const pathwayNode = editorNode.objectNodeMap.get(target)!;
-      const { pre, next } = vizpath.getNeighboringNodes(pathwayNode);
+      const pathNode = editorNode.objectNodeMap.get(target)!;
+      const { pre, next } = vizpath.getNeighboringNodes(pathNode);
 
       if (pre && next) {
-        const points = [pre, pathwayNode, next].map((item) => item.node!);
+        const points = [pre, pathNode, next].map((item) => item.node!);
         // 这里使用quadraticFromPoints，是使三个点组合成曲线路径（点都在曲线上）
         const splitCurves = this._splitInstruction(
           (Bezier as any).quadraticFromPoints(...points).points,
           points[1],
         );
-        const neighboringInstructions = vizpath.getNeighboringInstructions(pathwayNode);
+        const neighboringInstructions = vizpath.getNeighboringInstructions(pathNode);
         vizpath.replace(
-          pathwayNode.instruction[0] === InstructionType.START
+          pathNode.instruction[0] === InstructionType.START
             ? neighboringInstructions.pre!
-            : pathwayNode,
+            : pathNode,
           splitCurves.pre,
         );
         vizpath.replace(neighboringInstructions.next!, splitCurves.next);

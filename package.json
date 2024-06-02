@@ -1,7 +1,7 @@
 {
   "name": "fabric-path-editor",
   "version": "0.0.1",
-  "description": "An editor of path for Fabric.js(http://fabricjs.com)",
+  "description": "A path editor for Fabric.js(http://fabricjs.com)",
   "homepage": "https://huanjinliu.github.io/fabric-path-editor",
   "main": "dist/index.js",
   "module": "dist/index.es.js",

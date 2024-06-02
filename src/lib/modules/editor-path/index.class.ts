@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid';
 import VizPath, {
   VizPathSymbalType,
   type ResponsiveCrood,
-  type ResponsivePathway,
+  type ResponsivePath,
 } from '../../vizpath.class';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
@@ -13,9 +13,9 @@ import { parsePathJSON, repairPath } from '@utils';
 class EditorPath extends EditorModule {
   static ID = 'editor-path';
 
-  paths: ResponsivePathway = [];
+  paths: ResponsivePath = [];
 
-  nodePathMap = new WeakMap<ResponsiveCrood, ResponsivePathway[number]>([]);
+  nodePathMap = new WeakMap<ResponsiveCrood, ResponsivePath[number]>([]);
 
   /**
    * 将画布坐标转化为特定路径的相对指令坐标位置
@@ -95,14 +95,14 @@ class EditorPath extends EditorModule {
       return;
     }
 
-    const handler = (pathway: ResponsivePathway) => {
+    const handler = (path: ResponsivePath) => {
       const ui = vizPath.context.find(EditorUI);
 
-      pathway.forEach((item) => {
-        const { originPath } = item;
+      path.forEach((item) => {
+        const { pathObject } = item;
 
         // 如果已经带有标志则是已经添加进画布的路径
-        if (originPath[VizPath.symbol]) return;
+        if (pathObject[VizPath.symbol]) return;
 
         const decorator: ThemeDecorator<fabric.Path> = (customPath, callback) => {
           customPath.set({
@@ -121,23 +121,23 @@ class EditorPath extends EditorModule {
 
           return customPath;
         };
-        (ui?.options.path ?? EditorUI.noneUI.path)(decorator, originPath);
-        if (!originPath[VizPath.symbol]) decorator(item.originPath);
+        (ui?.options.path ?? EditorUI.noneUI.path)(decorator, pathObject);
+        if (!pathObject[VizPath.symbol]) decorator(item.pathObject);
       });
 
       // 添加新的路径对象
       canvas.renderOnAddRemove = true;
-      pathway.forEach(({ originPath }) => {
-        if (!canvas.contains(originPath)) canvas.add(originPath);
+      path.forEach(({ pathObject }) => {
+        if (!canvas.contains(pathObject)) canvas.add(pathObject);
       });
       canvas.renderOnAddRemove = false;
       canvas.requestRenderAll();
 
-      this.paths.push(...pathway);
+      this.paths.push(...path);
 
       // 建立映射关系，便于减少后续计算
       this.paths.forEach((item) => {
-        item.section.forEach(({ node }) => {
+        item.segment.forEach(({ node }) => {
           if (node) this.nodePathMap.set(node, item);
         });
       });
@@ -159,23 +159,23 @@ class EditorPath extends EditorModule {
       return;
     }
 
-    const handler = (pathway: ResponsivePathway) => {
-      canvas.remove(...pathway.map((i) => i.originPath));
+    const handler = (path: ResponsivePath) => {
+      canvas.remove(...path.map((i) => i.pathObject));
 
-      this.paths = this.paths.filter((i) => pathway.includes(i));
+      this.paths = this.paths.filter((i) => path.includes(i));
 
       // 清除映射
-      pathway.forEach((item) => {
-        item.section.forEach(({ node }) => {
+      path.forEach((item) => {
+        item.segment.forEach(({ node }) => {
           if (node) this.nodePathMap.delete(node);
         });
       });
     };
     vizPath.on('clear', handler);
     vizPath.on('clearAll', () => {
-      canvas.remove(...this.paths.map((i) => i.originPath));
+      canvas.remove(...this.paths.map((i) => i.pathObject));
       this.paths.forEach((item) => {
-        item.section.forEach(({ node }) => {
+        item.segment.forEach(({ node }) => {
           if (node) this.nodePathMap.delete(node);
         });
       });

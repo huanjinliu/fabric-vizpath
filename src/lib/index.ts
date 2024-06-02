@@ -22,19 +22,19 @@ export enum InstructionType {
 
 export type Instruction = [InstructionType, ...number[]];
 
-export type PathwayNode<T extends Crood = Crood> = {
-  section: PathwayNode<T>[];
+export type PathNode<T extends Crood = Crood> = {
+  segment: PathNode<T>[];
   instruction: Instruction;
   node?: T;
-  controllers?: Partial<{
+  curveDots?: Partial<{
     pre: T;
     next: T;
   }>;
 };
 
-export type Pathway = {
-  section: PathwayNode[];
-  originPath: fabric.Path;
+export type Path = {
+  segment: PathNode[];
+  pathObject: fabric.Path;
 }[];
 
 type VizPathOptions = {
@@ -74,69 +74,69 @@ class VizPathContext {
    * @param path farbic路径对象
    * @example
    *
-   * const pathway = getPathwayFromObject(new fabric.Path());
+   * const path = parseFabricPath(new fabric.Path());
    */
-  static parsePathFromObject(path: fabric.Path) {
-    const { layout, styles } = parsePathJSON(path);
+  static parseFabricPath(pathObject: fabric.Path) {
+    const { layout, styles } = parsePathJSON(pathObject);
 
     /**
      * 第一步：拆分组合路径， 如 new fabric.Path('M 0 0 L 10 10 z M 20 20 L 40 40 z')
      */
-    const instructions = cloneDeep(path.path as unknown as Instruction[]);
-    const sections = VizPath.getPathSections(instructions).map((section) => {
+    const instructions = cloneDeep(pathObject.path as unknown as Instruction[]);
+    const segments = VizPath.getPathSegments(instructions).map((segment) => {
       // 为每个子路径分配新建的路径对象
-      const originPath = new fabric.Path((fabric.util as any).joinPath(section), styles);
+      const pathObject = new fabric.Path((fabric.util as any).joinPath(segment), styles);
 
-      originPath.path = section as unknown as fabric.Point[];
+      pathObject.path = segment as unknown as fabric.Point[];
 
-      return { section, originPath };
+      return { segment, pathObject };
     });
 
     // 建立组并销毁组是为了保持子路径对象的正确尺寸和位置
     new fabric.Group(
-      sections.map((i) => i.originPath),
+      segments.map((i) => i.pathObject),
       layout,
     ).destroy();
 
     /**
-     * 第二步：组合pathway
+     * 第二步：组合path
      */
-    const pathway: Pathway = sections.map(({ section, originPath }) => {
+    const path: Path = segments.map(({ segment, pathObject }) => {
       // ① 清除组合元素对路径的偏移影响
-      clearPathOffset(originPath);
-      repairPath(originPath);
+      clearPathOffset(pathObject);
+      repairPath(pathObject);
 
       // ② 修正头指令，头指令必须是M开始指令，其他的也没效果
-      if (section[0][0] !== InstructionType.START) {
-        section[0] = [
+      if (segment[0][0] !== InstructionType.START) {
+        segment[0] = [
           InstructionType.START,
-          ...section[0].slice(section[0].length - 2),
+          ...segment[0].slice(segment[0].length - 2),
         ] as Instruction;
       }
 
       // ③ 闭合指令的字母全改为大小以保证统一处理
-      if (section[section.length - 1][0].toUpperCase() === InstructionType.CLOSE) {
-        section[section.length - 1][0] = InstructionType.CLOSE;
+      if (segment[segment.length - 1][0].toUpperCase() === InstructionType.CLOSE) {
+        segment[segment.length - 1][0] = InstructionType.CLOSE;
       }
 
       // ④ 小于两个点的闭合路径直接解除闭合
-      if (section.length <= 2 && section[section.length - 1][0] === InstructionType.CLOSE) {
-        section.pop();
+      if (segment.length <= 2 && segment[segment.length - 1][0] === InstructionType.CLOSE) {
+        segment.pop();
       }
 
       // ⑤ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
-      const isAutoClose = section[section.length - 1][0] === InstructionType.CLOSE;
+      const isAutoClose = segment[segment.length - 1][0] === InstructionType.CLOSE;
       if (isAutoClose) {
-        const startPoint = section[0].slice(section[0].length - 2);
-        const endPoint = section[section.length - 2].slice(section[section.length - 2].length - 2);
+        const startPoint = segment[0].slice(segment[0].length - 2);
+        const endPoint = segment[segment.length - 2].slice(segment[segment.length - 2].length - 2);
         if (
           // 如果路径只有一个起始点且闭合[M,Z]
-          section[0] === section[section.length - 2] ||
+          segment[0] === segment[segment.length - 2] ||
           // 或者路径闭合但是最后一个路径节点不完全等于起始点
           endPoint[0] !== startPoint[0] ||
           endPoint[1] !== startPoint[1]
         ) {
-          section.splice(section.length - 1, 0, [
+          segment.splice(segment.length - 1, 0, [
             InstructionType.LINE,
             startPoint[0],
             startPoint[1],
@@ -144,22 +144,22 @@ class VizPathContext {
         }
       }
 
-      // ⑤ 创建pathway
-      const _section: PathwayNode[] = [];
-      section.forEach((instruction) => {
-        _section.push({
-          section: _section,
+      // ⑤ 创建path
+      const _segment: PathNode[] = [];
+      segment.forEach((instruction) => {
+        _segment.push({
+          segment: _segment,
           instruction,
         });
       });
 
       return {
-        section: _section,
-        originPath,
+        segment: _segment,
+        pathObject,
       };
     });
 
-    return pathway;
+    return path;
   }
 
   /**
@@ -168,9 +168,9 @@ class VizPathContext {
    * @param d 路径指令信息
    * @example
    *
-   * const pathway = getPathwayFromPathD('M 0 0 L 100 100');
+   * const path = parsePathData('M 0 0 L 100 100');
    */
-  static parsePathFromPathD(d: string, options: fabric.IObjectOptions = {}) {
+  static parsePathData(d: string, options: fabric.IObjectOptions = {}) {
     const path = new fabric.Path(
       d,
       defaults(options, {
@@ -178,7 +178,7 @@ class VizPathContext {
         top: 0,
       }),
     );
-    return this.parsePathFromObject(path);
+    return this.parseFabricPath(path);
   }
 
   /**
@@ -187,9 +187,9 @@ class VizPathContext {
    * @param d 路径指令信息
    * @example
    *
-   * const pathway = getPathwayFromPathD('M 0 0 L 100 100');
+   * const path = parsePathFile('http');
    */
-  static async parsePathFromURL(url: string, options: fabric.IObjectOptions = {}) {
+  static async parsePathFile(url: string, options: fabric.IObjectOptions = {}) {
     const object = await loadSVGToPathFromURL(url);
     if (!object) return;
 
@@ -197,7 +197,7 @@ class VizPathContext {
 
     if (options) pathGroup.set({ ...options });
 
-    const pathways: Pathway[] = [];
+    const paths: Path[] = [];
 
     const extract = (group: fabric.Group) => {
       const children = group.getObjects();
@@ -206,13 +206,13 @@ class VizPathContext {
         if (child.type === 'group') {
           extract(child as fabric.Group);
         } else if (child.type === 'path') {
-          pathways.push(VizPathContext.parsePathFromObject(child as fabric.Path));
+          paths.push(VizPathContext.parseFabricPath(child as fabric.Path));
         }
       });
     };
     extract(pathGroup);
 
-    return pathways;
+    return paths;
   }
 
   /**

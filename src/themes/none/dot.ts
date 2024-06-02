@@ -2,7 +2,7 @@ import { fabric } from 'fabric';
 import EditorNode from 'src/lib/modules/editor-node/index.class';
 import type { Theme } from 'src/lib/modules/editor-ui/index.class';
 
-const createPoint: Theme['controllerPoint'] = (decorator) => {
+const createCurveDot: Theme['dot'] = (decorator) => {
   const circle = new fabric.Circle({
     radius: 3,
     fill: '#ffffff',
@@ -14,4 +14,4 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
   return circle;
 };
 
-export default createPoint;
+export default createCurveDot;

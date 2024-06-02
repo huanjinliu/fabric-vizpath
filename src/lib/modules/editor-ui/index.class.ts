@@ -10,10 +10,10 @@ export type ThemeDecorator<InputType, OutputType = InputType> = (
 ) => OutputType;
 
 export interface Theme {
-  path: (decorator: ThemeDecorator<fabric.Path>, originPath: fabric.Path) => fabric.Path;
+  path: (decorator: ThemeDecorator<fabric.Path>, pathObject: fabric.Path) => fabric.Path;
   node: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
-  controllerPoint: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
-  controllerLine: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
+  dot: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
+  line: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
 }
 
 class EditorUI extends EditorModule {

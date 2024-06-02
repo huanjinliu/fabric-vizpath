@@ -9,7 +9,6 @@ import {
   EditorShortcut,
   EditorBezier,
 } from 'fabric-path-editor';
-import theme from 'fabric-path-editor/dist/themes/default/index';
 
 const EXAMPLE_PATH_D = {
   point: 'M 100 100 z',
@@ -25,14 +24,13 @@ const EXAMPLE_PATH_D = {
   banana:
     'M 8,223 c 0,0 143,3 185,-181 c 2,-11 -1,-20 1,-33 h 16 c 0,0 -3,17 1,30 c 21,68 -4,242 -204,196 L 8,223 z M 8,230 c 0,0 188,40 196,-160',
   test: 'M -150 50 z M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100',
+  favicon:
+    'M 295.233 250.642 L 390.393 281.854 C 391.402 282.189 392.1 283.112 392.145 284.174 C 392.191 285.236 391.575 286.216 390.598 286.636 L 346.157 305.682 L 326.998 350.39 C 326.586 351.364 325.619 351.985 324.562 351.953 C 323.506 351.921 322.578 351.243 322.226 350.247 L 288.823 257.237 C 288.163 255.397 288.609 253.342 289.971 251.94 C 291.334 250.539 293.375 250.035 295.233 250.642 L 295.233 250.642 Z M 346.72 156.24 C 362.4 156.244 375.375 168.438 376.351 184.088 C 377.327 199.738 365.967 213.449 350.408 215.401 C 334.85 217.353 320.456 206.872 317.536 191.465 C 278.386 195.181 245.902 223.319 236.64 261.538 C 249.18 267.502 255.91 281.363 252.842 294.906 C 249.773 308.449 237.726 318.055 223.84 318.032 C 208.938 318.053 196.329 307.026 194.362 292.256 C 192.396 277.485 201.68 263.543 216.068 259.664 C 226.553 210.348 269.336 172.951 321.232 170.678 C 326.595 161.716 336.275 156.232 346.72 156.24 Z M 223.84 277.072 C 219.816 277.072 216.097 279.219 214.085 282.704 C 212.073 286.189 212.073 290.483 214.085 293.968 C 216.097 297.453 219.816 299.6 223.84 299.6 C 230.061 299.6 235.104 294.557 235.104 288.336 C 235.104 282.115 230.061 277.072 223.84 277.072 Z M 346.72 174.672 C 342.696 174.672 338.977 176.819 336.965 180.304 C 334.953 183.789 334.953 188.083 336.965 191.568 C 338.977 195.053 342.696 197.2 346.72 197.2 C 352.941 197.2 357.984 192.157 357.984 185.936 C 357.984 179.715 352.941 174.672 346.72 174.672 L 346.72 174.672 Z',
 };
 
 (async () => {
   // 取得上传文件输入框
   const uploader = document.getElementById('upload') as HTMLInputElement;
-
-  // 取得操作按钮
-  const btnDelete = document.getElementById('btn-delete') as HTMLButtonElement;
 
   // 取得容器节点
   const container = document.getElementsByTagName('main')[0];
@@ -61,12 +59,10 @@ const EXAMPLE_PATH_D = {
 
   fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
-  const path = new fabric.Path(EXAMPLE_PATH_D.test, {
+  const path = new fabric.Path(EXAMPLE_PATH_D.favicon, {
     objectCaching: false,
     noScaleCache: false,
-    // fill: 'transparent'，
-    fill: '#59d571',
-    stroke: '#5c7461',
+    fill: '#e1e1e1',
     strokeWidth: 2,
     originX: 'center',
     originY: 'center',
@@ -108,8 +104,8 @@ const EXAMPLE_PATH_D = {
   });
 
   const operator = await vizPath
-    .use(new Editor(fabricCanvas))
-    .use(new EditorUI(theme))
+    .use(new Editor(fabricCanvas, true))
+    .use(new EditorUI())
     .use(new EditorBackground())
     .use(new EditorPath())
     .use(new EditorNode())
@@ -217,7 +213,7 @@ const EXAMPLE_PATH_D = {
     .initialize();
 
   // // ① 通过路径指令直接绘制
-  // const pathway1 = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.test, {
+  // const path1 = VizPath.parsePathData(EXAMPLE_PATH_D.test, {
   //   left: pathText.left,
   //   top: pathText.top,
   //   originX: pathText.originX,
@@ -226,10 +222,10 @@ const EXAMPLE_PATH_D = {
   //   scaleX: pathText.scaleX,
   //   scaleY: pathText.scaleY,
   // });
-  // operator.draw(pathway1);
+  // operator.draw(path1);
 
   // operator.on('update', () => {
-  //   const d = operator.exportPathwayD(operator.pathway);
+  //   const d = operator.getPathData(operator.path);
 
   //   // 更新旧的路径信息
   //   path.initialize(d as any);
@@ -253,11 +249,11 @@ const EXAMPLE_PATH_D = {
   // });
 
   // ② 通过路径对象绘制
-  const pathway2 = VizPath.parsePathFromObject(path);
-  operator.draw(pathway2);
+  const path2 = VizPath.parseFabricPath(path);
+  operator.draw(path2);
 
   operator.on('update', () => {
-    const d = operator.exportPathwayD(operator.pathway);
+    const d = operator.getPathData(operator.path);
 
     path.set({
       scaleX: 1,
@@ -268,7 +264,7 @@ const EXAMPLE_PATH_D = {
 
     path.canvas?.renderAll();
 
-    // const d = operator.exportPathwayD(operator.pathway);
+    // const d = operator.getPathData(operator.path);
 
     // // 更新旧的路径信息
     // path.initialize(d as any);
@@ -293,7 +289,7 @@ const EXAMPLE_PATH_D = {
   // ③ 通过URL绘制
   // const svgURL = 'https://storage.sunzi.cool/image-template/2100d3fa-fbf0-4e7e-aa32-7afcf764fb62.svg';
   // const svgURL = 'https://sunzi-cool.maiyuan.online/image-template/d306e5f3-2c30-4599-b8a5-5348de226350.svg';
-  // const pathways = await VizPath.parsePathFromURL(svgURL, {
+  // const paths = await VizPath.parsePathFile(svgURL, {
   //   left: fabricCanvas.getWidth() / 2,
   //   top: fabricCanvas.getHeight() / 2,
   //   originX: 'center',
@@ -301,18 +297,18 @@ const EXAMPLE_PATH_D = {
   //   scaleX: 1.2,
   //   scaleY: 1.2
   // });
-  // pathways?.forEach((pathway) => {
-  //   operator.draw(pathway);
+  // paths?.forEach((path) => {
+  //   operator.draw(path);
   // })
 
   // ④ 快速使用
-  // const pathway = VizPath.parsePathFromPathD(EXAMPLE_PATH_D.bubble, {
+  // const path = VizPath.parsePathData(EXAMPLE_PATH_D.bubble, {
   //   left: fabricCanvas.getWidth() / 2,
   //   top: fabricCanvas.getHeight() / 2,
   //   originX: 'center',
   //   originY: 'center'
   // });
-  // operator.draw(pathway);
+  // operator.draw(path);
 
   // 上传input
   uploader.onchange = async (e: Event) => {
@@ -322,25 +318,16 @@ const EXAMPLE_PATH_D = {
     operator.clearAll();
 
     const url = URL.createObjectURL(file);
-    const pathways = await VizPath.parsePathFromURL(url, {
+    const paths = await VizPath.parsePathFile(url, {
       left: fabricCanvas.getWidth() / 2,
       top: fabricCanvas.getHeight() / 2,
       originX: 'center',
       originY: 'center',
     });
-    pathways?.forEach((pathway) => {
-      operator.draw(pathway);
+    paths?.forEach((path) => {
+      operator.draw(path);
     });
   };
-
-  // 操作按钮
-  btnDelete.addEventListener('click', () => {
-    const editorNode = vizPath.find(EditorNode);
-    if (!editorNode) return;
-
-    // if (editorNode.activePoint) editorNode.remove(editorNode.activePoint);
-    if (editorNode.activeNodes.length) editorNode.remove(...editorNode.activeNodes);
-  });
 
   // 操作测试
   // const editorNode = vizPath.find(EditorNode);
@@ -353,7 +340,7 @@ const EXAMPLE_PATH_D = {
 
   // editorNode.remove();
 
-  // operator.move(operator.pathway[0][0].node, { x: 200, y: 200 })
+  // operator.move(operator.path[0][0].node, { x: 200, y: 200 })
 
-  // operator.insert(operator.pathway[0].section[0].node!, { x: 100, y: 100 }, true);
+  // operator.insert(operator.path[0].segment[0].node!, { x: 100, y: 100 }, true);
 })();

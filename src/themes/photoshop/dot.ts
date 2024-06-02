@@ -2,7 +2,7 @@ import { fabric } from 'fabric';
 import EditorNode from 'src/lib/modules/editor-node/index.class';
 import type { Theme } from 'src/lib/modules/editor-ui/index.class';
 
-const createPoint: Theme['controllerPoint'] = (decorator) => {
+const createCurveDot: Theme['dot'] = (decorator) => {
   const circle = new fabric.Circle({
     radius: 3,
     fill: '#ffffff',
@@ -15,8 +15,8 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
       const editorNode = context.find(EditorNode);
       if (!editorNode) return;
 
-      const controller = editorNode.controllers.find((i) => i.point === object)!;
-      return controller?.node;
+      const curveDot = editorNode.curveDots.find((i) => i.point === object)!;
+      return curveDot?.node;
     };
 
     object.on('selected', () => {
@@ -47,4 +47,4 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
   });
 };
 
-export default createPoint;
+export default createCurveDot;

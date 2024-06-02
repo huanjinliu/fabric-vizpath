@@ -63,11 +63,6 @@ class Editor extends EditorModule {
         skipOffscreen: false,
         // 保持选中元素的层级关系
         preserveObjectStacking: true,
-        // 保留多选框配置
-        selectionColor: canvas.selectionColor,
-        selectionBorderColor: canvas.selectionBorderColor,
-        selectionDashArray: canvas.selectionDashArray,
-        selectionLineWidth: canvas.selectionLineWidth,
       });
 
       // 保留画布变换
