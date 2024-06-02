@@ -15,5 +15,4 @@ export const reinitializePath = (path: fabric.Path, d: string) => {
   path.setCoords();
 };
 
-
 export default reinitializePath;

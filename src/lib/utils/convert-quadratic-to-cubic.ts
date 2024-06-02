@@ -1,4 +1,4 @@
-import { InstructionType, type Instruction } from "..";
+import { InstructionType, type Instruction } from '..';
 
 /**
  * 将二阶曲线转换为三阶贝塞尔曲线
@@ -29,6 +29,6 @@ const convertQuadraticToCubic = (p0: Crood, instruction: Instruction) => {
 
   // 创建三阶贝塞尔曲线指令
   return ['C', q1.x, q1.y, q2.x, q2.y, q3.x, q3.y] as Instruction;
-}
+};
 
 export default convertQuadraticToCubic;

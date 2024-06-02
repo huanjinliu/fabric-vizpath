@@ -165,20 +165,9 @@ const loadSVGToPathFromURL = async (url: string) => {
         break;
       }
       case 'line': {
-        const {
-          type,
-          visible,
-          x1 = 0,
-          x2 = 0,
-          y1 = 0,
-          y2 = 0,
-          ...rest
-        } = svg as fabric.Line;
+        const { type, visible, x1 = 0, x2 = 0, y1 = 0, y2 = 0, ...rest } = svg as fabric.Line;
 
-        path = convertPolygonPath([
-          new fabric.Point(x1, y1),
-          new fabric.Point(x2, y2),
-        ]);
+        path = convertPolygonPath([new fabric.Point(x1, y1), new fabric.Point(x2, y2)]);
 
         path.set(rest);
 
@@ -186,12 +175,7 @@ const loadSVGToPathFromURL = async (url: string) => {
       }
       case 'polygon':
       case 'polyline': {
-        const {
-          type,
-          visible,
-          points = [],
-          ...rest
-        } = svg as fabric.Polygon | fabric.Polyline;
+        const { type, visible, points = [], ...rest } = svg as fabric.Polygon | fabric.Polyline;
 
         path = convertPolygonPath(points);
 
@@ -231,7 +215,7 @@ const loadSVGToPathFromURL = async (url: string) => {
         (objects) => {
           resolve(fabric.util.groupSVGElements(objects));
         },
-        storeShapeSourceData
+        storeShapeSourceData,
       );
     });
 

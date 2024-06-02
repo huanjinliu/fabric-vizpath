@@ -15,9 +15,7 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
       const editorNode = context.find(EditorNode);
       if (!editorNode) return;
 
-      const controller = editorNode.controllers.find(
-        (i) => i.point === object
-      )!;
+      const controller = editorNode.controllers.find((i) => i.point === object)!;
       return controller?.node;
     };
 
@@ -27,11 +25,11 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
       });
 
       const node = getBelongNode();
-      if (node) node.set({ fill: "#1884ec" });
+      if (node) node.set({ fill: '#1884ec' });
 
       object.canvas?.requestRenderAll();
     });
-  
+
     object.on('deselected', () => {
       circle.set({
         fill: '#ffffff',
@@ -40,12 +38,12 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
       const node = getBelongNode();
       if (node) {
         node.set({
-          fill: node.canvas?.getActiveObject() === node ? "#1884ec" : "#ffffff"
+          fill: node.canvas?.getActiveObject() === node ? '#1884ec' : '#ffffff',
         });
       }
 
       object.canvas?.requestRenderAll();
-    })
+    });
   });
 };
 

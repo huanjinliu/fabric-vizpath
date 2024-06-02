@@ -7,7 +7,6 @@ import {
   EditorNode,
   EditorUI,
   EditorShortcut,
-  utils,
   EditorBezier,
 } from 'fabric-path-editor';
 import theme from 'fabric-path-editor/dist/themes/default/index';
@@ -62,7 +61,7 @@ const EXAMPLE_PATH_D = {
 
   fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
-  let path = new fabric.Path(EXAMPLE_PATH_D.test, {
+  const path = new fabric.Path(EXAMPLE_PATH_D.test, {
     objectCaching: false,
     noScaleCache: false,
     // fill: 'transparent'，
@@ -213,7 +212,7 @@ const EXAMPLE_PATH_D = {
             editorNode.setting.forcePointSymmetric = 'none';
           },
         },
-      ])
+      ]),
     )
     .initialize();
 
@@ -340,8 +339,7 @@ const EXAMPLE_PATH_D = {
     if (!editorNode) return;
 
     // if (editorNode.activePoint) editorNode.remove(editorNode.activePoint);
-    if (editorNode.activeNodes.length)
-      editorNode.remove(...editorNode.activeNodes);
+    if (editorNode.activeNodes.length) editorNode.remove(...editorNode.activeNodes);
   });
 
   // 操作测试

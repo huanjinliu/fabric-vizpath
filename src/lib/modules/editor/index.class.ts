@@ -45,9 +45,7 @@ class Editor extends EditorModule {
   private _createEditorCanvas(canvas: fabric.Canvas) {
     const container = canvas.getElement().parentNode as HTMLDivElement;
     if (!container) {
-      throw new TypeError(
-        'Please use fabric.Canvas which is mounted into the document.'
-      );
+      throw new TypeError('Please use fabric.Canvas which is mounted into the document.');
     }
 
     // 如果使用隔离画布则会参考配置构造新画布使与原画布隔离
@@ -73,9 +71,7 @@ class Editor extends EditorModule {
       });
 
       // 保留画布变换
-      editorFabricCanvas.setViewportTransform(
-        canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
-      );
+      editorFabricCanvas.setViewportTransform(canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]);
 
       // 更多画布配置需要使用者外部配置
 
@@ -105,11 +101,7 @@ class Editor extends EditorModule {
   /**
    * 移除事件监听
    */
-  off(
-    type: 'global' | 'canvas',
-    eventName: string,
-    handler?: (e: any) => void
-  ) {
+  off(type: 'global' | 'canvas', eventName: string, handler?: (e: any) => void) {
     const canvas = this.canvas;
     if (!canvas) return;
 
@@ -150,9 +142,7 @@ class Editor extends EditorModule {
     }
 
     if (!(this.mountCanvas instanceof fabric.Canvas)) {
-      throw new TypeError(
-        'Please use fabric.Canvas instead of fabric.StaticCanvas.'
-      );
+      throw new TypeError('Please use fabric.Canvas instead of fabric.StaticCanvas.');
     }
 
     this.canvas = this._createEditorCanvas(this.mountCanvas);

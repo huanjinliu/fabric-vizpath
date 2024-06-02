@@ -85,10 +85,7 @@ class VizPathContext {
     const instructions = cloneDeep(path.path as unknown as Instruction[]);
     const sections = VizPath.getPathSections(instructions).map((section) => {
       // 为每个子路径分配新建的路径对象
-      const originPath = new fabric.Path(
-        (fabric.util as any).joinPath(section),
-        styles,
-      );
+      const originPath = new fabric.Path((fabric.util as any).joinPath(section), styles);
 
       originPath.path = section as unknown as fabric.Point[];
 
@@ -98,7 +95,7 @@ class VizPathContext {
     // 建立组并销毁组是为了保持子路径对象的正确尺寸和位置
     new fabric.Group(
       sections.map((i) => i.originPath),
-      layout
+      layout,
     ).destroy();
 
     /**
@@ -128,13 +125,10 @@ class VizPathContext {
       }
 
       // ⑤ 闭合的路径如果在闭合指令前没有回到起始点，补充一条回到起始点的指令
-      const isAutoClose =
-        section[section.length - 1][0] === InstructionType.CLOSE;
+      const isAutoClose = section[section.length - 1][0] === InstructionType.CLOSE;
       if (isAutoClose) {
         const startPoint = section[0].slice(section[0].length - 2);
-        const endPoint = section[section.length - 2].slice(
-          section[section.length - 2].length - 2
-        );
+        const endPoint = section[section.length - 2].slice(section[section.length - 2].length - 2);
         if (
           // 如果路径只有一个起始点且闭合[M,Z]
           section[0] === section[section.length - 2] ||
@@ -182,7 +176,7 @@ class VizPathContext {
       defaults(options, {
         left: 0,
         top: 0,
-      })
+      }),
     );
     return this.parsePathFromObject(path);
   }
@@ -195,10 +189,7 @@ class VizPathContext {
    *
    * const pathway = getPathwayFromPathD('M 0 0 L 100 100');
    */
-  static async parsePathFromURL(
-    url: string,
-    options: fabric.IObjectOptions = {}
-  ) {
+  static async parsePathFromURL(url: string, options: fabric.IObjectOptions = {}) {
     const object = await loadSVGToPathFromURL(url);
     if (!object) return;
 
@@ -215,9 +206,7 @@ class VizPathContext {
         if (child.type === 'group') {
           extract(child as fabric.Group);
         } else if (child.type === 'path') {
-          pathways.push(
-            VizPathContext.parsePathFromObject(child as fabric.Path)
-          );
+          pathways.push(VizPathContext.parsePathFromObject(child as fabric.Path));
         }
       });
     };
@@ -231,7 +220,7 @@ class VizPathContext {
    */
   use(module: EditorModule) {
     const index = this.modules.findIndex(
-      (item) => (item.constructor as any).ID === (module.constructor as any).ID
+      (item) => (item.constructor as any).ID === (module.constructor as any).ID,
     );
     if (index !== -1) {
       this.modules.splice(index, 1);
@@ -247,8 +236,7 @@ class VizPathContext {
    */
   find<Module extends Constructor>(moduleConstructor: Module) {
     return this.modules.find(
-      (module) =>
-        (module.constructor as any).ID === (moduleConstructor as any).ID
+      (module) => (module.constructor as any).ID === (moduleConstructor as any).ID,
     ) as InstanceType<Module> | undefined;
   }
 

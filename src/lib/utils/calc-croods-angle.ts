@@ -9,6 +9,6 @@ const calcCroodsAngle = (a: Crood, b: Crood, c: Crood) => {
     angle = 360 - angle;
   }
   return angle;
-}
+};
 
 export default calcCroodsAngle;

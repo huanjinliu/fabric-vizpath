@@ -1,8 +1,8 @@
-import { fabric } from "fabric";
-import defaultsDeep from "lodash-es/defaultsDeep";
-import type Vizpath from "../../vizpath.class";
-import EditorModule from "../base.class";
-import Editor from "../editor/index.class";
+import { fabric } from 'fabric';
+import defaultsDeep from 'lodash-es/defaultsDeep';
+import type Vizpath from '../../vizpath.class';
+import EditorModule from '../base.class';
+import Editor from '../editor/index.class';
 
 type EditorBackgroundOptions = {
   grid?: boolean;
@@ -15,13 +15,13 @@ type EditorBackgroundOptions = {
 };
 
 class EditorBackground extends EditorModule {
-  static ID = "editor-background";
+  static ID = 'editor-background';
 
   options: Required<EditorBackgroundOptions> = {
     grid: true,
     gridSize: 50,
     gridStyle: {
-      stroke: "rgba(0, 0, 0, 0.05)",
+      stroke: 'rgba(0, 0, 0, 0.05)',
       strokeWidth: 1,
       strokeDashArray: [4, 2],
     },
@@ -79,14 +79,14 @@ class EditorBackground extends EditorModule {
           canvas.setBackgroundColor(
             new fabric.Pattern({
               source: image,
-              repeat: "repeat",
+              repeat: 'repeat',
               offsetX: -(canvas.getWidth() % gridSize) / 2,
               offsetY: -(canvas.getHeight() % gridSize) / 2,
             }),
             () => {
               canvas.requestRenderAll();
               resolve();
-            }
+            },
           );
         };
         image.src = pattern.toDataURL({});

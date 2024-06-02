@@ -27,19 +27,12 @@ class EditorBezier extends EditorModule {
       curve.derivative(100);
       const { t } = curve.project(point);
       const splitCurves = curve.split(t!);
-      const path = new fabric.Path(
-        splitCurves.left.toSVG() + splitCurves.right.toSVG()
-      ).path! as unknown as Instruction[];
+      const path = new fabric.Path(splitCurves.left.toSVG() + splitCurves.right.toSVG())
+        .path! as unknown as Instruction[];
 
       return {
-        pre: convertQuadraticToCubic(
-          { x: path[0][1], y: path[0][2] },
-          path[1]
-        ),
-        next: convertQuadraticToCubic(
-          { x: path[2][1], y: path[2][2] },
-          path[3]
-        ),
+        pre: convertQuadraticToCubic({ x: path[0][1], y: path[0][2] }, path[1]),
+        next: convertQuadraticToCubic({ x: path[2][1], y: path[2][2] }, path[3]),
       };
     }
   }
@@ -56,11 +49,11 @@ class EditorBezier extends EditorModule {
 
       if (!target || !editorNode.nodes.includes(target)) return;
 
-      const controls = editorNode.controllers.filter(i => i.node === target);
+      const controls = editorNode.controllers.filter((i) => i.node === target);
 
       // 如果有控制点直接降级为直线
       if (controls.length) {
-        editorNode.degrade(target, "both", true);
+        editorNode.degrade(target, 'both', true);
         return;
       }
       // 否则则升级为曲线
@@ -72,13 +65,18 @@ class EditorBezier extends EditorModule {
         // 这里使用quadraticFromPoints，是使三个点组合成曲线路径（点都在曲线上）
         const splitCurves = this._splitInstruction(
           (Bezier as any).quadraticFromPoints(...points).points,
-          points[1]
+          points[1],
         );
         const neighboringInstructions = vizpath.getNeighboringInstructions(pathwayNode);
-        vizpath.replace(pathwayNode.instruction[0] === InstructionType.START ? neighboringInstructions.pre! : pathwayNode, splitCurves.pre);
+        vizpath.replace(
+          pathwayNode.instruction[0] === InstructionType.START
+            ? neighboringInstructions.pre!
+            : pathwayNode,
+          splitCurves.pre,
+        );
         vizpath.replace(neighboringInstructions.next!, splitCurves.next);
       }
-    })
+    });
   }
 }
 

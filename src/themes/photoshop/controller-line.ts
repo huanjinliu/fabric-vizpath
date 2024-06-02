@@ -8,6 +8,6 @@ const createLine: Theme['controllerLine'] = () => {
   });
 
   return line;
-}
+};
 
 export default createLine;

@@ -10,13 +10,13 @@ const createNode: Theme['node'] = (decorator) => {
   });
 
   return decorator(circle, (context, object) => {
-    object.on("selected", () => {
-      object.set({ fill: "#4b4b4b", stroke: '#ffffff' });
+    object.on('selected', () => {
+      object.set({ fill: '#4b4b4b', stroke: '#ffffff' });
       object.canvas?.requestRenderAll();
     });
-  
-    object.on("deselected", () => {
-      object.set({ fill: "#ffffff", stroke: '#4b4b4b' });
+
+    object.on('deselected', () => {
+      object.set({ fill: '#ffffff', stroke: '#4b4b4b' });
       object.canvas?.requestRenderAll();
     });
   });

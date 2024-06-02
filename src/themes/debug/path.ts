@@ -7,7 +7,7 @@ const createPath: Theme['path'] = (decorator, originPath) => {
     strokeWidth: 4,
     fill: 'transparent',
     strokeUniform: true,
-    backgroundColor: 'rgba(255, 0, 0, 0.2)'
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
   });
 
   return originPath;

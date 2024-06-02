@@ -5,8 +5,8 @@ const createNode: Theme['node'] = (decorator) => {
   const rect = new fabric.Rect({
     width: 6,
     height: 6,
-    fill: "#ffffff",
-    stroke: "#1784ec",
+    fill: '#ffffff',
+    stroke: '#1784ec',
     strokeWidth: 1,
   });
 
@@ -17,7 +17,7 @@ const createNode: Theme['node'] = (decorator) => {
       });
       object.canvas?.requestRenderAll();
     });
-  
+
     object.on('deselected', () => {
       rect.set({
         fill: '#ffffff',

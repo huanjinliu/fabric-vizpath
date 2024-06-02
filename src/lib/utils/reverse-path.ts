@@ -12,16 +12,11 @@ const reversePath = (path: Instruction[]) => {
     const instruction = path[i];
 
     const preInstruction = path[i - 1];
-    const preMajorPointCrood = preInstruction?.slice(
-      preInstruction.length - 2
-    ) as number[];
+    const preMajorPointCrood = preInstruction?.slice(preInstruction.length - 2) as number[];
 
     if (i === path.length - 1) {
       if (instruction[0] === InstructionType.CLOSE) {
-        _path.push([
-          InstructionType.START,
-          ...preMajorPointCrood,
-        ] as Instruction);
+        _path.push([InstructionType.START, ...preMajorPointCrood] as Instruction);
       } else {
         _path.push([
           InstructionType.START,

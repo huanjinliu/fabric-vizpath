@@ -19,7 +19,7 @@ const repairPath = (path: fabric.Path) => {
     width: path.width!,
     height: path.height!,
     pathOffset: { ...path.pathOffset },
-  }
+  };
 
   // 持有旧的指令后恢复避免丢失引用
   const instructions = path.path;
@@ -32,14 +32,10 @@ const repairPath = (path: fabric.Path) => {
   // 计算路径偏移差值
   const repairOffset = fabric.util.transformPoint(
     new fabric.Point(
-      path.pathOffset.x -
-        (path.width! - oldInfo.width) / 2 -
-        oldInfo.pathOffset.x,
-      path.pathOffset.y -
-        (path.height! - oldInfo.height) / 2 -
-        oldInfo.pathOffset.y
+      path.pathOffset.x - (path.width! - oldInfo.width) / 2 - oldInfo.pathOffset.x,
+      path.pathOffset.y - (path.height! - oldInfo.height) / 2 - oldInfo.pathOffset.y,
     ),
-    [...path.calcOwnMatrix().slice(0, 4), 0, 0]
+    [...path.calcOwnMatrix().slice(0, 4), 0, 0],
   );
 
   // 设置回正确的偏移位置

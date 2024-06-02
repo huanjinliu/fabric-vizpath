@@ -1,16 +1,13 @@
-import type VizPath from "../vizpath.class";
+import type VizPath from '../vizpath.class';
 
 abstract class EditorModule {
   static ID: string;
 
-  async prepare() {
-  }
+  async prepare() {}
 
-  unload(vizPath: VizPath) {
-  }
+  unload(vizPath: VizPath) {}
 
-  load(vizPath: VizPath) {
-  }
+  load(vizPath: VizPath) {}
 }
 
 export default EditorModule;

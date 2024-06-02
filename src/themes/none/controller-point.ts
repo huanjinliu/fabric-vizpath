@@ -8,7 +8,7 @@ const createPoint: Theme['controllerPoint'] = (decorator) => {
     fill: '#ffffff',
     stroke: '#4b4b4bcc',
     strokeWidth: 1,
-    strokeDashArray: [1, 1]
+    strokeDashArray: [1, 1],
   });
 
   return circle;

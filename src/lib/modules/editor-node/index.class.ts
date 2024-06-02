@@ -14,18 +14,14 @@ import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import VizPath, { VizPathSymbalType } from '../../vizpath.class';
 import EditorPath from '../editor-path/index.class';
-import VizPathContext, {
-  InstructionType,
-  type Instruction,
-  type PathwayNode,
-} from '../..';
+import VizPathContext, { InstructionType, type Instruction, type PathwayNode } from '../..';
 import type { ResponsiveCrood } from '../../vizpath.class';
 import EditorUI, { type ThemeDecorator } from '../editor-ui/index.class';
 
 enum Mode {
   MOVE = 'move',
   ADD = 'add',
-  CONVERT = 'convert'
+  CONVERT = 'convert',
 }
 
 type EditorController = {
@@ -63,7 +59,7 @@ class EditorNode extends EditorModule {
     forcePointSymmetric: 'none' | 'angle' | 'entire';
   } = {
     mode: Mode.MOVE,
-    forcePointSymmetric: 'none'
+    forcePointSymmetric: 'none',
   };
 
   vizPath: VizPath | null = null;
@@ -97,7 +93,7 @@ class EditorNode extends EditorModule {
   } = {
     nodes: [],
     points: [],
-    lines: []
+    lines: [],
   };
 
   private _initPathNodes() {
@@ -125,13 +121,13 @@ class EditorNode extends EditorModule {
           hasControls: false,
           // 保持居中
           originX: 'center',
-          originY: 'center'
+          originY: 'center',
         });
 
         // 不做另外的画布缓存
         deepIterateGroup(customObject, (object) => {
           object.set({
-            objectCaching: false
+            objectCaching: false,
           });
         });
 
@@ -152,14 +148,14 @@ class EditorNode extends EditorModule {
           (x, y) => {
             const position = editorPath.calcAbsolutePosition(
               { x, y },
-              editorPath.nodePathMap.get(node)!.originPath
+              editorPath.nodePathMap.get(node)!.originPath,
             );
             if (object.group) {
               const relativePosition = editorPath.calcRelativeCrood(position, object.group);
               object
                 .set({
                   left: relativePosition.x,
-                  top: relativePosition.y
+                  top: relativePosition.y,
                 })
                 .setCoords();
               object.group.addWithUpdate();
@@ -169,8 +165,8 @@ class EditorNode extends EditorModule {
           },
           {
             id: object.name,
-            immediate: true
-          }
+            immediate: true,
+          },
         );
       };
 
@@ -232,7 +228,7 @@ class EditorNode extends EditorModule {
     return {
       objects,
       objectNodeMap,
-      nodeObjectMap
+      nodeObjectMap,
     };
   }
 
@@ -343,13 +339,13 @@ class EditorNode extends EditorModule {
           hasControls: false,
           // 保持居中
           originX: 'center',
-          originY: 'center'
+          originY: 'center',
         });
 
         // 不做另外的画布缓存
         deepIterateGroup(customObject, (object) => {
           object.set({
-            objectCaching: false
+            objectCaching: false,
           });
         });
 
@@ -373,14 +369,14 @@ class EditorNode extends EditorModule {
             if (point.canvas?.getActiveObject() === point) return;
             const position = editorPath.calcAbsolutePosition(
               { x, y },
-              editorPath.nodePathMap.get(node)!.originPath
+              editorPath.nodePathMap.get(node)!.originPath,
             );
             point.set(position).setCoords();
           },
           {
             immediate: true,
-            id: point.name
-          }
+            id: point.name,
+          },
         );
         observe(
           point,
@@ -393,7 +389,7 @@ class EditorNode extends EditorModule {
               angle:
                 45 +
                 (Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180) /
-                  Math.PI
+                  Math.PI,
             });
 
             // 响应式更改指令信息
@@ -401,9 +397,9 @@ class EditorNode extends EditorModule {
               const crood = editorPath.calcRelativeCrood(
                 {
                   left: left!,
-                  top: top!
+                  top: top!,
                 },
-                editorPath.nodePathMap.get(node)!.originPath
+                editorPath.nodePathMap.get(node)!.originPath,
               );
               // 曲线变换点对称操作
               if (this.setting.forcePointSymmetric !== 'none') {
@@ -413,7 +409,7 @@ class EditorNode extends EditorModule {
                   return (
                     i.pathwayNode ===
                     neighboringControllers.find(
-                      (i) => i.position === position && i.direction === antiDirection
+                      (i) => i.position === position && i.direction === antiDirection,
                     )?.from
                   );
                 });
@@ -425,21 +421,21 @@ class EditorNode extends EditorModule {
                   const new_d = calcCroodsDistance(
                     {
                       x: node.x - (crood.x - node.x),
-                      y: node.y - (crood.y - node.y)
+                      y: node.y - (crood.y - node.y),
                     },
-                    node
+                    node,
                   );
                   const scale = this.setting.forcePointSymmetric === 'entire' ? 1 : d / new_d;
                   _controller.setCrood({
                     x: node.x - (crood.x - node.x) * scale,
-                    y: node.y - (crood.y - node.y) * scale
+                    y: node.y - (crood.y - node.y) * scale,
                   });
                 }
               }
               controller.setCrood(crood, [point.name]);
             }
           },
-          true
+          true,
         );
       };
       const onRemovedPoint = () => {
@@ -468,7 +464,7 @@ class EditorNode extends EditorModule {
           originX: 'center',
           originY: 'center',
           // 不做另外的画布缓存
-          objectCaching: false
+          objectCaching: false,
         });
 
         customObject[VizPath.symbol] = VizPathSymbalType.CONTROLLER_LINE;
@@ -490,27 +486,27 @@ class EditorNode extends EditorModule {
           (x, y) => {
             const position = editorPath.calcAbsolutePosition(
               { x, y },
-              editorPath.nodePathMap.get(node)!.originPath
+              editorPath.nodePathMap.get(node)!.originPath,
             );
             line.set({ x1: position.left, y1: position.top });
           },
           {
             immediate: true,
-            id: line.name
-          }
+            id: line.name,
+          },
         );
         controller.observe(
           (x, y) => {
             const position = editorPath.calcAbsolutePosition(
               { x, y },
-              editorPath.nodePathMap.get(node)!.originPath
+              editorPath.nodePathMap.get(node)!.originPath,
             );
             line.set({ x2: position.left, y2: position.top });
           },
           {
             immediate: true,
-            id: line.name
-          }
+            id: line.name,
+          },
         );
       };
       const onRemovedLine = () => {
@@ -530,7 +526,7 @@ class EditorNode extends EditorModule {
         controller,
         node: nodeObject,
         point,
-        line
+        line,
       });
 
       controllerSet.add(controller);
@@ -585,8 +581,8 @@ class EditorNode extends EditorModule {
       if (focusPath) {
         this.focus(
           ...this.nodes.filter(
-            (node) => editorPath.nodePathMap.get(this.objectNodeMap.get(node)!.node!) === focusPath
-          )
+            (node) => editorPath.nodePathMap.get(this.objectNodeMap.get(node)!.node!) === focusPath,
+          ),
         );
       }
     });
@@ -688,7 +684,7 @@ class EditorNode extends EditorModule {
       this._abandonedPool = {
         nodes: [],
         points: [],
-        lines: []
+        lines: [],
       };
     });
   }
@@ -787,7 +783,7 @@ class EditorNode extends EditorModule {
           if (upgradeDirection) {
             this.upgrade(object, upgradeDirection);
             const controller = this.controllers.find(
-              (i) => i.pathwayNode === currentNode && i.type === upgradeDirection
+              (i) => i.pathwayNode === currentNode && i.type === upgradeDirection,
             );
             if (controller) {
               this.focus(controller.point);
@@ -819,14 +815,14 @@ class EditorNode extends EditorModule {
 
       const position = editorPath.calcRelativeCrood(
         { left: pointer.x, top: pointer.y },
-        originPath
+        originPath,
       );
       const antiPosition = editorPath.calcRelativeCrood(
         {
           left: target.left! - (pointer.x - target.left!),
-          top: target.top! - (pointer.y - target.top!)
+          top: target.top! - (pointer.y - target.top!),
         },
-        originPath
+        originPath,
       );
 
       // 根据夹角大小排序，夹角越小意味鼠标越接近
@@ -844,7 +840,7 @@ class EditorNode extends EditorModule {
         const newInstruction = [...item[1].instruction] as Instruction;
         newInstruction[0] = {
           [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
-          [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE
+          [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
         }[newInstruction[0]];
         newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCrood.x, newCrood.y);
         this.vizPath?.replace(item[1], newInstruction);
@@ -888,7 +884,7 @@ class EditorNode extends EditorModule {
         ) {
           this.link(
             this.objectNodeMap.get(this.activeNodes[0]!)!,
-            this.objectNodeMap.get(event.target)!
+            this.objectNodeMap.get(event.target)!,
           );
         }
         return;
@@ -962,7 +958,7 @@ class EditorNode extends EditorModule {
 
     const nodeObjects = objects.filter((i) => i[VizPath.symbol] === VizPathSymbalType.NODE);
     const pointObjects = objects.filter(
-      (i) => i[VizPath.symbol] === VizPathSymbalType.CONTROLLER_POINT
+      (i) => i[VizPath.symbol] === VizPathSymbalType.CONTROLLER_POINT,
     );
 
     if (nodeObjects.length) {
@@ -977,9 +973,7 @@ class EditorNode extends EditorModule {
       });
       this.vizPath.remove(...removeNodes);
     } else if (pointObjects.length === 1) {
-      const { type, node } = this.controllers.find(
-        (i) => i.point === pointObjects[0]
-      )!;
+      const { type, node } = this.controllers.find((i) => i.point === pointObjects[0])!;
       this.degrade(node, type);
     }
   }
@@ -991,10 +985,7 @@ class EditorNode extends EditorModule {
    *
    * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
    */
-  upgrade(
-    object: fabric.Object,
-    direction: 'pre' | 'next' | 'both' = 'both'
-  ) {
+  upgrade(object: fabric.Object, direction: 'pre' | 'next' | 'both' = 'both') {
     if (!this.vizPath) return;
 
     const pathwayNode = this.objectNodeMap.get(object);
@@ -1006,7 +997,7 @@ class EditorNode extends EditorModule {
 
     const directionNodeMap = {
       pre: instruction[0] === InstructionType.START ? pre : pathwayNode,
-      next
+      next,
     };
 
     const targets: [direction: 'pre' | 'next', pathwayNode: PathwayNode<ResponsiveCrood>][] = [];
@@ -1026,7 +1017,7 @@ class EditorNode extends EditorModule {
       const newInstruction = [...oldInstruction] as Instruction;
       newInstruction[0] = {
         [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
-        [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE
+        [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
       }[newInstruction[0]];
       newInstruction.splice({ pre: -2, next: 1 }[direction], 0, node!.x, node!.y);
 
@@ -1045,24 +1036,17 @@ class EditorNode extends EditorModule {
    * @param [direction='both'] 降级范围
    * @param [lowest=false] 是否直接降到直线级别
    */
-  degrade(
-    object: fabric.Object,
-    direction: 'pre' | 'next' | 'both' = 'both',
-    lowest = false
-  ) {
+  degrade(object: fabric.Object, direction: 'pre' | 'next' | 'both' = 'both', lowest = false) {
     if (!this.vizPath) return;
 
     const pathwayNode = this.objectNodeMap.get(object);
     if (!pathwayNode) return;
 
-    const { pre, next } = this.vizPath.getNeighboringInstructions(
-      pathwayNode,
-      true
-    );
+    const { pre, next } = this.vizPath.getNeighboringInstructions(pathwayNode, true);
 
     const directionNodeMap = {
       pre: pathwayNode.instruction[0] === InstructionType.START ? pre : pathwayNode,
-      next
+      next,
     };
 
     const targets: [direction: 'pre' | 'next', pathwayNode: PathwayNode<ResponsiveCrood>][] = [];
@@ -1087,7 +1071,7 @@ class EditorNode extends EditorModule {
       } else {
         newInstruction[0] = {
           [InstructionType.QUADRATIC_CURCE]: InstructionType.LINE,
-          [InstructionType.BEZIER_CURVE]: InstructionType.QUADRATIC_CURCE
+          [InstructionType.BEZIER_CURVE]: InstructionType.QUADRATIC_CURCE,
         }[newInstruction[0]];
         newInstruction.splice({ pre: -4, next: 1 }[direction], 2);
       }
@@ -1102,7 +1086,7 @@ class EditorNode extends EditorModule {
       left: number;
       top: number;
     },
-    followControllers: ResponsiveCrood[] = []
+    followControllers: ResponsiveCrood[] = [],
   ) {
     const pathwayNode = this.objectNodeMap.get(object);
     if (!pathwayNode) return;
@@ -1118,12 +1102,12 @@ class EditorNode extends EditorModule {
     const {
       scaleX: newScaleX,
       scaleY: newScaleY,
-      angle: newAngle
+      angle: newAngle,
     } = selectionGroup
       ? {
           scaleX: 1 / selectionGroup.scaleX!,
           scaleY: 1 / selectionGroup.scaleY!,
-          angle: -selectionGroup.angle!
+          angle: -selectionGroup.angle!,
         }
       : { scaleX: 1, scaleY: 1, angle: 0 };
 
@@ -1131,13 +1115,13 @@ class EditorNode extends EditorModule {
       .set({
         scaleX: newScaleX,
         scaleY: newScaleY,
-        angle: newAngle
+        angle: newAngle,
       })
       .setCoords();
 
     const newCrood = editorPath.calcRelativeCrood(
       position,
-      editorPath.nodePathMap.get(node!)!.originPath
+      editorPath.nodePathMap.get(node!)!.originPath,
     );
 
     // 需要跟随变化的曲线曲线变换点
@@ -1146,25 +1130,25 @@ class EditorNode extends EditorModule {
       const relativeDiff = transform(
         {
           x: controller.x - newCrood.x,
-          y: controller.y - newCrood.y
+          y: controller.y - newCrood.y,
         },
         [
           {
             translate: {
               x: newCrood.x - node!.x,
-              y: newCrood.y - node!.y
-            }
+              y: newCrood.y - node!.y,
+            },
           },
           {
             scale: {
               x: preScaleX / newScaleX,
-              y: preScaleY / newScaleY
-            }
+              y: preScaleY / newScaleY,
+            },
           },
           {
-            rotate: preAngle - newAngle
-          }
-        ]
+            rotate: preAngle - newAngle,
+          },
+        ],
       );
       controller.x = newCrood.x + relativeDiff.x;
       controller.y = newCrood.y + relativeDiff.y;
@@ -1202,7 +1186,7 @@ class EditorNode extends EditorModule {
 
       const newCrood = editorPath.calcRelativeCrood(
         position,
-        editorPath.nodePathMap.get(pathwayNode.node!)!.originPath
+        editorPath.nodePathMap.get(pathwayNode.node!)!.originPath,
       );
 
       const addPathwayNode = vizPath.insert(pathwayNode.node!, newCrood);
@@ -1253,11 +1237,11 @@ class EditorNode extends EditorModule {
       for (let i = 0; i < instruction.length - 1; i += 2) {
         const position = editorPath.calcAbsolutePosition(
           new fabric.Point(instruction[i + 1] as number, instruction[i + 2] as number),
-          vizPath.getPathway(target.section)!.originPath
+          vizPath.getPathway(target.section)!.originPath,
         );
         const crood = editorPath.calcRelativeCrood(
           position,
-          vizPath.getPathway(source.section)!.originPath
+          vizPath.getPathway(source.section)!.originPath,
         );
         instruction[i + 1] = crood.x;
         instruction[i + 2] = crood.y;
@@ -1269,7 +1253,7 @@ class EditorNode extends EditorModule {
     vizPath.onceRerenderOriginPath(() => {
       vizPath.clear(target.section);
       vizPath.replacePathwaySections(vizPath.getPathway(source.section)!, [
-        mergePath
+        mergePath,
       ] as Instruction[][]);
     });
   }
@@ -1319,7 +1303,7 @@ class EditorNode extends EditorModule {
           // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
           lockRotation: true,
           originX: 'center',
-          originY: 'center'
+          originY: 'center',
         });
         if (activeSelection.lockRotation) {
           activeSelection.setControlVisible('mtr', false);

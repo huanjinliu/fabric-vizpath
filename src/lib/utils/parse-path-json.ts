@@ -39,19 +39,20 @@ const parsePathJSON = (path: fabric.Path) => {
     'globalCompositeOperation',
   ] as const;
 
-  const layout: Pick<typeof data, (typeof layoutKeys)[number]> =
-    layoutKeys.reduce((styles, key) => {
+  const layout: Pick<typeof data, (typeof layoutKeys)[number]> = layoutKeys.reduce(
+    (styles, key) => {
       styles[key] = data[key];
       return styles;
-    }, {});
+    },
+    {},
+  );
 
-  const styles: Pick<typeof data, (typeof styleKeys)[number]> =
-    styleKeys.reduce((styles, key) => {
-      styles[key] = data[key];
-      return styles;
-    }, {});
+  const styles: Pick<typeof data, (typeof styleKeys)[number]> = styleKeys.reduce((styles, key) => {
+    styles[key] = data[key];
+    return styles;
+  }, {});
 
   return { path: data.path, layout, styles };
-}
+};
 
 export default parsePathJSON;

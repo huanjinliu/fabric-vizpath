@@ -1,10 +1,10 @@
-import cloneDeep from "lodash-es/cloneDeep";
-import isEqual from "lodash-es/isEqual";
-import EditorModule from "../base.class";
-import Editor from "../editor/index.class";
-import type VizPath from "../../vizpath.class";
+import cloneDeep from 'lodash-es/cloneDeep';
+import isEqual from 'lodash-es/isEqual';
+import EditorModule from '../base.class';
+import Editor from '../editor/index.class';
+import type VizPath from '../../vizpath.class';
 
-type CombinationKey = "alt" | "ctrl" | "shift" | "meta";
+type CombinationKey = 'alt' | 'ctrl' | 'shift' | 'meta';
 
 type Shortcut = {
   key?: string;
@@ -21,7 +21,7 @@ type ShortcutOptions = {
 };
 
 class EditorShortcut extends EditorModule {
-  static ID = "editor-shortcut";
+  static ID = 'editor-shortcut';
 
   shortcuts: Shortcut[] = [];
 
@@ -68,31 +68,27 @@ class EditorShortcut extends EditorModule {
 
       const activateKey =
         !key ||
-        (key.toUpperCase() === (e.key ?? "").toUpperCase() ||
-          `KEY${key.toUpperCase()}` === e.code.toUpperCase());
+        key.toUpperCase() === (e.key ?? '').toUpperCase() ||
+        `KEY${key.toUpperCase()}` === e.code.toUpperCase();
 
       if (
         // 按下键的情况
-        e.type === "keydown" &&
+        e.type === 'keydown' &&
         // 匹配快捷键
         activateKey &&
         // 匹配全部组合键
-        combinationKeys.every(
-          (combinationPrefix) => e[`${combinationPrefix}Key`]
-        )
+        combinationKeys.every((combinationPrefix) => e[`${combinationPrefix}Key`])
       ) {
         return true;
       }
 
       if (
         // 松开键的情况
-        e.type === "keyup" &&
+        e.type === 'keyup' &&
         // 匹配空快捷键
         !key &&
         // 匹配全部组合键
-        combinationKeys.every(
-          (combinationPrefix) => e[`${combinationPrefix}Key`]
-        )
+        combinationKeys.every((combinationPrefix) => e[`${combinationPrefix}Key`])
       ) {
         return true;
       }
@@ -102,9 +98,7 @@ class EditorShortcut extends EditorModule {
 
     activateKeys.sort((a, b) => {
       if (a.key && !b.key) return -1;
-      return (
-        (b.combinationKeys?.length ?? 0) - (a.combinationKeys?.length ?? 0)
-      );
+      return (b.combinationKeys?.length ?? 0) - (a.combinationKeys?.length ?? 0);
     });
 
     const shortcut = activateKeys[0];
@@ -125,8 +119,7 @@ class EditorShortcut extends EditorModule {
     if (!_shortcut) return;
 
     const index = this.shortcuts.findIndex((item) => {
-      isEqual(item.key, _shortcut.key) &&
-        isEqual(item.combinationKeys, _shortcut.combinationKeys);
+      isEqual(item.key, _shortcut.key) && isEqual(item.combinationKeys, _shortcut.combinationKeys);
     });
     if (index !== -1) {
       this.shortcuts.splice(index, 1, _shortcut);
@@ -149,9 +142,9 @@ class EditorShortcut extends EditorModule {
     const editor = vizPath.context.find(Editor);
     if (!editor) return;
 
-    editor.off("global", "keydown", this._handleShortcutKey.bind(this));
-    editor.off("global", "keyup", this._handleShortcutKey.bind(this));
-    editor.off("global", "blur", this._handlePageDeactivate.bind(this));
+    editor.off('global', 'keydown', this._handleShortcutKey.bind(this));
+    editor.off('global', 'keyup', this._handleShortcutKey.bind(this));
+    editor.off('global', 'blur', this._handlePageDeactivate.bind(this));
 
     this.shortcuts.length = 0;
     this.activeShortcut = undefined;
@@ -161,9 +154,9 @@ class EditorShortcut extends EditorModule {
     const editor = vizPath.context.find(Editor);
     if (!editor) return;
 
-    editor.on("global", "keydown", this._handleShortcutKey.bind(this));
-    editor.on("global", "keyup", this._handleShortcutKey.bind(this));
-    editor.on("global", "blur", this._handlePageDeactivate.bind(this));
+    editor.on('global', 'keydown', this._handleShortcutKey.bind(this));
+    editor.on('global', 'keyup', this._handleShortcutKey.bind(this));
+    editor.on('global', 'blur', this._handlePageDeactivate.bind(this));
   }
 }
 
