@@ -13,6 +13,12 @@
     "build": "rollup --config"
   },
   "author": "Hain <huanjin.liu@foxmail.com>",
+  "files": [
+    "dist",
+    "docs",
+    "LICENSE",
+    "README.md"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/huanjinliu/fabric-path-editor.git"
