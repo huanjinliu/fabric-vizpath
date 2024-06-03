@@ -14,7 +14,7 @@ import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import VizPath, { VizPathSymbalType } from '../../vizpath.class';
 import EditorPath from '../editor-path/index.class';
-import VizPathContext, { InstructionType, type Instruction, type PathNode } from '../..';
+import VizPathCreator, { InstructionType, type Instruction, type PathNode } from '../..';
 import type { ResponsiveCrood } from '../../vizpath.class';
 import EditorUI, { type ThemeDecorator } from '../editor-ui/index.class';
 
@@ -886,23 +886,28 @@ class EditorNode extends EditorModule {
             this.objectNodeMap.get(this.activeNodes[0]!)!,
             this.objectNodeMap.get(event.target)!,
           );
+          target = event.target;
         }
-        return;
+      } else {
+        // 新增节点
+        const pointer = calcCanvasCrood(this.editor!.canvas!, event.pointer);
+        target = this.add({ left: pointer.x, top: pointer.y });
       }
 
-      // 新增节点
-      const pointer = calcCanvasCrood(this.editor!.canvas!, event.pointer);
-      target = this.add({ left: pointer.x, top: pointer.y });
-
-      // 先将两边的点都降级，便于后续拖拽变换
-      this.degrade(target!, 'both', true);
-
-      this.editor!.canvas!.selection = false;
+      if (target) {
+        target.set({ lockMovementX: true, lockMovementY: true });
+  
+        // 先将两边的点都降级，便于后续拖拽变换
+        this.degrade(target!, 'both', true);
+  
+        this.editor!.canvas!.selection = false;
+      }
     });
     this.editor.on('canvas', 'mouse:move', (event) => {
       if (!target) return;
 
       if (this.setting.mode !== Mode.ADD) {
+        target?.set({ lockMovementX: false, lockMovementY: false });
         target = undefined;
         this.editor!.canvas!.selection = true;
         return;
@@ -926,6 +931,7 @@ class EditorNode extends EditorModule {
       }
     });
     this.editor.on('canvas', 'mouse:up', () => {
+      target?.set({ lockMovementX: false, lockMovementY: false });
       target = undefined;
       this.editor!.canvas!.selection = true;
     });
@@ -1192,7 +1198,7 @@ class EditorNode extends EditorModule {
 
       return this.nodeObjectMap.get(addPathNode);
     } else {
-      const path = VizPathContext.parseFabricPath(new fabric.Path('M 0 0', position));
+      const path = VizPathCreator.parseFabricPath(new fabric.Path('M 0 0', position));
       const responsivePath = vizPath.draw(path);
       return this.nodeObjectMap.get(responsivePath[0].segment[0]);
     }

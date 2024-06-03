@@ -4,7 +4,6 @@ import defaults from 'lodash-es/defaults';
 import VizPath from './vizpath.class';
 import {
   clearPathOffset,
-  getCubicFromQuadratic,
   loadSVGToPathFromURL,
   parsePathJSON,
   repairPath,
@@ -53,7 +52,7 @@ type VizPathOptions = {
 /**
  * VizPath
  */
-class VizPathContext {
+class VizPathCreator {
   options: Required<VizPathOptions> = {
     refreshPathTriggerTime: 'auto',
     refreshDeferDuration: 100,
@@ -206,7 +205,7 @@ class VizPathContext {
         if (child.type === 'group') {
           extract(child as fabric.Group);
         } else if (child.type === 'path') {
-          paths.push(VizPathContext.parseFabricPath(child as fabric.Path));
+          paths.push(VizPathCreator.parseFabricPath(child as fabric.Path));
         }
       });
     };
@@ -268,4 +267,4 @@ class VizPathContext {
   }
 }
 
-export default VizPathContext;
+export default VizPathCreator;

@@ -1,6 +1,6 @@
 import { fabric } from 'fabric';
 import cloneDeep from 'lodash-es/cloneDeep';
-import VizPathContext from '.';
+import VizPathCreator from '.';
 import { type Path, type Instruction, InstructionType, type PathNode } from '.';
 import { parsePathJSON, repairPath } from '@utils';
 import round from 'lodash-es/round';
@@ -46,7 +46,7 @@ class VizPath {
   /**
    * 上下文
    */
-  context: VizPathContext;
+  context: VizPathCreator;
 
   /**
    * 路径信息（包含路径分段、路径指令、路径节点及曲线变换点信息）
@@ -84,7 +84,7 @@ class VizPath {
    */
   private _onceRerenderPaths: Set<fabric.Path> | null = null;
 
-  constructor(context: VizPathContext) {
+  constructor(context: VizPathCreator) {
     this.context = context;
   }
 

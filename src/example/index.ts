@@ -1,6 +1,6 @@
 import { fabric } from 'fabric';
 import {
-  VizPath,
+  VizPathCreator,
   Editor,
   EditorBackground,
   EditorPath,
@@ -11,6 +11,7 @@ import {
 } from 'fabric-path-editor';
 
 const EXAMPLE_PATH_D = {
+  arc: 'M 88.827 199.088 Q 258.533 199.088 258.533 368.794',
   point: 'M 100 100 z',
   polyline: 'M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160',
   circle:
@@ -59,7 +60,7 @@ const EXAMPLE_PATH_D = {
 
   fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
-  const path = new fabric.Path(EXAMPLE_PATH_D.favicon, {
+  const path = new fabric.Path(EXAMPLE_PATH_D.arc, {
     objectCaching: false,
     noScaleCache: false,
     fill: '#e1e1e1',
@@ -98,7 +99,7 @@ const EXAMPLE_PATH_D = {
 
   fabricCanvas.renderAll();
 
-  const vizPath = new VizPath({
+  const vizPath = new VizPathCreator({
     refreshPathTriggerTime: 'auto',
     refreshDeferDuration: 10,
   });
@@ -249,7 +250,7 @@ const EXAMPLE_PATH_D = {
   // });
 
   // ② 通过路径对象绘制
-  const path2 = VizPath.parseFabricPath(path);
+  const path2 = VizPathCreator.parseFabricPath(path);
   operator.draw(path2);
 
   operator.on('update', () => {
@@ -318,7 +319,7 @@ const EXAMPLE_PATH_D = {
     operator.clearAll();
 
     const url = URL.createObjectURL(file);
-    const paths = await VizPath.parsePathFile(url, {
+    const paths = await VizPathCreator.parsePathFile(url, {
       left: fabricCanvas.getWidth() / 2,
       top: fabricCanvas.getHeight() / 2,
       originX: 'center',

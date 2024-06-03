@@ -3058,36 +3058,46 @@
   };
 
   /**
+   * 画布真实坐标转变换后坐标
+   */
+  var calcCanvasCrood = function calcCanvasCrood(canvas, point) {
+    var _a;
+    var matrix = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0];
+    return fabric.fabric.util.transformPoint(point, fabric.fabric.util.invertTransform(matrix));
+  };
+
+  /**
    * 手动模拟触发fabric Canvas的鼠标选择事件，以实现在选中操作对象时更改操作对象
    *
-   * @note 请注意这会触发画布mouse:down/mouse:down等画布事件
+   * @note 请注意这会触发画布mouse:up/mouse:down等画布事件
    */
   var fireMouseUpAndSelect = function fireMouseUpAndSelect(object) {
     var canvas = object.canvas;
     if (!canvas) return;
     var canvasElement = canvas.getSelectionElement();
     if (!canvasElement) return;
-    var manualMouseUp = function manualMouseUp() {
-      var event = new MouseEvent('mouseup');
-      // TODO：浏览器触发不生效，调用fabric的私有方法替代，暂时没发现副作用
-      // canvasElement.dispatchEvent(event);
-      canvas._onMouseUp(event);
+    var dispatchMouseUpEvent = function dispatchMouseUpEvent() {
+      var event = new MouseEvent('mouseup', {
+        view: window,
+        bubbles: true,
+        cancelable: true
+      });
+      canvasElement.dispatchEvent(event);
     };
-    var manualMouseDown = function manualMouseDown() {
-      // 计算对象正确的鼠标位置
+    var dispatchMouseDownEvent = function dispatchMouseDownEvent() {
       var objectBoundRect = object.getBoundingRect();
       var canvasElementBoundRect = canvasElement.getBoundingClientRect();
       var event = new MouseEvent('mousedown', {
         clientX: canvasElementBoundRect.left + objectBoundRect.left + objectBoundRect.width / 2,
         clientY: canvasElementBoundRect.top + objectBoundRect.top + objectBoundRect.height / 2
       });
-      canvas._onMouseDown(event);
+      canvasElement.dispatchEvent(event);
     };
     if (canvas.getActiveObject() !== object) {
       canvas.setActiveObject(object);
     }
-    manualMouseUp();
-    manualMouseDown();
+    dispatchMouseUpEvent();
+    dispatchMouseDownEvent();
   };
 
   /**
@@ -3108,15 +3118,6 @@
    */
   var calcCroodsDistance = function calcCroodsDistance(a, b) {
     return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
-  };
-
-  /**
-   * 画布真实坐标转变换后坐标
-   */
-  var calcCanvasCrood = function calcCanvasCrood(canvas, point) {
-    var _a;
-    var matrix = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0];
-    return fabric.fabric.util.transformPoint(point, fabric.fabric.util.invertTransform(matrix));
   };
 
   /******************************************************************************
@@ -4793,10 +4794,10 @@
   /**
    * VizPath
    */
-  var VizPathContext = /*#__PURE__*/function () {
-    function VizPathContext() {
+  var VizPathCreator = /*#__PURE__*/function () {
+    function VizPathCreator() {
       var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-      _classCallCheck(this, VizPathContext);
+      _classCallCheck(this, VizPathCreator);
       this.options = {
         refreshPathTriggerTime: 'auto',
         refreshDeferDuration: 100
@@ -4815,7 +4816,7 @@
      *
      * const path = parseFabricPath(new fabric.Path());
      */
-    return _createClass(VizPathContext, [{
+    return _createClass(VizPathCreator, [{
       key: "use",
       value:
       /**
@@ -5033,7 +5034,7 @@
                     if (child.type === 'group') {
                       extract(child);
                     } else if (child.type === 'path') {
-                      paths.push(VizPathContext.parseFabricPath(child));
+                      paths.push(VizPathCreator.parseFabricPath(child));
                     }
                   });
                 };
@@ -6555,23 +6556,34 @@
           if (event.target) {
             if (_this22.activeNodes.length === 1 && event.target[VizPath.symbol] === VizPathSymbalType.NODE) {
               _this22.link(_this22.objectNodeMap.get(_this22.activeNodes[0]), _this22.objectNodeMap.get(event.target));
+              target = event.target;
             }
-            return;
+          } else {
+            // 新增节点
+            var pointer = calcCanvasCrood(_this22.editor.canvas, event.pointer);
+            target = _this22.add({
+              left: pointer.x,
+              top: pointer.y
+            });
           }
-          // 新增节点
-          var pointer = calcCanvasCrood(_this22.editor.canvas, event.pointer);
-          target = _this22.add({
-            left: pointer.x,
-            top: pointer.y
-          });
-          // 先将两边的点都降级，便于后续拖拽变换
-          _this22.degrade(target, 'both', true);
-          _this22.editor.canvas.selection = false;
+          if (target) {
+            target.set({
+              lockMovementX: true,
+              lockMovementY: true
+            });
+            // 先将两边的点都降级，便于后续拖拽变换
+            _this22.degrade(target, 'both', true);
+            _this22.editor.canvas.selection = false;
+          }
         });
         this.editor.on('canvas', 'mouse:move', function (event) {
           var _a;
           if (!target) return;
           if (_this22.setting.mode !== Mode.ADD) {
+            target === null || target === void 0 ? void 0 : target.set({
+              lockMovementX: false,
+              lockMovementY: false
+            });
             target = undefined;
             _this22.editor.canvas.selection = true;
             return;
@@ -6592,6 +6604,10 @@
           }
         });
         this.editor.on('canvas', 'mouse:up', function () {
+          target === null || target === void 0 ? void 0 : target.set({
+            lockMovementX: false,
+            lockMovementY: false
+          });
           target = undefined;
           _this22.editor.canvas.selection = true;
         });
@@ -6840,7 +6856,7 @@
           if (!addPathNode) return;
           return this.nodeObjectMap.get(addPathNode);
         } else {
-          var path = VizPathContext.parseFabricPath(new fabric.fabric.Path('M 0 0', position));
+          var path = VizPathCreator.parseFabricPath(new fabric.fabric.Path('M 0 0', position));
           var responsivePath = vizPath.draw(path);
           return this.nodeObjectMap.get(responsivePath[0].segment[0]);
         }
@@ -9935,6 +9951,7 @@
   EditorBezier.ID = 'editor-bezier';
 
   const EXAMPLE_PATH_D = {
+      arc: 'M 88.827 199.088 Q 258.533 199.088 258.533 368.794',
       point: 'M 100 100 z',
       polyline: 'M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160',
       circle: 'M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z',
@@ -9970,7 +9987,7 @@
           // selection: false,
       });
       fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-      const path = new fabric.fabric.Path(EXAMPLE_PATH_D.favicon, {
+      const path = new fabric.fabric.Path(EXAMPLE_PATH_D.arc, {
           objectCaching: false,
           noScaleCache: false,
           fill: '#e1e1e1',
@@ -10006,7 +10023,7 @@
       // );
       // fabricCanvas.add(pathText);
       fabricCanvas.renderAll();
-      const vizPath = new VizPathContext({
+      const vizPath = new VizPathCreator({
           refreshPathTriggerTime: 'auto',
           refreshDeferDuration: 10,
       });
@@ -10146,7 +10163,7 @@
       //   fabricCanvas.requestRenderAll();
       // });
       // ② 通过路径对象绘制
-      const path2 = VizPathContext.parseFabricPath(path);
+      const path2 = VizPathCreator.parseFabricPath(path);
       operator.draw(path2);
       operator.on('update', () => {
           var _a;
@@ -10206,7 +10223,7 @@
               return;
           operator.clearAll();
           const url = URL.createObjectURL(file);
-          const paths = await VizPathContext.parsePathFile(url, {
+          const paths = await VizPathCreator.parsePathFile(url, {
               left: fabricCanvas.getWidth() / 2,
               top: fabricCanvas.getHeight() / 2,
               originX: 'center',

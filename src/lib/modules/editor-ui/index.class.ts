@@ -2,11 +2,11 @@ import defaults from 'lodash-es/defaults';
 import EditorModule from '../base.class';
 import defaultTheme from 'src/themes/default';
 import noneTheme from 'src/themes/none';
-import type VizPathContext from 'src/lib';
+import type VizPathCreator from 'src/lib';
 
 export type ThemeDecorator<InputType, OutputType = InputType> = (
   customObject: InputType,
-  callback?: (context: VizPathContext, object: OutputType) => void,
+  callback?: (context: VizPathCreator, object: OutputType) => void,
 ) => OutputType;
 
 export interface Theme {
