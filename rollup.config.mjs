@@ -8,6 +8,7 @@ import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
 import serve from 'rollup-plugin-serve';
 import livereload from 'rollup-plugin-livereload';
+import clean from 'rollup-plugin-clear';
 import peerDepsExternal from 'rollup-plugin-peer-deps-external';
 
 const build_umd = () => ({
@@ -51,6 +52,7 @@ const build_es_lib = () => ({
     },
   ],
   plugins: [
+    clean({ targets: ['dist'] }),
     resolve(),
     peerDepsExternal(),
     commonjs(),

@@ -79,5 +79,8 @@
   "dependencies": {
     "lodash-es": "^4.17.21",
     "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">= 18.18.0"
   }
 }

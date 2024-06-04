@@ -2,12 +2,7 @@ import { fabric } from 'fabric';
 import cloneDeep from 'lodash-es/cloneDeep';
 import defaults from 'lodash-es/defaults';
 import VizPath from './vizpath.class';
-import {
-  clearPathOffset,
-  loadSVGToPathFromURL,
-  parsePathJSON,
-  repairPath,
-} from '@utils';
+import { clearPathOffset, loadSVGToPathFromURL, parsePathJSON, repairPath } from '@utils';
 import type EditorModule from './modules/base.class';
 
 /** 指令类型 */
@@ -57,6 +52,8 @@ class VizPathCreator {
     refreshPathTriggerTime: 'auto',
     refreshDeferDuration: 100,
   };
+
+  vizPath: VizPath | null = null;
 
   /**
    * 增强模块列表
@@ -231,21 +228,45 @@ class VizPathCreator {
   }
 
   /**
+   * 通过模块ID查找模块
+   */
+  findByID<Module extends Constructor>(ID: string) {
+    return this.modules.find((module) => (module.constructor as any).ID === ID) as
+      | InstanceType<Module>
+      | undefined;
+  }
+
+  /**
    * 查找模块
    */
   find<Module extends Constructor>(moduleConstructor: Module) {
-    return this.modules.find(
-      (module) => (module.constructor as any).ID === (moduleConstructor as any).ID,
-    ) as InstanceType<Module> | undefined;
+    return this.findByID<Module>((moduleConstructor as any).ID);
+  }
+
+  /**
+   * 销毁
+   */
+  destroy() {
+    if (!this.vizPath) return;
+
+    const vizPath = this.vizPath;
+
+    this.modules.forEach((module) => {
+      module.__unload(vizPath);
+    });
+
+    this.vizPath = null;
   }
 
   /**
    * 初始可视路径编辑器
    */
   async initialize() {
+    if (this.vizPath) return this.vizPath;
+
     const vizPath = new VizPath(this);
 
-    return new Promise<VizPath>((resolve) => {
+    await new Promise<VizPath>((resolve) => {
       let next = 0;
 
       const loadModule = async () => {
@@ -255,8 +276,7 @@ class VizPathCreator {
           return;
         }
 
-        await module.prepare();
-        await Promise.resolve(module.load(vizPath));
+        await Promise.resolve(module.__load(vizPath));
 
         next++;
         loadModule();
@@ -264,6 +284,10 @@ class VizPathCreator {
 
       loadModule();
     });
+
+    this.vizPath = vizPath;
+
+    return vizPath;
   }
 }
 

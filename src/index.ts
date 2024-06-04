@@ -11,6 +11,7 @@ export { default as EditorBezier } from './lib/modules/editor-bezier/index.class
 
 /** 必要类型导出 */
 export type { default as VizPath } from './lib/vizpath.class';
+export type { Path, Instruction } from './lib';
 export type { Theme } from './lib/modules/editor-ui/index.class';
 
 export * as utils from './lib/utils';

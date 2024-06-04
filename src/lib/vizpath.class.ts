@@ -4,6 +4,7 @@ import VizPathCreator from '.';
 import { type Path, type Instruction, InstructionType, type PathNode } from '.';
 import { parsePathJSON, repairPath } from '@utils';
 import round from 'lodash-es/round';
+import BaseEvent from './base-event.class';
 
 export enum VizPathSymbalType {
   PATH = 'path',
@@ -27,20 +28,18 @@ export type ResponsiveCrood = Crood & {
 export type ResponsivePath = {
   segment: PathNode<ResponsiveCrood>[];
   pathObject: fabric.Path;
-}[];
-
-export type VizPathEvent = {
-  draw: (path: ResponsivePath) => void;
-  clear: (path: ResponsivePath) => void;
-  update: (path: ResponsivePath[number]) => void;
-  clearAll: () => void;
-  destroy: () => void;
 };
 
 /**
  * VizPath (Visualization Path，可视化路径)
  */
-class VizPath {
+class VizPath extends BaseEvent<{
+  draw: (paths: ResponsivePath[]) => void;
+  clear: (paths: ResponsivePath[]) => void;
+  update: (path: ResponsivePath) => void;
+  clearAll: () => void;
+  destroy: () => void;
+}> {
   static symbol = Symbol('vizpath');
 
   /**
@@ -51,17 +50,12 @@ class VizPath {
   /**
    * 路径信息（包含路径分段、路径指令、路径节点及曲线变换点信息）
    */
-  path: ResponsivePath = [];
+  paths: ResponsivePath[] = [];
 
   /**
    * 路径信息映射
    */
   pathNodeMap: Map<Crood, PathNode> = new Map([]);
-
-  /**
-   * 监听事件
-   */
-  events: Partial<Record<keyof VizPathEvent, ((...args: any[]) => void)[]>> = {};
 
   /**
    * 响应式节点的更改监听
@@ -85,6 +79,8 @@ class VizPath {
   private _onceRerenderPaths: Set<fabric.Path> | null = null;
 
   constructor(context: VizPathCreator) {
+    super();
+
     this.context = context;
   }
 
@@ -193,19 +189,19 @@ class VizPath {
   getPath(target: PathNode[] | fabric.Path) {
     const index =
       target instanceof fabric.Path
-        ? this.path.findIndex((i) => i.pathObject === target)
-        : this.path.findIndex((i) => i.segment === target);
+        ? this.paths.findIndex((i) => i.pathObject === target)
+        : this.paths.findIndex((i) => i.segment === target);
 
     if (index === -1) return;
 
-    return this.path[index];
+    return this.paths[index];
   }
 
   /**
    * 提取当前路径的信息
    */
-  getPathSegmentsInfo(path: ResponsivePath = this.path, precision = 3) {
-    const ds = path.map(({ segment, pathObject }) => {
+  getPathSegmentsInfo(paths: ResponsivePath[] = this.paths, precision = 3) {
+    const ds = paths.map(({ segment, pathObject }) => {
       const matrix = [...pathObject.calcOwnMatrix()] as Matrix;
       const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
       const instructions = segment.map((item) => {
@@ -231,8 +227,8 @@ class VizPath {
   /**
    * 提取当前路径的信息
    */
-  getPathData(path: ResponsivePath = this.path, precision = 3) {
-    const segments = this.getPathSegmentsInfo(path, precision);
+  getPathData(paths: ResponsivePath[] = this.paths, precision = 3) {
+    const segments = this.getPathSegmentsInfo(paths, precision);
     return segments.map((fabric.util as any).joinPath).join(' ');
   }
 
@@ -359,10 +355,10 @@ class VizPath {
    *
    * @param path 路径信息
    */
-  draw(path: Path) {
-    const allDrawPaths: ResponsivePath = [];
-    path.forEach((item) => {
-      const drawPath = item as ResponsivePath[number];
+  draw(paths: Path) {
+    const allDrawPaths: ResponsivePath[] = [];
+    paths.forEach((item) => {
+      const drawPath = item as ResponsivePath;
       const { segment, pathObject } = item;
       segment.forEach((pathNode, index) => {
         const { instruction } = pathNode;
@@ -486,19 +482,19 @@ class VizPath {
         }
       });
 
-      const index = this.path.indexOf(drawPath);
+      const index = this.paths.indexOf(drawPath);
       if (index === -1) {
-        this.path.push(drawPath);
+        this.paths.push(drawPath);
       } else {
         pathObject.path = segment.map((i) => i.instruction) as unknown as fabric.Point[];
         this._rerenderOriginPath(pathObject);
-        this.path.splice(index, 1, drawPath);
+        this.paths.splice(index, 1, drawPath);
       }
 
       allDrawPaths.push(drawPath);
     });
 
-    this._fire('draw', path as ResponsivePath);
+    this.fire('draw', paths as ResponsivePath[]);
 
     return allDrawPaths;
   }
@@ -516,7 +512,7 @@ class VizPath {
     repairPath(path);
     path.canvas?.requestRenderAll();
 
-    this._fire('update', this.getPath(path)!);
+    this.fire('update', this.getPath(path)!);
   }
 
   /**
@@ -559,6 +555,7 @@ class VizPath {
     this._onceRerenderPaths = new Set([]);
     callback();
     const paths = Array.from(this._onceRerenderPaths.values());
+    this._onceRerenderPaths.clear();
     this._onceRerenderPaths = null;
     paths.forEach(this._rerenderOriginPath.bind(this));
   }
@@ -566,7 +563,7 @@ class VizPath {
   /**
    * 使用新的路径信息绘制旧路径，多个路径段则会使原路径拆分成多个
    */
-  replacePathSegments(path: ResponsivePath[number], segments: Instruction[][]) {
+  replacePathSegments(path: ResponsivePath, segments: Instruction[][]) {
     const { pathObject } = path;
 
     const { styles, layout } = parsePathJSON(pathObject);
@@ -597,43 +594,6 @@ class VizPath {
       this.draw(newPath);
       this._rerenderOriginPath(pathObject);
     });
-  }
-
-  /**
-   * 监听事件
-   * @param eventName 事件名
-   * @param callback 回调
-   */
-  on<Event extends keyof VizPathEvent>(eventName: Event, callback: VizPathEvent[Event]) {
-    this.events[eventName] = this.events[eventName] ?? [];
-    this.events[eventName]!.push(callback);
-  }
-
-  /**
-   * 取消监听事件
-   * @param eventName 事件名
-   * @param callback 回调
-   */
-  off<Event extends keyof VizPathEvent>(eventName: Event, callback?: VizPathEvent[Event]) {
-    if (!callback) delete this.events[eventName];
-
-    const handlers = this.events[eventName];
-    if (!handlers) return;
-
-    const index = handlers.indexOf(callback as (typeof handlers)[number]);
-    if (index !== -1) handlers.splice(index, 1);
-  }
-
-  /**
-   * 触发编辑器事件
-   */
-  private _fire<Event extends keyof VizPathEvent>(
-    eventName: Event,
-    ...data: Parameters<VizPathEvent[Event]>
-  ) {
-    const handlers = this.events[eventName];
-    if (!handlers) return;
-    for (const callback of handlers) callback(...data);
   }
 
   /**
@@ -684,7 +644,7 @@ class VizPath {
         indexes.length === segment.length || (isClosePath && indexes.length === segment.length - 1);
       if (isWholePath) {
         return {
-          path: this.path.find((i) => i.segment === segment)!,
+          path: this.paths.find((i) => i.segment === segment)!,
           segment: [],
         };
       }
@@ -779,7 +739,7 @@ class VizPath {
       };
 
       return {
-        path: this.path.find((i) => i.segment === segment)!,
+        path: this.paths.find((i) => i.segment === segment)!,
         segment: indexes.length === 1 ? removeSingleNode(indexes[0]) : removeMulitpleNodes(indexes),
       };
     });
@@ -809,7 +769,7 @@ class VizPath {
     const index = segment.indexOf(pathNode);
     if (index === -1) return;
 
-    const newPath = this._updatePathByCommands(this.path.find((i) => i.segment === segment)!, [
+    const newPath = this._updatePathByCommands(this.paths.find((i) => i.segment === segment)!, [
       {
         type: 'add',
         index,
@@ -865,7 +825,7 @@ class VizPath {
       });
     }
 
-    this._updatePathByCommands(this.path.find((i) => i.segment === segment)!, updateCommands);
+    this._updatePathByCommands(this.paths.find((i) => i.segment === segment)!, updateCommands);
   }
 
   /**
@@ -914,7 +874,7 @@ class VizPath {
    * @param instruction
    */
   private _updatePathByCommands(
-    path: ResponsivePath[number],
+    path: ResponsivePath,
     queue: {
       type: 'add' | 'update';
       index: number;
@@ -959,12 +919,12 @@ class VizPath {
   clear(target: PathNode[] | fabric.Path) {
     const index =
       target instanceof fabric.Path
-        ? this.path.findIndex((i) => i.pathObject === target)
-        : this.path.findIndex((i) => i.segment === target);
+        ? this.paths.findIndex((i) => i.pathObject === target)
+        : this.paths.findIndex((i) => i.segment === target);
 
     if (index === -1) return;
 
-    const path = this.path[index];
+    const path = this.paths[index];
 
     path.segment.forEach(({ node, curveDots }) => {
       if (!node) return;
@@ -975,29 +935,29 @@ class VizPath {
       this.pathNodeMap.delete(node);
     });
 
-    this.path.splice(index, 1);
+    this.paths.splice(index, 1);
 
     this._rerenderOriginPath(path.pathObject);
 
-    this._fire('clear', [path]);
+    this.fire('clear', [path]);
   }
 
   /**
    * 清除所有路径
    */
   clearAll() {
-    this.path.forEach(({ segment }) => {
+    this.paths.forEach(({ segment }) => {
       segment.forEach(({ node, curveDots }) => {
         node?.unobserve();
         curveDots?.pre?.unobserve();
         curveDots?.next?.unobserve();
       });
     });
-    this.path = [];
+    this.paths.length = 0;
     this.pathNodeMap.clear();
     this._observers.clear();
 
-    this._fire('clearAll');
+    this.fire('clearAll');
   }
 
   /**
@@ -1006,13 +966,13 @@ class VizPath {
   destroy() {
     this.clearAll();
 
+    this._onceRerenderPaths?.clear();
+    this._onceRerenderPaths = null;
+
+    this.context.destroy();
+
     this.events = {};
-
-    this.context.modules.forEach((module) => {
-      module.unload(this);
-    });
-
-    this._fire('destroy');
+    this.fire('destroy');
   }
 }
 

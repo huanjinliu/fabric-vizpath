@@ -59,6 +59,17 @@ class EditorBackground extends EditorModule {
   //   });
   // }
 
+  unload(vizPath: Vizpath) {
+    const editor = vizPath.context.find(Editor);
+    if (!editor) return;
+
+    const canvas = editor.canvas;
+    if (!canvas) return;
+
+    canvas.backgroundColor = undefined;
+    canvas.requestRenderAll();
+  }
+
   async load(vizPath: Vizpath) {
     const editor = vizPath.context.find(Editor);
     if (!editor) return;

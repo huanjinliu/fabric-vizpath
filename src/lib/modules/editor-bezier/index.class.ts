@@ -37,6 +37,10 @@ class EditorBezier extends EditorModule {
     }
   }
 
+  unload() {
+    // TODO: module unload
+  }
+
   load(vizpath: Vizpath) {
     const editor = vizpath.context.find(Editor);
     if (!editor) return;

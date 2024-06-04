@@ -79,40 +79,48 @@ class Editor extends EditorModule {
   /**
    * 添加事件监听
    */
-  on(type: 'global' | 'canvas', eventName: string, handler: (e: any) => void) {
+  on(eventName: string, handler: (e: any) => void, type?: 'global' | 'canvas') {
     if (!this.canvas) return;
 
-    if (type === 'global') {
-      window.addEventListener(eventName, handler);
-    }
+    if (type) {
+      if (type === 'global') {
+        window.addEventListener(eventName, handler);
+      }
 
-    if (type === 'canvas') {
-      this.canvas.on(eventName, handler);
-    }
+      if (type === 'canvas') {
+        this.canvas.on(eventName, handler);
+      }
 
-    this.listeners.push({ type, eventName, handler });
+      this.listeners.push({ type, eventName, handler });
+    } else {
+      super.on(eventName, handler);
+    }
   }
 
   /**
    * 移除事件监听
    */
-  off(type: 'global' | 'canvas', eventName: string, handler?: (e: any) => void) {
+  off(eventName: string, handler?: (e: any) => void, type?: 'global' | 'canvas') {
     const canvas = this.canvas;
     if (!canvas) return;
 
-    this.listeners = this.listeners.filter((listener) => {
-      if (handler && handler !== listener.handler) return true;
-      if (eventName === listener.eventName) {
-        if (type === 'global') {
-          window.removeEventListener(listener.eventName, listener.handler);
+    if (type) {
+      this.listeners = this.listeners.filter((listener) => {
+        if (handler && handler !== listener.handler) return true;
+        if (eventName === listener.eventName) {
+          if (type === 'global') {
+            window.removeEventListener(listener.eventName, listener.handler);
+          }
+          if (type === 'canvas') {
+            canvas.off(listener.eventName, listener.handler);
+          }
+          return false;
         }
-        if (type === 'canvas') {
-          canvas.off(listener.eventName, listener.handler);
-        }
-        return false;
-      }
-      return true;
-    });
+        return true;
+      });
+    } else {
+      super.off(eventName, handler);
+    }
   }
 
   unload() {
@@ -121,7 +129,7 @@ class Editor extends EditorModule {
       this.canvas?.dispose();
     } else {
       this.listeners.forEach(({ type, eventName, handler }) => {
-        this.off(type, eventName, handler);
+        this.off(eventName, handler, type);
       });
     }
 

@@ -60,7 +60,7 @@ const EXAMPLE_PATH_D = {
 
   fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
 
-  const path = new fabric.Path(EXAMPLE_PATH_D.arc, {
+  const path = new fabric.Path(EXAMPLE_PATH_D.test, {
     objectCaching: false,
     noScaleCache: false,
     fill: '#e1e1e1',
@@ -104,12 +104,15 @@ const EXAMPLE_PATH_D = {
     refreshDeferDuration: 10,
   });
 
+  const editorNode = new EditorNode();
+  const editorUI = new EditorUI();
+
   const operator = await vizPath
     .use(new Editor(fabricCanvas, true))
-    .use(new EditorUI())
     .use(new EditorBackground())
     .use(new EditorPath())
-    .use(new EditorNode())
+    .use(editorNode)
+    .use(editorUI)
     .use(new EditorBezier())
     .use(
       new EditorShortcut([
@@ -213,6 +216,14 @@ const EXAMPLE_PATH_D = {
     )
     .initialize();
 
+  editorNode.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
+    editorUI.shareState.selectedNodes = nodes;
+    editorUI.shareState.selectedPoint = point ? point : undefined;
+  });
+  editorNode.on('deselected', () => {
+    editorUI.shareState.selectedNodes = [];
+  });
+
   // // ① 通过路径指令直接绘制
   // const path1 = VizPath.parsePathData(EXAMPLE_PATH_D.test, {
   //   left: pathText.left,
@@ -226,7 +237,7 @@ const EXAMPLE_PATH_D = {
   // operator.draw(path1);
 
   // operator.on('update', () => {
-  //   const d = operator.getPathData(operator.path);
+  //   const d = operator.getPathData(operator.paths);
 
   //   // 更新旧的路径信息
   //   path.initialize(d as any);
@@ -254,7 +265,7 @@ const EXAMPLE_PATH_D = {
   operator.draw(path2);
 
   operator.on('update', () => {
-    const d = operator.getPathData(operator.path);
+    const d = operator.getPathData(operator.paths);
 
     path.set({
       scaleX: 1,
@@ -265,7 +276,7 @@ const EXAMPLE_PATH_D = {
 
     path.canvas?.renderAll();
 
-    // const d = operator.getPathData(operator.path);
+    // const d = operator.getPathData(operator.paths);
 
     // // 更新旧的路径信息
     // path.initialize(d as any);
@@ -341,7 +352,7 @@ const EXAMPLE_PATH_D = {
 
   // editorNode.remove();
 
-  // operator.move(operator.path[0][0].node, { x: 200, y: 200 })
+  // operator.move(operator.paths[0][0].node, { x: 200, y: 200 })
 
-  // operator.insert(operator.path[0].segment[0].node!, { x: 100, y: 100 }, true);
+  // operator.insert(operator.paths[0].segment[0].node!, { x: 100, y: 100 }, true);
 })();
