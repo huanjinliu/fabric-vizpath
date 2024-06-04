@@ -2,9 +2,7 @@ import { fabric } from 'fabric';
 import type { Theme } from 'src/lib/modules/editor-ui/index.class';
 
 export default {
-  path: (pathObject) => {
-    return pathObject;
-  },
+  path: (pathObject) => {},
   node: () => {
     const circle = new fabric.Circle({
       radius: 3,

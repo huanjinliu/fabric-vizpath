@@ -15,8 +15,6 @@ export default {
       fill: 'transparent',
       strokeUniform: true,
     });
-
-    return pathObject;
   },
   node: (decorator, shareState) => {
     const object = new fabric.Circle({

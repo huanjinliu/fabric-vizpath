@@ -11,7 +11,7 @@ export type ThemeDecorator<InputType, OutputType = InputType> = (
 ) => OutputType;
 
 export interface Theme<T extends Record<string, any> = {}> {
-  path: (pathObject: fabric.Path, shareState: T) => fabric.Path | void;
+  path: (pathObject: fabric.Path, decorator: ThemeDecorator<fabric.Path>, shareState: T) => void;
   node: (decorator: ThemeDecorator<fabric.Object>, shareState: T) => fabric.Object;
   dot: (decorator: ThemeDecorator<fabric.Object>, shareState: T) => fabric.Object;
   line: (decorator: ThemeDecorator<fabric.Line>, shareState: T) => fabric.Line;

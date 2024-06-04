@@ -5909,7 +5909,6 @@
         fill: 'transparent',
         strokeUniform: true
       });
-      return pathObject;
     },
     node: function node(decorator, shareState) {
       var object = new fabric.fabric.Circle({
@@ -5968,9 +5967,7 @@
     }
   };
   var noneTheme = {
-    path: function path(pathObject) {
-      return pathObject;
-    },
+    path: function path(pathObject) {},
     node: function node() {
       var circle = new fabric.fabric.Circle({
         radius: 3,
@@ -6010,7 +6007,7 @@
        */
       _this14.objectPreRenderCallbackMap = new Map([]);
       _this14.options = defaults(options, EditorUI.noneUI);
-      _this14.shareState = initialShareState;
+      _this14.shareState = initialShareState !== null && initialShareState !== void 0 ? initialShareState : {};
       return _this14;
     }
     /**
@@ -6136,21 +6133,28 @@
           var _this18$paths;
           var ui = vizPath.context.find(EditorUI);
           paths.forEach(function (item) {
-            var _a, _b;
+            var _a;
             var pathObject = item.pathObject;
             // 如果已经带有标志则是已经添加进画布的路径
             if (pathObject[VizPath.symbol]) return;
-            var customPath = (_b = ((_a = ui === null || ui === void 0 ? void 0 : ui.options.path) !== null && _a !== void 0 ? _a : EditorUI.noneUI.path)(pathObject, ui ? ui.shareState : {})) !== null && _b !== void 0 ? _b : pathObject;
-            customPath.set({
-              name: v4(),
-              // 路径本身不可选中，后续通过操纵点和线条来更改路径
-              selectable: false,
-              // 不触发事件
-              evented: false,
-              // 防止因为缓存没有显示正确的路径
-              objectCaching: false
-            });
-            customPath[VizPath.symbol] = VizPathSymbalType.PATH;
+            var decorator = function decorator(customPath, callback) {
+              customPath.set({
+                name: v4(),
+                // 路径本身不可选中，后续通过操纵点和线条来更改路径
+                selectable: false,
+                // 不触发事件
+                evented: false,
+                // 防止因为缓存没有显示正确的路径
+                objectCaching: false
+              });
+              customPath[VizPath.symbol] = VizPathSymbalType.PATH;
+              if (ui && callback) {
+                ui.objectPreRenderCallbackMap.set(customPath, callback);
+              }
+              return customPath;
+            };
+            ((_a = ui === null || ui === void 0 ? void 0 : ui.options.path) !== null && _a !== void 0 ? _a : EditorUI.noneUI.path)(pathObject, decorator, ui ? ui.shareState : {});
+            if (!pathObject[VizPath.symbol]) decorator(pathObject);
           });
           // 添加新的路径对象
           canvas.renderOnAddRemove = true;
@@ -10097,51 +10101,6 @@
   }(EditorModule);
   EditorBezier.ID = 'editor-bezier';
 
-  var index = {
-    path: function path(pathObject) {
-      pathObject.set({
-        stroke: '#1884ec',
-        strokeWidth: 2
-      });
-      return pathObject;
-    },
-    node: function node(decorator, shareState) {
-      var rect = new fabric.fabric.Rect({
-        width: 6,
-        height: 6,
-        fill: '#ffffff',
-        stroke: '#1784ec',
-        strokeWidth: 1
-      });
-      return decorator(rect, function () {
-        var _a;
-        rect.set({
-          fill: ((_a = shareState.selectedNodes) === null || _a === void 0 ? void 0 : _a.includes(rect)) ? '#1884ec' : '#ffffff'
-        });
-      });
-    },
-    dot: function dot(decorator, shareState) {
-      var circle = new fabric.fabric.Circle({
-        radius: 3,
-        fill: '#ffffff',
-        stroke: '#1884ec',
-        strokeWidth: 1
-      });
-      return decorator(circle, function () {
-        circle.set({
-          fill: shareState.selectedPoint === circle ? '#1884ec' : '#ffffff'
-        });
-      });
-    },
-    line: function line() {
-      var line = new fabric.fabric.Line([0, 0, 0, 0], {
-        stroke: '#1884ec',
-        strokeWidth: 1
-      });
-      return line;
-    }
-  };
-
   const EXAMPLE_PATH_D = {
       arc: 'M 88.827 199.088 Q 258.533 199.088 258.533 368.794',
       point: 'M 100 100 z',
@@ -10220,7 +10179,7 @@
           refreshDeferDuration: 10,
       });
       const editorNode = new EditorNode();
-      const editorUI = new EditorUI(index);
+      const editorUI = new EditorUI();
       const operator = await vizPath
           .use(new Editor(fabricCanvas, true))
           .use(new EditorBackground())

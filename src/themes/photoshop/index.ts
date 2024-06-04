@@ -14,7 +14,6 @@ export default {
       stroke: '#1884ec',
       strokeWidth: 2,
     });
-    return pathObject;
   },
   node: (decorator, shareState) => {
     const rect = new fabric.Rect({
