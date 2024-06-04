@@ -1,30 +1,73 @@
 import { fabric } from 'fabric';
-import defaults from 'lodash-es/defaults';
 import EditorModule from '../base.class';
-import defaultTheme, { type ThemeShareState } from 'src/themes/default';
-import noneTheme from 'src/themes/none';
 import Editor from '../editor/index.class';
+import VizPath from '../../vizpath.class';
 
 export type ThemeDecorator<InputType, OutputType = InputType> = (
   customObject: InputType,
   callback?: () => void,
 ) => OutputType;
 
-export interface Theme<T extends Record<string, any> = {}> {
-  path: (pathObject: fabric.Path, decorator: ThemeDecorator<fabric.Path>, shareState: T) => void;
-  node: (decorator: ThemeDecorator<fabric.Object>, shareState: T) => fabric.Object;
-  dot: (decorator: ThemeDecorator<fabric.Object>, shareState: T) => fabric.Object;
-  line: (decorator: ThemeDecorator<fabric.Line>, shareState: T) => fabric.Line;
-}
+export type ThemeConfigurator<T extends Record<string, any> = {}> = (
+  editor: Editor,
+  shareState: T,
+) => {
+  path?: (decorator: ThemeDecorator<fabric.Path>, pathObject: fabric.Path) => void;
+  node: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
+  dot: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
+  line: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
+};
 
-class EditorUI<T extends Record<string, any> = ThemeShareState> extends EditorModule {
+export const DEFAULT_THEME = {
+  path: (decorator, pathObject) => {
+    pathObject.set({
+      stroke: '#4b4b4b',
+      strokeWidth: 1,
+    });
+  },
+  node: () => {
+    const circle = new fabric.Circle({
+      radius: 3,
+      fill: '#ffffff',
+      stroke: '#4b4b4b',
+      strokeWidth: 1,
+    });
+
+    return circle;
+  },
+  dot: () => {
+    const circle = new fabric.Circle({
+      radius: 3,
+      fill: '#ffffff',
+      stroke: '#4b4b4bcc',
+      strokeWidth: 1,
+      strokeDashArray: [1, 1],
+    });
+
+    return circle;
+  },
+  line: () => {
+    const line = new fabric.Line([0, 0, 0, 0], {
+      stroke: '#bebebe',
+      strokeWidth: 1,
+    });
+
+    return line;
+  },
+} as Required<ReturnType<ThemeConfigurator<object>>>;
+
+class EditorUI<T extends Record<string, any> = object> extends EditorModule {
   static ID = 'editor-ui';
 
-  static noneUI = noneTheme;
+  /**
+   * 主题配置器
+   */
+  configurator: ThemeConfigurator<T>;
 
-  static defaultUI = defaultTheme;
-
-  options: Theme<T>;
+  /**
+   * 主题
+   */
+  theme: Required<ReturnType<ThemeConfigurator<T>>> | null = null;
 
   /**
    * 共享状态
@@ -36,10 +79,10 @@ class EditorUI<T extends Record<string, any> = ThemeShareState> extends EditorMo
    */
   objectPreRenderCallbackMap = new Map<fabric.Object, () => void>([]);
 
-  constructor(options: Partial<Theme<T>> = EditorUI.defaultUI, initialShareState: T = {} as T) {
+  constructor(configurator: ThemeConfigurator<T>, initialShareState: T) {
     super();
-    this.options = defaults(options, EditorUI.noneUI);
-    this.shareState = (initialShareState ?? {}) as T;
+    this.configurator = configurator;
+    this.shareState = initialShareState;
   }
 
   /**
@@ -60,9 +103,14 @@ class EditorUI<T extends Record<string, any> = ThemeShareState> extends EditorMo
   unload() {
     this.shareState = {} as T;
     this.objectPreRenderCallbackMap.clear();
+    this.theme = null;
   }
 
-  load() {
+  load(vizPath: VizPath) {
+    const editor = vizPath.context.find(Editor);
+    if (!editor) {
+      throw new TypeError('Please use editor module before using ui module.');
+    }
     this.shareState = new Proxy(this.shareState, {
       // 每次共享状态修改都会触发UI更新
       set: (target, p, newValue, receiver) => {
@@ -72,6 +120,10 @@ class EditorUI<T extends Record<string, any> = ThemeShareState> extends EditorMo
         return result;
       },
     });
+    this.theme = {
+      path: (decorator, pathObject) => pathObject,
+      ...this.configurator(editor, this.shareState),
+    };
   }
 }
 

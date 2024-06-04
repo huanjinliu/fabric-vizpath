@@ -2,7 +2,6 @@ import { fabric } from 'fabric';
 import { Bezier } from 'bezier-js';
 import type Vizpath from '../../vizpath.class';
 import EditorModule from '../base.class';
-import EditorNode from '../editor-node/index.class';
 import Editor from '../editor/index.class';
 import { InstructionType, type Instruction } from 'src/lib';
 import { convertQuadraticToCubic } from '@utils';
@@ -45,23 +44,20 @@ class EditorBezier extends EditorModule {
     const editor = vizpath.context.find(Editor);
     if (!editor) return;
 
-    const editorNode = vizpath.context.find(EditorNode);
-    if (!editorNode) return;
-
     editor.canvas?.on('mouse:dblclick', (event) => {
       const { target } = event;
 
-      if (!target || !editorNode.nodes.includes(target)) return;
+      if (!target || !editor.nodes.includes(target)) return;
 
-      const curveDots = editorNode.curveDots.filter((i) => i.node === target);
+      const curveDots = editor.curveDots.filter((i) => i.node === target);
 
       // 如果有控制点直接降级为直线
       if (curveDots.length) {
-        editorNode.degrade(target, 'both', true);
+        editor.degrade(target, 'both', true);
         return;
       }
       // 否则则升级为曲线
-      const pathNode = editorNode.objectNodeMap.get(target)!;
+      const pathNode = editor.objectNodeMap.get(target)!;
       const { pre, next } = vizpath.getNeighboringNodes(pathNode);
 
       if (pre && next) {

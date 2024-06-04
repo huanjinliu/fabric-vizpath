@@ -3,12 +3,11 @@ import {
   VizPathCreator,
   Editor,
   EditorBackground,
-  EditorPath,
-  EditorNode,
   EditorUI,
   EditorShortcut,
   EditorBezier,
 } from 'fabric-path-editor';
+import photoshop from 'fabric-path-editor/dist/themes/photoshop';
 
 const EXAMPLE_PATH_D = {
   arc: 'M 88.827 199.088 Q 258.533 199.088 258.533 368.794',
@@ -58,7 +57,7 @@ const EXAMPLE_PATH_D = {
     // selection: false,
   });
 
-  fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+  // fabricCanvas.setViewportTransform([0.5, 0, 0, 0.5, 100, 100]);
 
   const path = new fabric.Path(EXAMPLE_PATH_D.test, {
     objectCaching: false,
@@ -104,15 +103,21 @@ const EXAMPLE_PATH_D = {
     refreshDeferDuration: 10,
   });
 
-  const editorNode = new EditorNode();
-  const editorUI = new EditorUI();
+  const editor = new Editor(fabricCanvas, true);
 
   const operator = await vizPath
-    .use(new Editor(fabricCanvas, true))
+    .use(editor)
     .use(new EditorBackground())
-    .use(new EditorPath())
-    .use(editorNode)
-    .use(editorUI)
+    .use(
+      new EditorUI(photoshop, {
+        hoverNode: null,
+        hoverPoint: null,
+        hoverLine: null,
+        selectedNodes: [],
+        selectedPoint: null,
+        selectedLine: null,
+      }),
+    )
     .use(new EditorBezier())
     .use(
       new EditorShortcut([
@@ -122,14 +127,14 @@ const EXAMPLE_PATH_D = {
           onActivate: (e) => {
             e.preventDefault();
 
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
             // 如果当前有选中曲线控制点
-            if (editorNode.activePoint) {
-              editorNode.remove(editorNode.activePoint);
-            } else if (editorNode.activeNodes.length) {
-              editorNode.remove(...editorNode.activeNodes);
+            if (editor.activePoint) {
+              editor.remove(editor.activePoint);
+            } else if (editor.activeNodes.length) {
+              editor.remove(...editor.activeNodes);
             }
           },
         },
@@ -140,10 +145,10 @@ const EXAMPLE_PATH_D = {
           onActivate: (e) => {
             e.preventDefault();
 
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.focus(...editorNode.nodes);
+            editor.focus(...editor.nodes);
           },
         },
         // 取消节点选择
@@ -153,76 +158,68 @@ const EXAMPLE_PATH_D = {
           onActivate: (e) => {
             e.preventDefault();
 
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.focus();
+            editor.focus();
           },
         },
         // 更改路径节点交互模式
         {
           combinationKeys: ['alt'],
           onActivate: () => {
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.setting.mode = 'convert';
-            editorNode.setting.forcePointSymmetric = 'entire';
+            editor.setting.mode = 'convert';
+            editor.setting.forcePointSymmetric = 'entire';
           },
           onDeactivate: () => {
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.setting.mode = 'move';
-            editorNode.setting.forcePointSymmetric = 'none';
+            editor.setting.mode = 'move';
+            editor.setting.forcePointSymmetric = 'none';
           },
         },
         {
           combinationKeys: ['alt', 'ctrl'],
           onActivate: () => {
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.setting.mode = 'convert';
-            editorNode.setting.forcePointSymmetric = 'angle';
+            editor.setting.mode = 'convert';
+            editor.setting.forcePointSymmetric = 'angle';
           },
           onDeactivate: () => {
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.setting.mode = 'move';
-            editorNode.setting.forcePointSymmetric = 'none';
+            editor.setting.mode = 'move';
+            editor.setting.forcePointSymmetric = 'none';
           },
         },
         // 更改为添加模式
         {
           combinationKeys: ['shift'],
           onActivate: () => {
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.setting.mode = 'add';
-            editorNode.setting.forcePointSymmetric = 'entire';
+            editor.setting.mode = 'add';
+            editor.setting.forcePointSymmetric = 'entire';
           },
           onDeactivate: () => {
-            const editorNode = vizPath.find(EditorNode);
-            if (!editorNode) return;
+            const editor = vizPath.find(Editor);
+            if (!editor) return;
 
-            editorNode.setting.mode = 'move';
-            editorNode.setting.forcePointSymmetric = 'none';
+            editor.setting.mode = 'move';
+            editor.setting.forcePointSymmetric = 'none';
           },
         },
       ]),
     )
     .initialize();
-
-  editorNode.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
-    editorUI.shareState.selectedNodes = nodes;
-    editorUI.shareState.selectedPoint = point ? point : undefined;
-  });
-  editorNode.on('deselected', () => {
-    editorUI.shareState.selectedNodes = [];
-  });
 
   // // ① 通过路径指令直接绘制
   // const path1 = VizPath.parsePathData(EXAMPLE_PATH_D.test, {

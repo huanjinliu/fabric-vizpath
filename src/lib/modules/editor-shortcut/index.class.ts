@@ -142,9 +142,9 @@ class EditorShortcut extends EditorModule {
     const editor = vizPath.context.find(Editor);
     if (!editor) return;
 
-    editor.off('keydown', this._handleShortcutKey.bind(this), 'global');
-    editor.off('keyup', this._handleShortcutKey.bind(this), 'global');
-    editor.off('blur', this._handlePageDeactivate.bind(this), 'global');
+    editor.removeGlobalEvent('keydown', this._handleShortcutKey.bind(this));
+    editor.removeGlobalEvent('keyup', this._handleShortcutKey.bind(this));
+    editor.removeGlobalEvent('blur', this._handlePageDeactivate.bind(this));
 
     this.shortcuts.length = 0;
     this.activeShortcut = undefined;
@@ -154,9 +154,9 @@ class EditorShortcut extends EditorModule {
     const editor = vizPath.context.find(Editor);
     if (!editor) return;
 
-    editor.on('keydown', this._handleShortcutKey.bind(this), 'global');
-    editor.on('keyup', this._handleShortcutKey.bind(this), 'global');
-    editor.on('blur', this._handlePageDeactivate.bind(this), 'global');
+    editor.addGlobalEvent('keydown', this._handleShortcutKey.bind(this));
+    editor.addGlobalEvent('keyup', this._handleShortcutKey.bind(this));
+    editor.addGlobalEvent('blur', this._handlePageDeactivate.bind(this));
   }
 }
 

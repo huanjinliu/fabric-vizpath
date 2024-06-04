@@ -1,55 +1,73 @@
 import { fabric } from 'fabric';
-import type { Theme } from 'src/lib/modules/editor-ui/index.class';
+import type { ThemeConfigurator } from '../../lib/modules/editor-ui/index.class';
 
 export type ThemeShareState = {
-  hoverObject?: fabric.Object;
-  selectedNodes?: fabric.Object[];
-  selectedPoint?: fabric.Object;
-  test: string;
+  hoverNode: fabric.Object | null;
+  hoverPoint: fabric.Object | null;
+  hoverLine: fabric.Line | null;
+  selectedNodes: fabric.Object[];
+  selectedPoint: fabric.Object | null;
+  selectedLine: fabric.Line | null;
 };
 
-export default {
-  path: (pathObject) => {
-    pathObject.set({
-      stroke: '#1884ec',
-      strokeWidth: 2,
-    });
-  },
-  node: (decorator, shareState) => {
-    const rect = new fabric.Rect({
-      width: 6,
-      height: 6,
-      fill: '#ffffff',
-      stroke: '#1784ec',
-      strokeWidth: 1,
-    });
+export default ((editor, shareState) => {
+  editor.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
+    shareState.selectedNodes = nodes;
+    shareState.selectedPoint = point;
+    if (point) {
+      shareState.selectedLine = editor.curveDots.find((i) => i.point === point)?.line ?? null;
+    }
+  });
 
-    return decorator(rect, () => {
-      rect.set({
-        fill: shareState.selectedNodes?.includes(rect) ? '#1884ec' : '#ffffff',
+  editor.on('deselected', () => {
+    shareState.selectedNodes = [];
+    shareState.selectedPoint = null;
+    shareState.selectedLine = null;
+  });
+
+  return {
+    path: (decorator, pathObject) => {
+      pathObject.set({
+        stroke: '#1884ec',
+        strokeWidth: 1,
       });
-    });
-  },
-  dot: (decorator, shareState) => {
-    const circle = new fabric.Circle({
-      radius: 3,
-      fill: '#ffffff',
-      stroke: '#1884ec',
-      strokeWidth: 1,
-    });
-
-    return decorator(circle, () => {
-      circle.set({
-        fill: shareState.selectedPoint === circle ? '#1884ec' : '#ffffff',
+    },
+    node: (decorator) => {
+      const rect = new fabric.Rect({
+        width: 6,
+        height: 6,
+        fill: '#ffffff',
+        stroke: '#1784ec',
+        strokeWidth: 1,
       });
-    });
-  },
-  line: () => {
-    const line = new fabric.Line([0, 0, 0, 0], {
-      stroke: '#1884ec',
-      strokeWidth: 1,
-    });
 
-    return line;
-  },
-} as Theme<ThemeShareState>;
+      return decorator(rect, () => {
+        rect.set({
+          fill: shareState.selectedNodes?.includes(rect) ? '#1884ec' : '#ffffff',
+        });
+      });
+    },
+    dot: (decorator) => {
+      const circle = new fabric.Circle({
+        radius: 3,
+        fill: '#ffffff',
+        stroke: '#1884ec',
+        strokeWidth: 1,
+      });
+
+      return decorator(circle, () => {
+        circle.set({
+          fill: shareState.selectedPoint === circle ? '#1884ec' : '#ffffff',
+        });
+      });
+    },
+    line: () => {
+      const line = new fabric.Line([0, 0, 0, 0], {
+        stroke: '#1884ec',
+        strokeWidth: 1,
+      });
+
+      return line;
+    },
+  };
+}) as ThemeConfigurator<ThemeShareState>;
