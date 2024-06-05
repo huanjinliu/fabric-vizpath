@@ -6,13 +6,6 @@ import { parsePathJSON, repairPath } from '@utils';
 import round from 'lodash-es/round';
 import BaseEvent from './base-event.class';
 
-export enum VizPathSymbalType {
-  PATH = 'path',
-  NODE = 'node',
-  CURVE_DOT = 'curve-dot',
-  LINE = 'line',
-}
-
 export type ResponsiveCrood = Crood & {
   setCrood: (crood: Crood, skipObserverIDs?: (string | undefined)[]) => void;
   observe: (
@@ -40,8 +33,6 @@ class VizPath extends BaseEvent<{
   clearAll: () => void;
   destroy: () => void;
 }> {
-  static symbol = Symbol('vizpath');
-
   /**
    * 上下文
    */
@@ -546,18 +537,16 @@ class VizPath extends BaseEvent<{
   /**
    * 在回调中执行，可以让过程中的路径重渲染操作只执行一次
    */
-  onceRerenderOriginPath(callback: () => void) {
+  onceRerenderOriginPath<T>(callback: () => T): T {
     // 外层设置了一次渲染则直接进行回调即可
-    if (this._onceRerenderPaths) {
-      callback();
-      return;
-    }
+    if (this._onceRerenderPaths) return callback();
     this._onceRerenderPaths = new Set([]);
-    callback();
+    const result = callback();
     const paths = Array.from(this._onceRerenderPaths.values());
     this._onceRerenderPaths.clear();
     this._onceRerenderPaths = null;
     paths.forEach(this._rerenderOriginPath.bind(this));
+    return result;
   }
 
   /**
@@ -589,10 +578,11 @@ class VizPath extends BaseEvent<{
       };
     });
 
-    this.onceRerenderOriginPath(() => {
+    return this.onceRerenderOriginPath(() => {
       this.clear(pathObject);
-      this.draw(newPath);
+      const newResponsivePath = this.draw(newPath);
       this._rerenderOriginPath(pathObject);
+      return newResponsivePath;
     });
   }
 

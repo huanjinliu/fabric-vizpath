@@ -14,8 +14,16 @@ import {
   transform,
 } from '@utils';
 import EditorUI, { DEFAULT_THEME, type ThemeDecorator } from '../editor-ui/index.class';
-import VizPath, { VizPathSymbalType } from '../../vizpath.class';
+import VizPath from '../../vizpath.class';
 import VizPathCreator, { InstructionType, type Instruction, type PathNode } from 'src/lib';
+
+export enum EditorSymbolType {
+  PATH = 'path',
+  NODE = 'node',
+  CURVE_DOT = 'curve-dot',
+  LINE = 'line',
+  OTHER = 'other',
+}
 
 export enum Mode {
   MOVE = 'move',
@@ -37,6 +45,8 @@ class Editor extends EditorModule<{
   deselected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
 }> {
   static ID = 'editor';
+
+  static symbol = Symbol('editor');
 
   /* ---------------------------- 画布相关配置 ---------------------------- */
 
@@ -295,7 +305,7 @@ class Editor extends EditorModule<{
         const { pathObject } = item;
 
         // 如果已经带有标志则是已经添加进画布的路径
-        if (pathObject[VizPath.symbol]) return;
+        if (pathObject[Editor.symbol]) return;
 
         const decorator: ThemeDecorator<fabric.Path> = (customPath, callback) => {
           customPath.set({
@@ -308,7 +318,7 @@ class Editor extends EditorModule<{
             objectCaching: false,
           });
 
-          customPath[VizPath.symbol] = VizPathSymbalType.PATH;
+          customPath[Editor.symbol] = EditorSymbolType.PATH;
 
           if (ui && callback) {
             ui.objectPreRenderCallbackMap.set(customPath, callback);
@@ -319,7 +329,7 @@ class Editor extends EditorModule<{
 
         theme.path(decorator, pathObject);
 
-        if (!pathObject[VizPath.symbol]) decorator(pathObject);
+        if (!pathObject[Editor.symbol]) decorator(pathObject);
       });
 
       // 添加新的路径对象
@@ -408,7 +418,7 @@ class Editor extends EditorModule<{
           });
         });
 
-        customObject[VizPath.symbol] = VizPathSymbalType.NODE;
+        customObject[Editor.symbol] = EditorSymbolType.NODE;
 
         if (ui && callback) {
           ui.objectPreRenderCallbackMap.set(customObject, callback);
@@ -419,7 +429,7 @@ class Editor extends EditorModule<{
 
       let object = originObject ?? theme.node(decorator);
 
-      if (!object[VizPath.symbol]) object = decorator(object);
+      if (!object[Editor.symbol]) object = decorator(object);
 
       // 加入画布时添加自动响应
       const onAddedNode = () => {
@@ -683,7 +693,7 @@ class Editor extends EditorModule<{
     });
     // 选中路径段时自动选中路线段内的所有指令路径节点
     this.addCanvasEvent('mouse:dblclick', (e) => {
-      if (e.target) return;
+      if (e.target && e.target[Editor.symbol]) return;
 
       let focusPath: (typeof this.paths)[number] | undefined;
       for (let i = this.paths.length - 1; i >= 0; i--) {
@@ -714,16 +724,16 @@ class Editor extends EditorModule<{
     this.addCanvasEvent('mouse:down:before', (event) => {
       if (this.setting.mode !== Mode.ADD) return;
 
-      if (event.target) {
+      if (event.target && event.target[Editor.symbol]) {
         if (
           this.activeNodes.length === 1 &&
-          event.target[VizPath.symbol] === VizPathSymbalType.NODE
+          event.target[Editor.symbol] === EditorSymbolType.NODE
         ) {
-          this.link(
+          const joinNode = this.link(
             this.objectNodeMap.get(this.activeNodes[0]!)!,
             this.objectNodeMap.get(event.target)!,
           );
-          target = event.target;
+          if (joinNode) target = this.nodeObjectMap.get(joinNode);
         }
       } else {
         // 新增节点
@@ -734,11 +744,11 @@ class Editor extends EditorModule<{
       if (target) {
         target.set({ lockMovementX: true, lockMovementY: true });
 
-        // 先将两边的点都降级，便于后续拖拽变换
-        this.degrade(target!, 'both', true);
-
         canvas.selection = false;
       }
+    });
+    this.addCanvasEvent('mouse:down', (event) => {
+      if (target) this.focus(target);
     });
     this.addCanvasEvent('mouse:move', (event) => {
       if (!target) return;
@@ -755,7 +765,8 @@ class Editor extends EditorModule<{
 
       const currentNode = this.objectNodeMap.get(target)!;
 
-      this.focus(target);
+      // 先将两边的点都降到直线级，便于后续拖拽变换
+      this.degrade(target!, 'both', true);
       this.upgrade(target, 'both');
 
       const curveDot =
@@ -822,7 +833,7 @@ class Editor extends EditorModule<{
           });
         });
 
-        customObject[VizPath.symbol] = VizPathSymbalType.CURVE_DOT;
+        customObject[Editor.symbol] = EditorSymbolType.CURVE_DOT;
 
         if (ui && callback) {
           ui.objectPreRenderCallbackMap.set(customObject, callback);
@@ -833,7 +844,7 @@ class Editor extends EditorModule<{
 
       let point = this._abandonedPool.points.pop() ?? theme.dot(pointDecorator);
 
-      if (!point[VizPath.symbol]) point = pointDecorator(point);
+      if (!point[Editor.symbol]) point = pointDecorator(point);
 
       // 建立相互响应，指令的数据和元素的位置更改会相互同步
       const onAddedPoint = () => {
@@ -940,7 +951,7 @@ class Editor extends EditorModule<{
           objectCaching: false,
         });
 
-        customObject[VizPath.symbol] = VizPathSymbalType.LINE;
+        customObject[Editor.symbol] = EditorSymbolType.LINE;
 
         if (ui && callback) {
           ui.objectPreRenderCallbackMap.set(customObject, callback);
@@ -951,7 +962,7 @@ class Editor extends EditorModule<{
 
       let line = this._abandonedPool.lines.pop() ?? theme.line(lineDecorator);
 
-      if (!line[VizPath.symbol]) line = lineDecorator(line);
+      if (!line[Editor.symbol]) line = lineDecorator(line);
 
       // 建立响应式，让连线随时跟随指令的值进行变化
       const onAddedLine = () => {
@@ -1105,7 +1116,7 @@ class Editor extends EditorModule<{
     this.addCanvasEvent('mouse:down:before', (event) => {
       if (this.setting.mode !== Mode.CONVERT) return;
 
-      if (event.target?.[VizPath.symbol] !== VizPathSymbalType.NODE) return;
+      if (event.target?.[Editor.symbol] !== EditorSymbolType.NODE) return;
 
       if (this.activeNodes.length > 1) return;
 
@@ -1229,13 +1240,13 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    const nodeObjects = objects.filter((i) => i[VizPath.symbol] === VizPathSymbalType.NODE);
-    const pointObjects = objects.filter((i) => i[VizPath.symbol] === VizPathSymbalType.CURVE_DOT);
+    const nodeObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.NODE);
+    const pointObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.CURVE_DOT);
 
     if (nodeObjects.length) {
       const removeNodes: ResponsiveCrood[] = [];
       nodeObjects.forEach((object) => {
-        if (object[VizPath.symbol] !== VizPathSymbalType.NODE) return;
+        if (object[Editor.symbol] !== EditorSymbolType.NODE) return;
 
         const { node } = this.objectNodeMap.get(object)!;
         if (!node) return;
@@ -1453,7 +1464,7 @@ class Editor extends EditorModule<{
     // 自身合并，直接加'z'闭合指令即可
     if (source.segment === target.segment) {
       vizPath.close(source);
-      return;
+      return target;
     }
 
     // 不同路径需要进行合并
@@ -1479,13 +1490,16 @@ class Editor extends EditorModule<{
         instruction[i + 2] = crood.y;
       }
     });
+    const joinIndex = sourcePath.length;
     const mergePath = sourcePath.concat(targetPath);
 
     // 合并后添加回路径段集合
-    vizPath.onceRerenderOriginPath(() => {
+    const newPath = vizPath.onceRerenderOriginPath(() => {
       vizPath.clear(target.segment);
-      vizPath.replacePathSegments(vizPath.getPath(source.segment)!, [mergePath] as Instruction[][]);
+      return vizPath.replacePathSegments(vizPath.getPath(source.segment)!, [mergePath] as Instruction[][]);
     });
+
+    return newPath[0].segment[joinIndex];
   }
 
   focus(...selectedObjects: fabric.Object[]) {
@@ -1496,11 +1510,11 @@ class Editor extends EditorModule<{
     const focusNodes: fabric.Object[] = [];
     const focusCurveDotPoints: fabric.Object[] = [];
     selectedObjects.forEach((object) => {
-      switch (object[VizPath.symbol]) {
-        case VizPathSymbalType.NODE:
+      switch (object[Editor.symbol]) {
+        case EditorSymbolType.NODE:
           focusNodes.push(object);
           break;
-        case VizPathSymbalType.CURVE_DOT:
+        case EditorSymbolType.CURVE_DOT:
           focusCurveDotPoints.push(object);
           break;
         default:

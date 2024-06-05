@@ -44,12 +44,14 @@ export default ((editor, shareState) => {
 
       object.on('mouseover', () => {
         shareState.hoverNode = object;
-        object.canvas?.requestRenderAll();
       });
 
       object.on('mouseout', () => {
         shareState.hoverNode = null;
-        object.canvas?.requestRenderAll();
+      });
+
+      object.on('removed', () => {
+        if (shareState.hoverNode === object) shareState.hoverNode = null;
       });
 
       return decorator(object, () => {

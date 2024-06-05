@@ -95,9 +95,8 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
     const canvas = editor.canvas;
     if (!canvas) return;
 
-    canvas?._objects.map((object) => {
-      this.objectPreRenderCallbackMap.get(object)?.();
-    });
+    this.objectPreRenderCallbackMap.forEach(callback => callback());
+    canvas.requestRenderAll();
   }
 
   unload() {

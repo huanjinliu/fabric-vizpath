@@ -2,9 +2,6 @@ import { fabric } from 'fabric';
 import type { ThemeConfigurator } from '../../lib/modules/editor-ui/index.class';
 
 export type ThemeShareState = {
-  hoverNode: fabric.Object | null;
-  hoverPoint: fabric.Object | null;
-  hoverLine: fabric.Line | null;
   selectedNodes: fabric.Object[];
   selectedPoint: fabric.Object | null;
   selectedLine: fabric.Line | null;
