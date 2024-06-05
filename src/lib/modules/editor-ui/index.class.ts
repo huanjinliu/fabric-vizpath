@@ -8,7 +8,7 @@ export type ThemeDecorator<InputType, OutputType = InputType> = (
   callback?: () => void,
 ) => OutputType;
 
-export type ThemeConfigurator<T extends Record<string, any> = {}> = (
+export type ThemeConfigurator<T extends Record<string, any> = object> = (
   editor: Editor,
   shareState: T,
 ) => {
@@ -77,14 +77,18 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
   /**
    * 监听共享状态变化
    */
-  private _onShareStateUpdate?: (shareState: T) => void;
+  private _onShareStateUpdate?: (editor: Editor, shareState: T) => void;
 
   /**
    * 元素渲染更新回调映射
    */
   objectPreRenderCallbackMap = new Map<fabric.Object, () => void>([]);
 
-  constructor(configurator: ThemeConfigurator<T>, initialShareState: T, onShareStateUpdate?: (shareState: T) => void) {
+  constructor(
+    configurator: ThemeConfigurator<T>,
+    initialShareState: T,
+    onShareStateUpdate?: (editor: Editor, shareState: T) => void,
+  ) {
     super();
     this.configurator = configurator;
     this.shareState = initialShareState;
@@ -101,9 +105,9 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
     const canvas = editor.canvas;
     if (!canvas) return;
 
-    this._onShareStateUpdate?.(this.shareState);
+    this._onShareStateUpdate?.(editor, this.shareState);
 
-    this.objectPreRenderCallbackMap.forEach(callback => callback());
+    this.objectPreRenderCallbackMap.forEach((callback) => callback());
     canvas.requestRenderAll();
   }
 

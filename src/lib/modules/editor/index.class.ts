@@ -98,9 +98,9 @@ class Editor extends EditorModule<{
      */
     forcePointSymmetric: 'none' | 'angle' | 'entire';
   } = {
-      mode: Mode.MOVE,
-      forcePointSymmetric: 'none',
-    };
+    mode: Mode.MOVE,
+    forcePointSymmetric: 'none',
+  };
 
   /** 路径节点对象 */
   nodes: fabric.Object[] = [];
@@ -129,10 +129,10 @@ class Editor extends EditorModule<{
     points: fabric.Object[];
     lines: fabric.Line[];
   } = {
-      nodes: [],
-      points: [],
-      lines: [],
-    };
+    nodes: [],
+    points: [],
+    lines: [],
+  };
 
   /**
    * 构造函数
@@ -464,7 +464,7 @@ class Editor extends EditorModule<{
         object.off('added', onAddedNode);
         object.off('removed', onRemovedNode);
         node.unobserve(object.name);
-        observe(object, ['left', 'top'], () => { });
+        observe(object, ['left', 'top'], () => {});
         this._abandonedPool.nodes.push(object);
       };
 
@@ -632,8 +632,8 @@ class Editor extends EditorModule<{
           object.set({
             scaleX: object.scaleX! / (newValue.scaleX! / oldValue.scaleX!),
             scaleY: object.scaleY! / (newValue.scaleY! / oldValue.scaleY!),
-            angle: object.angle! - (newValue.angle! - oldValue.angle!)
-          })
+            angle: object.angle! - (newValue.angle! - oldValue.angle!),
+          });
 
           const decomposeMatrix = fabric.util.qrDecompose(object.calcTransformMatrix(false));
           const left = decomposeMatrix.translateX;
@@ -647,7 +647,7 @@ class Editor extends EditorModule<{
               scaleY: newValue.scaleY! / oldValue.scaleY!,
               angle: newValue.angle! - oldValue.angle!,
             },
-            followCurveDots
+            followCurveDots,
           );
         }
         hadFollowedCroods.clear();
@@ -873,7 +873,7 @@ class Editor extends EditorModule<{
               angle:
                 45 +
                 (Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180) /
-                Math.PI,
+                  Math.PI,
             });
 
             // 响应式更改指令信息
@@ -927,7 +927,7 @@ class Editor extends EditorModule<{
         point.off('removed', onRemovedPoint);
 
         curveDot.unobserve(point.name);
-        observe(point, ['left', 'top'], () => { });
+        observe(point, ['left', 'top'], () => {});
         this._abandonedPool.points.push(point);
       };
       point.on('added', onAddedPoint);
@@ -1398,7 +1398,7 @@ class Editor extends EditorModule<{
             },
           },
           { scale: { x: scaleX, y: scaleY } },
-          { rotate: angle }
+          { rotate: angle },
         ],
       );
       curveDot.x = newCrood.x + relativeDiff.x;
@@ -1496,7 +1496,9 @@ class Editor extends EditorModule<{
     // 合并后添加回路径段集合
     const newPath = vizPath.onceRerenderOriginPath(() => {
       vizPath.clear(target.segment);
-      return vizPath.replacePathSegments(vizPath.getPath(source.segment)!, [mergePath] as Instruction[][]);
+      return vizPath.replacePathSegments(vizPath.getPath(source.segment)!, [
+        mergePath,
+      ] as Instruction[][]);
     });
 
     return newPath[0].segment[joinIndex];

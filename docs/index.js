@@ -5263,7 +5263,7 @@
         if (!editor) return;
         var canvas = editor.canvas;
         if (!canvas) return;
-        (_b = this._onShareStateUpdate) === null || _b === void 0 ? void 0 : _b.call(this, this.shareState);
+        (_b = this._onShareStateUpdate) === null || _b === void 0 ? void 0 : _b.call(this, editor, this.shareState);
         this.objectPreRenderCallbackMap.forEach(function (callback) {
           return callback();
         });

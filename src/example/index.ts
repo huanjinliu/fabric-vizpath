@@ -109,16 +109,20 @@ const EXAMPLE_PATH_D = {
     .use(editor)
     .use(new EditorBackground())
     .use(
-      new EditorUI(defaultTheme, {
-        hoverNode: null,
-        hoverPoint: null,
-        hoverLine: null,
-        selectedNodes: [],
-        selectedPoint: null,
-        selectedLine: null,
-      }, (state) => {
-        // 监听状态变化
-      }),
+      new EditorUI(
+        defaultTheme,
+        {
+          hoverNode: null,
+          hoverPoint: null,
+          hoverLine: null,
+          selectedNodes: [],
+          selectedPoint: null,
+          selectedLine: null,
+        },
+        (state) => {
+          // 监听状态变化
+        },
+      ),
     )
     .use(new EditorBezier())
     .use(
