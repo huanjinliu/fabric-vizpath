@@ -75,14 +75,20 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
   shareState: T;
 
   /**
+   * 监听共享状态变化
+   */
+  private _onShareStateUpdate?: (shareState: T) => void;
+
+  /**
    * 元素渲染更新回调映射
    */
   objectPreRenderCallbackMap = new Map<fabric.Object, () => void>([]);
 
-  constructor(configurator: ThemeConfigurator<T>, initialShareState: T) {
+  constructor(configurator: ThemeConfigurator<T>, initialShareState: T, onShareStateUpdate?: (shareState: T) => void) {
     super();
     this.configurator = configurator;
     this.shareState = initialShareState;
+    this._onShareStateUpdate = onShareStateUpdate;
   }
 
   /**
@@ -95,14 +101,17 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
     const canvas = editor.canvas;
     if (!canvas) return;
 
+    this._onShareStateUpdate?.(this.shareState);
+
     this.objectPreRenderCallbackMap.forEach(callback => callback());
     canvas.requestRenderAll();
   }
 
   unload() {
-    this.shareState = {} as T;
-    this.objectPreRenderCallbackMap.clear();
     this.theme = null;
+    this.shareState = {} as T;
+    this._onShareStateUpdate = undefined;
+    this.objectPreRenderCallbackMap.clear();
   }
 
   load(vizPath: VizPath) {

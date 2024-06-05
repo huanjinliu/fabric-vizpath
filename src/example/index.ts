@@ -116,6 +116,8 @@ const EXAMPLE_PATH_D = {
         selectedNodes: [],
         selectedPoint: null,
         selectedLine: null,
+      }, (state) => {
+        // 监听状态变化
       }),
     )
     .use(new EditorBezier())

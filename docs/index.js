@@ -5234,7 +5234,7 @@
     }
   };
   var EditorUI = /*#__PURE__*/function (_EditorModule) {
-    function EditorUI(configurator, initialShareState) {
+    function EditorUI(configurator, initialShareState, onShareStateUpdate) {
       var _this11;
       _classCallCheck(this, EditorUI);
       _this11 = _callSuper(this, EditorUI);
@@ -5248,6 +5248,7 @@
       _this11.objectPreRenderCallbackMap = new Map([]);
       _this11.configurator = configurator;
       _this11.shareState = initialShareState;
+      _this11._onShareStateUpdate = onShareStateUpdate;
       return _this11;
     }
     /**
@@ -5257,11 +5258,12 @@
     return _createClass(EditorUI, [{
       key: "refresh",
       value: function refresh() {
-        var _a;
+        var _a, _b;
         var editor = (_a = this.vizPath) === null || _a === void 0 ? void 0 : _a.context.find(Editor$1);
         if (!editor) return;
         var canvas = editor.canvas;
         if (!canvas) return;
+        (_b = this._onShareStateUpdate) === null || _b === void 0 ? void 0 : _b.call(this, this.shareState);
         this.objectPreRenderCallbackMap.forEach(function (callback) {
           return callback();
         });
@@ -5270,9 +5272,10 @@
     }, {
       key: "unload",
       value: function unload() {
-        this.shareState = {};
-        this.objectPreRenderCallbackMap.clear();
         this.theme = null;
+        this.shareState = {};
+        this._onShareStateUpdate = undefined;
+        this.objectPreRenderCallbackMap.clear();
       }
     }, {
       key: "load",
@@ -10114,6 +10117,8 @@
           selectedNodes: [],
           selectedPoint: null,
           selectedLine: null,
+      }, (state) => {
+          // 监听状态变化
       }))
           .use(new EditorBezier())
           .use(new EditorShortcut([
