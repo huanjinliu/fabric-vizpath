@@ -7,7 +7,7 @@ import {
   EditorShortcut,
   EditorBezier,
 } from 'fabric-path-editor';
-import photoshop from 'fabric-path-editor/dist/themes/photoshop';
+import defaultTheme from 'fabric-path-editor/dist/themes/default';
 
 const EXAMPLE_PATH_D = {
   arc: 'M 88.827 199.088 Q 258.533 199.088 258.533 368.794',
@@ -109,7 +109,7 @@ const EXAMPLE_PATH_D = {
     .use(editor)
     .use(new EditorBackground())
     .use(
-      new EditorUI(photoshop, {
+      new EditorUI(defaultTheme, {
         hoverNode: null,
         hoverPoint: null,
         hoverLine: null,

@@ -88,9 +88,9 @@ class Editor extends EditorModule<{
      */
     forcePointSymmetric: 'none' | 'angle' | 'entire';
   } = {
-    mode: Mode.MOVE,
-    forcePointSymmetric: 'none',
-  };
+      mode: Mode.MOVE,
+      forcePointSymmetric: 'none',
+    };
 
   /** 路径节点对象 */
   nodes: fabric.Object[] = [];
@@ -119,10 +119,10 @@ class Editor extends EditorModule<{
     points: fabric.Object[];
     lines: fabric.Line[];
   } = {
-    nodes: [],
-    points: [],
-    lines: [],
-  };
+      nodes: [],
+      points: [],
+      lines: [],
+    };
 
   /**
    * 构造函数
@@ -454,7 +454,7 @@ class Editor extends EditorModule<{
         object.off('added', onAddedNode);
         object.off('removed', onRemovedNode);
         node.unobserve(object.name);
-        observe(object, ['left', 'top'], () => {});
+        observe(object, ['left', 'top'], () => { });
         this._abandonedPool.nodes.push(object);
       };
 
@@ -603,7 +603,7 @@ class Editor extends EditorModule<{
    * 添加活跃组的响应式变化
    */
   private _addActiveSelectionObserve(group: fabric.ActiveSelection) {
-    observe(group, ['left', 'top', 'angle'], () => {
+    observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], (newValue, oldValue) => {
       this.vizPath?.onceRerenderOriginPath(() => {
         const hadFollowedCroods = new Set<ResponsiveCrood>([]);
         for (const object of group._objects as fabric.Object[]) {
@@ -619,10 +619,26 @@ class Editor extends EditorModule<{
             hadFollowedCroods.add(crood);
           });
 
+          object.set({
+            scaleX: object.scaleX! / (newValue.scaleX! / oldValue.scaleX!),
+            scaleY: object.scaleY! / (newValue.scaleY! / oldValue.scaleY!),
+            angle: object.angle! - (newValue.angle! - oldValue.angle!)
+          })
+
           const decomposeMatrix = fabric.util.qrDecompose(object.calcTransformMatrix(false));
           const left = decomposeMatrix.translateX;
           const top = decomposeMatrix.translateY;
-          this.move(object, { left, top }, followCurveDots);
+          this.move(
+            object,
+            {
+              left: left!,
+              top: top!,
+              scaleX: newValue.scaleX! / oldValue.scaleX!,
+              scaleY: newValue.scaleY! / oldValue.scaleY!,
+              angle: newValue.angle! - oldValue.angle!,
+            },
+            followCurveDots
+          );
         }
         hadFollowedCroods.clear();
       });
@@ -846,7 +862,7 @@ class Editor extends EditorModule<{
               angle:
                 45 +
                 (Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180) /
-                  Math.PI,
+                Math.PI,
             });
 
             // 响应式更改指令信息
@@ -900,7 +916,7 @@ class Editor extends EditorModule<{
         point.off('removed', onRemovedPoint);
 
         curveDot.unobserve(point.name);
-        observe(point, ['left', 'top'], () => {});
+        observe(point, ['left', 'top'], () => { });
         this._abandonedPool.points.push(point);
       };
       point.on('added', onAddedPoint);
@@ -1337,9 +1353,12 @@ class Editor extends EditorModule<{
 
   move(
     object: fabric.Object,
-    position: {
+    options: {
       left: number;
       top: number;
+      scaleX?: number;
+      scaleY?: number;
+      angle?: number;
     },
     followCurveDots: ResponsiveCrood[] = [],
   ) {
@@ -1348,30 +1367,9 @@ class Editor extends EditorModule<{
 
     const { node } = pathNode;
 
-    const selectionGroup = object.group;
+    const { left, top, scaleX = 1, scaleY = 1, angle = 0 } = options;
 
-    const { scaleX: preScaleX = 1, scaleY: preScaleY = 1, angle: preAngle = 0 } = object;
-    const {
-      scaleX: newScaleX,
-      scaleY: newScaleY,
-      angle: newAngle,
-    } = selectionGroup
-      ? {
-          scaleX: 1 / selectionGroup.scaleX!,
-          scaleY: 1 / selectionGroup.scaleY!,
-          angle: -selectionGroup.angle!,
-        }
-      : { scaleX: 1, scaleY: 1, angle: 0 };
-
-    object
-      .set({
-        scaleX: newScaleX,
-        scaleY: newScaleY,
-        angle: newAngle,
-      })
-      .setCoords();
-
-    const newCrood = this.calcRelativeCrood(position, this.nodePathMap.get(node!)!.pathObject);
+    const newCrood = this.calcRelativeCrood({ left, top }, this.nodePathMap.get(node!)!.pathObject);
 
     // 需要跟随变化的曲线曲线变换点
     followCurveDots.forEach((curveDot) => {
@@ -1388,15 +1386,8 @@ class Editor extends EditorModule<{
               y: newCrood.y - node!.y,
             },
           },
-          {
-            scale: {
-              x: preScaleX / newScaleX,
-              y: preScaleY / newScaleY,
-            },
-          },
-          {
-            rotate: preAngle - newAngle,
-          },
+          { scale: { x: scaleX, y: scaleY } },
+          { rotate: angle }
         ],
       );
       curveDot.x = newCrood.x + relativeDiff.x;

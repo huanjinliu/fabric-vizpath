@@ -5814,7 +5814,7 @@
       key: "_addActiveSelectionObserve",
       value: function _addActiveSelectionObserve(group) {
         var _this20 = this;
-        observe(group, ['left', 'top', 'angle'], function () {
+        observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], function (newValue, oldValue) {
           var _a;
           (_a = _this20.vizPath) === null || _a === void 0 ? void 0 : _a.onceRerenderOriginPath(function () {
             var _a, _b;
@@ -5839,12 +5839,20 @@
                   followCurveDots.push(crood);
                   hadFollowedCroods.add(crood);
                 });
+                object.set({
+                  scaleX: object.scaleX / (newValue.scaleX / oldValue.scaleX),
+                  scaleY: object.scaleY / (newValue.scaleY / oldValue.scaleY),
+                  angle: object.angle - (newValue.angle - oldValue.angle)
+                });
                 var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix(false));
                 var left = decomposeMatrix.translateX;
                 var top = decomposeMatrix.translateY;
                 _this20.move(object, {
                   left: left,
-                  top: top
+                  top: top,
+                  scaleX: newValue.scaleX / oldValue.scaleX,
+                  scaleY: newValue.scaleY / oldValue.scaleY,
+                  angle: newValue.angle - oldValue.angle
                 }, followCurveDots);
               };
               for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
@@ -6527,37 +6535,24 @@
       }
     }, {
       key: "move",
-      value: function move(object, position) {
+      value: function move(object, options) {
         var followCurveDots = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
         var _a;
         var pathNode = this.objectNodeMap.get(object);
         if (!pathNode) return;
         var node = pathNode.node;
-        var selectionGroup = object.group;
-        var _object$scaleX = object.scaleX,
-          preScaleX = _object$scaleX === void 0 ? 1 : _object$scaleX,
-          _object$scaleY = object.scaleY,
-          preScaleY = _object$scaleY === void 0 ? 1 : _object$scaleY,
-          _object$angle = object.angle,
-          preAngle = _object$angle === void 0 ? 0 : _object$angle;
-        var _ref28 = selectionGroup ? {
-            scaleX: 1 / selectionGroup.scaleX,
-            scaleY: 1 / selectionGroup.scaleY,
-            angle: -selectionGroup.angle
-          } : {
-            scaleX: 1,
-            scaleY: 1,
-            angle: 0
-          },
-          newScaleX = _ref28.scaleX,
-          newScaleY = _ref28.scaleY,
-          newAngle = _ref28.angle;
-        object.set({
-          scaleX: newScaleX,
-          scaleY: newScaleY,
-          angle: newAngle
-        }).setCoords();
-        var newCrood = this.calcRelativeCrood(position, this.nodePathMap.get(node).pathObject);
+        var left = options.left,
+          top = options.top,
+          _options$scaleX = options.scaleX,
+          scaleX = _options$scaleX === void 0 ? 1 : _options$scaleX,
+          _options$scaleY = options.scaleY,
+          scaleY = _options$scaleY === void 0 ? 1 : _options$scaleY,
+          _options$angle = options.angle,
+          angle = _options$angle === void 0 ? 0 : _options$angle;
+        var newCrood = this.calcRelativeCrood({
+          left: left,
+          top: top
+        }, this.nodePathMap.get(node).pathObject);
         // 需要跟随变化的曲线曲线变换点
         followCurveDots.forEach(function (curveDot) {
           if (!curveDot) return;
@@ -6571,11 +6566,11 @@
             }
           }, {
             scale: {
-              x: preScaleX / newScaleX,
-              y: preScaleY / newScaleY
+              x: scaleX,
+              y: scaleY
             }
           }, {
-            rotate: preAngle - newAngle
+            rotate: angle
           }]);
           curveDot.x = newCrood.x + relativeDiff.x;
           curveDot.y = newCrood.y + relativeDiff.y;
@@ -6773,10 +6768,10 @@
         this.paths.length = 0;
         this.nodePathMap.clear();
         // 画布相关配置
-        this.listeners.forEach(function (_ref29) {
-          var type = _ref29.type,
-            eventName = _ref29.eventName,
-            handler = _ref29.handler;
+        this.listeners.forEach(function (_ref28) {
+          var type = _ref28.type,
+            eventName = _ref28.eventName,
+            handler = _ref28.handler;
           if (type === 'global') _this31.removeGlobalEvent(eventName, handler);
           if (type === 'canvas') _this31.removeCanvasEvent(eventName, handler);
         });
