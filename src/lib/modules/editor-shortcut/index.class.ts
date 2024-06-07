@@ -25,13 +25,118 @@ class EditorShortcut extends EditorModule {
 
   shortcuts: Shortcut[] = [];
 
+  shortcutOptions: ShortcutOptions[] | undefined;
+
   activeShortcut: Shortcut | undefined;
 
-  constructor(shortcuts: ShortcutOptions[] = []) {
+  constructor(options: ShortcutOptions[]) {
     super();
-    this.shortcuts = shortcuts
-      .map(this._tryGetValidShortcut.bind(this))
-      .filter(Boolean) as typeof this.shortcuts;
+
+    this.shortcutOptions = options;
+  }
+
+  /**
+   * 初始默认快捷键配置
+   */
+  private _getDefaultShortcutOptions(vizpath: VizPath) {
+    return [
+      // 删除节点快捷键
+      {
+        key: 'backspace',
+        onActivate: (e) => {
+          e.preventDefault();
+
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          // 如果当前有选中曲线控制点
+          if (editor.activePoint) {
+            editor.remove(editor.activePoint);
+          } else if (editor.activeNodes.length) {
+            editor.remove(...editor.activeNodes);
+          }
+        },
+      },
+      // 全选节点快捷键
+      {
+        key: 'A',
+        combinationKeys: ['meta'],
+        onActivate: (e) => {
+          e.preventDefault();
+
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.focus(...editor.nodes);
+        },
+      },
+      // 取消节点选择
+      {
+        key: 'D',
+        combinationKeys: ['meta'],
+        onActivate: (e) => {
+          e.preventDefault();
+
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.focus();
+        },
+      },
+      // 更改路径节点交互模式
+      {
+        combinationKeys: ['alt'],
+        onActivate: () => {
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.setting.mode = 'convert';
+          editor.setting.forcePointSymmetric = 'entire';
+        },
+        onDeactivate: () => {
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.setting.mode = 'move';
+          editor.setting.forcePointSymmetric = 'none';
+        },
+      },
+      {
+        combinationKeys: ['alt', 'ctrl'],
+        onActivate: () => {
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.setting.mode = 'convert';
+          editor.setting.forcePointSymmetric = 'angle';
+        },
+        onDeactivate: () => {
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.setting.mode = 'move';
+          editor.setting.forcePointSymmetric = 'none';
+        },
+      },
+      // 更改为添加模式
+      {
+        combinationKeys: ['shift'],
+        onActivate: () => {
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.setting.mode = 'add';
+          editor.setting.forcePointSymmetric = 'entire';
+        },
+        onDeactivate: () => {
+          const editor = vizpath.context.find(Editor);
+          if (!editor) return;
+
+          editor.setting.mode = 'move';
+          editor.setting.forcePointSymmetric = 'none';
+        },
+      },
+    ] as ShortcutOptions[];
   }
 
   private _tryGetValidShortcut(shortcut: ShortcutOptions) {
@@ -138,8 +243,8 @@ class EditorShortcut extends EditorModule {
     }
   }
 
-  unload(vizPath: VizPath): void {
-    const editor = vizPath.context.find(Editor);
+  unload(vizpath: VizPath): void {
+    const editor = vizpath.context.find(Editor);
     if (!editor) return;
 
     editor.removeGlobalEvent('keydown', this._handleShortcutKey.bind(this));
@@ -150,9 +255,13 @@ class EditorShortcut extends EditorModule {
     this.activeShortcut = undefined;
   }
 
-  load(vizPath: VizPath) {
-    const editor = vizPath.context.find(Editor);
+  load(vizpath: VizPath) {
+    const editor = vizpath.context.find(Editor);
     if (!editor) return;
+
+    this.shortcuts = (this.shortcutOptions ?? this._getDefaultShortcutOptions(vizpath))
+      .map(this._tryGetValidShortcut.bind(this))
+      .filter(Boolean) as typeof this.shortcuts;
 
     editor.addGlobalEvent('keydown', this._handleShortcutKey.bind(this));
     editor.addGlobalEvent('keyup', this._handleShortcutKey.bind(this));

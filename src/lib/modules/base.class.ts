@@ -9,24 +9,24 @@ abstract class EditorModule<
 > extends BaseEvent<Events> {
   static ID: string;
 
-  vizPath: VizPath | null = null;
+  vizpath: VizPath | null = null;
 
   async prepare() {}
 
-  abstract unload(vizPath: VizPath): void;
+  abstract unload(vizpath: VizPath): void;
 
-  abstract load(vizPath: VizPath): void;
+  abstract load(vizpath: VizPath): void;
 
-  __unload(vizPath: VizPath) {
-    this.unload(vizPath);
-    this.vizPath = null;
+  __unload(vizpath: VizPath) {
+    this.unload(vizpath);
+    this.vizpath = null;
     this.events = {};
   }
 
-  async __load(vizPath: VizPath) {
+  async __load(vizpath: VizPath) {
     await this.prepare();
-    this.vizPath = vizPath;
-    this.load(vizPath);
+    this.vizpath = vizpath;
+    this.load(vizpath);
   }
 }
 

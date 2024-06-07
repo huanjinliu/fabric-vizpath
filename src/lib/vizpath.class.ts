@@ -746,14 +746,11 @@ class VizPath extends BaseEvent<{
   }
 
   /**
-   * 新增路径节点
-   * @param target 参考路径节点
-   * @param newTarget 新添加的路径节点位置
+   * 新增路径
+   * @param pathNode 指令对象
+   * @param instruction 新指令
    */
-  insert(target: ResponsiveCrood, newTarget: Crood) {
-    const pathNode = this.pathNodeMap.get(target);
-    if (!pathNode) return;
-
+  insert(pathNode: PathNode<ResponsiveCrood>, instruction: Instruction) {
     const segment = pathNode.segment;
 
     const index = segment.indexOf(pathNode);
@@ -763,7 +760,7 @@ class VizPath extends BaseEvent<{
       {
         type: 'add',
         index,
-        instruction: [InstructionType.LINE, newTarget.x, newTarget.y],
+        instruction,
       },
     ]);
 
@@ -815,7 +812,12 @@ class VizPath extends BaseEvent<{
       });
     }
 
-    this._updatePathByCommands(this.paths.find((i) => i.segment === segment)!, updateCommands);
+    const newPath = this._updatePathByCommands(
+      this.paths.find((i) => i.segment === segment)!,
+      updateCommands,
+    );
+
+    return newPath[0].segment[index];
   }
 
   /**

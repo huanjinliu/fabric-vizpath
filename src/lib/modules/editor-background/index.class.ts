@@ -59,8 +59,8 @@ class EditorBackground extends EditorModule {
   //   });
   // }
 
-  unload(vizPath: Vizpath) {
-    const editor = vizPath.context.find(Editor);
+  unload(vizpath: Vizpath) {
+    const editor = vizpath.context.find(Editor);
     if (!editor) return;
 
     const canvas = editor.canvas;
@@ -70,8 +70,8 @@ class EditorBackground extends EditorModule {
     canvas.requestRenderAll();
   }
 
-  async load(vizPath: Vizpath) {
-    const editor = vizPath.context.find(Editor);
+  async load(vizpath: Vizpath) {
+    const editor = vizpath.context.find(Editor);
     if (!editor) return;
 
     const canvas = editor.canvas;

@@ -16,6 +16,7 @@ export type ThemeConfigurator<T extends Record<string, any> = object> = (
   node: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
   dot: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
   line: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
+  splitDot?: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
 };
 
 export const DEFAULT_THEME = {
@@ -26,6 +27,16 @@ export const DEFAULT_THEME = {
     });
   },
   node: () => {
+    const circle = new fabric.Circle({
+      radius: 3,
+      fill: '#ffffff',
+      stroke: '#4b4b4b',
+      strokeWidth: 1,
+    });
+
+    return circle;
+  },
+  splitDot: () => {
     const circle = new fabric.Circle({
       radius: 3,
       fill: '#ffffff',
@@ -99,7 +110,7 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
    * 重新渲染对象样式
    */
   refresh() {
-    const editor = this.vizPath?.context.find(Editor);
+    const editor = this.vizpath?.context.find(Editor);
     if (!editor) return;
 
     const canvas = editor.canvas;
@@ -118,8 +129,8 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
     this.objectPreRenderCallbackMap.clear();
   }
 
-  load(vizPath: VizPath) {
-    const editor = vizPath.context.find(Editor);
+  load(vizpath: VizPath) {
+    const editor = vizpath.context.find(Editor);
     if (!editor) {
       throw new TypeError('Please use editor module before using ui module.');
     }
@@ -132,9 +143,13 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
         return result;
       },
     });
+    const { path, node, splitDot, dot, line } = this.configurator(editor, this.shareState);
     this.theme = {
-      path: (decorator, pathObject) => pathObject,
-      ...this.configurator(editor, this.shareState),
+      path: path ?? ((decorator, pathObject) => pathObject),
+      splitDot: splitDot ?? node,
+      node,
+      dot,
+      line
     };
   }
 }

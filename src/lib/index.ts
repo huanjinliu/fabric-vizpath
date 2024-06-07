@@ -53,7 +53,7 @@ class VizPathCreator {
     refreshDeferDuration: 100,
   };
 
-  vizPath: VizPath | null = null;
+  vizpath: VizPath | null = null;
 
   /**
    * 增强模块列表
@@ -247,24 +247,24 @@ class VizPathCreator {
    * 销毁
    */
   destroy() {
-    if (!this.vizPath) return;
+    if (!this.vizpath) return;
 
-    const vizPath = this.vizPath;
+    const vizpath = this.vizpath;
 
     this.modules.forEach((module) => {
-      module.__unload(vizPath);
+      module.__unload(vizpath);
     });
 
-    this.vizPath = null;
+    this.vizpath = null;
   }
 
   /**
    * 初始可视路径编辑器
    */
   async initialize() {
-    if (this.vizPath) return this.vizPath;
+    if (this.vizpath) return this.vizpath;
 
-    const vizPath = new VizPath(this);
+    const vizpath = new VizPath(this);
 
     await new Promise<VizPath>((resolve) => {
       let next = 0;
@@ -272,11 +272,11 @@ class VizPathCreator {
       const loadModule = async () => {
         const module = this.modules[next];
         if (!module) {
-          resolve(vizPath);
+          resolve(vizpath);
           return;
         }
 
-        await Promise.resolve(module.__load(vizPath));
+        await Promise.resolve(module.__load(vizpath));
 
         next++;
         loadModule();
@@ -285,9 +285,9 @@ class VizPathCreator {
       loadModule();
     });
 
-    this.vizPath = vizPath;
+    this.vizpath = vizpath;
 
-    return vizPath;
+    return vizpath;
   }
 }
 
