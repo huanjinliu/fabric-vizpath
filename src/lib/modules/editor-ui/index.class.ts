@@ -2,21 +2,28 @@ import { fabric } from 'fabric';
 import EditorModule from '../base.class';
 import Editor from '../editor/index.class';
 import VizPath from '../../vizpath.class';
+import defaults from 'lodash-es/defaults';
 
 export type ThemeDecorator<InputType, OutputType = InputType> = (
   customObject: InputType,
   callback?: () => void,
 ) => OutputType;
 
-export type ThemeConfigurator<T extends Record<string, any> = object> = (
-  editor: Editor,
-  shareState: T,
-) => {
-  path?: (decorator: ThemeDecorator<fabric.Path>, pathObject: fabric.Path) => void;
+export type DefaultThemeConfigurators = {
+  path: (decorator: ThemeDecorator<fabric.Path>, pathObject: fabric.Path) => void;
   node: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
   dot: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
   line: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
-  splitDot?: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
+};
+
+export type ThemeConfigurators<
+  T extends Record<string, any> = Record<string, unknown>,
+  Q extends Record<string, any> = Record<string, unknown>,
+> = (
+  editor: Editor,
+  shareState: Partial<T>,
+) => DefaultThemeConfigurators & {
+  [p in keyof Omit<Q, keyof DefaultThemeConfigurators>]?: (decorator: ThemeDecorator<Q[p]>) => Q[p];
 };
 
 export const DEFAULT_THEME = {
@@ -27,16 +34,6 @@ export const DEFAULT_THEME = {
     });
   },
   node: () => {
-    const circle = new fabric.Circle({
-      radius: 3,
-      fill: '#ffffff',
-      stroke: '#4b4b4b',
-      strokeWidth: 1,
-    });
-
-    return circle;
-  },
-  splitDot: () => {
     const circle = new fabric.Circle({
       radius: 3,
       fill: '#ffffff',
@@ -65,30 +62,40 @@ export const DEFAULT_THEME = {
 
     return line;
   },
-} as Required<ReturnType<ThemeConfigurator<object>>>;
+} as DefaultThemeConfigurators;
 
-class EditorUI<T extends Record<string, any> = object> extends EditorModule {
+class EditorUI<
+  T extends Record<string, any> = Record<string, unknown>,
+  Q extends Record<string, any> = Record<string, unknown>,
+> extends EditorModule {
   static ID = 'editor-ui';
 
   /**
    * 主题配置器
    */
-  configurator: ThemeConfigurator<T>;
+  configurator: (
+    editor: Editor,
+    shareState: Partial<T>,
+  ) => Partial<DefaultThemeConfigurators> & {
+    [p in keyof Omit<Q, keyof DefaultThemeConfigurators>]?: (
+      decorator: ThemeDecorator<Q[p]>,
+    ) => Q[p];
+  };
 
   /**
    * 主题
    */
-  theme: Required<ReturnType<ThemeConfigurator<T>>> | null = null;
+  theme: ReturnType<ThemeConfigurators<T, Q>> | null = null;
 
   /**
    * 共享状态
    */
-  shareState: T;
+  shareState: Partial<T>;
 
   /**
    * 监听共享状态变化
    */
-  private _onShareStateUpdate?: (editor: Editor, shareState: T) => void;
+  private _onShareStateUpdate?: (editor: Editor, shareState: Partial<T>) => void;
 
   /**
    * 元素渲染更新回调映射
@@ -96,9 +103,9 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
   objectPreRenderCallbackMap = new Map<fabric.Object, () => void>([]);
 
   constructor(
-    configurator: ThemeConfigurator<T>,
-    initialShareState: T,
-    onShareStateUpdate?: (editor: Editor, shareState: T) => void,
+    configurator: EditorUI<T, Q>['configurator'] = () => ({}),
+    initialShareState: Partial<T> = {},
+    onShareStateUpdate?: (editor: Editor, shareState: Partial<T>) => void,
   ) {
     super();
     this.configurator = configurator;
@@ -143,14 +150,8 @@ class EditorUI<T extends Record<string, any> = object> extends EditorModule {
         return result;
       },
     });
-    const { path, node, splitDot, dot, line } = this.configurator(editor, this.shareState);
-    this.theme = {
-      path: path ?? ((decorator, pathObject) => pathObject),
-      splitDot: splitDot ?? node,
-      node,
-      dot,
-      line
-    };
+    const theme = this.configurator(editor, this.shareState);
+    this.theme = defaults(theme, DEFAULT_THEME);
   }
 }
 

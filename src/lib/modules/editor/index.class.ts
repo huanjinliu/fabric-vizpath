@@ -7,6 +7,7 @@ import {
   calcCroodsAngle,
   calcCroodsDistance,
   deepIterateGroup,
+  fireFabricMouseUp,
   fireMouseUpAndSelect,
   observe,
   repairPath,
@@ -28,6 +29,7 @@ export enum EditorSymbolType {
 export enum Mode {
   MOVE = 'move',
   ADD = 'add',
+  DELETE = 'delete',
   CONVERT = 'convert',
 }
 
@@ -67,7 +69,9 @@ class Editor extends EditorModule<{
   }[] = [];
 
   /** 功能禁用请求凭证 */
-  disabledFunctionTokens: Partial<Record<'add' | 'remove' | 'upgrade' | 'degrade' | 'convert' | 'link', string[]>> = {}
+  disabledFunctionTokens: Partial<
+    Record<'add' | 'remove' | 'upgrade' | 'degrade' | 'convert' | 'link', string[]>
+  > = {};
 
   /* ---------------------------- 路径相关配置 ---------------------------- */
 
@@ -726,7 +730,7 @@ class Editor extends EditorModule<{
 
     let target: fabric.Object | undefined;
     this.addCanvasEvent('mouse:down:before', (event) => {
-      if (this.disabledFunctionTokens.add?.length) return;  
+      if (this.disabledFunctionTokens.add?.length) return;
       if (this.setting.mode !== Mode.ADD) return;
 
       if (event.target && event.target[Editor.symbol]) {
@@ -1119,7 +1123,7 @@ class Editor extends EditorModule<{
 
     let target: fabric.Object | undefined;
     this.addCanvasEvent('mouse:down:before', (event) => {
-      if (this.disabledFunctionTokens.convert?.length) return;  
+      if (this.disabledFunctionTokens.convert?.length) return;
       if (this.setting.mode !== Mode.CONVERT) return;
 
       if (event.target?.[Editor.symbol] !== EditorSymbolType.NODE) return;
@@ -1160,12 +1164,12 @@ class Editor extends EditorModule<{
     });
 
     this.addCanvasEvent('mouse:move', (event) => {
-      const pointer = calcCanvasCrood(canvas, event.pointer);
-
       if (!target) return;
 
       // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
       if (target.containsPoint(event.pointer)) return;
+
+      const pointer = calcCanvasCrood(canvas, event.pointer);
 
       const targetNode = this.objectNodeMap.get(target)!;
 
@@ -1222,11 +1226,28 @@ class Editor extends EditorModule<{
   }
 
   /**
+   * 初始路径节点删除事件
+   */
+  private _initDeleteNodeEvents() {
+    this.addCanvasEvent('mouse:down', (event) => {
+      if (this.disabledFunctionTokens.remove?.length) return;
+      if (this.setting.mode !== Mode.DELETE) return;
+
+      if (
+        event.target?.[Editor.symbol] === EditorSymbolType.NODE ||
+        event.target?.[Editor.symbol] === EditorSymbolType.CURVE_DOT
+      ) {
+        this.remove(event.target);
+      }
+    });
+  }
+
+  /**
    * 变换节点
-   * @param object 路径节点 
+   * @param object 路径节点
    * @param options 变换配置
    * @param followCurveDots 跟随变换的曲线变换点
-   * @returns 
+   * @returns
    */
   private _transform(
     object: fabric.Object,
@@ -1279,18 +1300,20 @@ class Editor extends EditorModule<{
 
   /**
    * 请求对特定功能禁用
-   * 
+   *
    * @param functionName 禁用功能名称
-   * 
+   *
    * @example
-   * 
+   *
    * // 持有凭证用于重新启用功能
    * const token = requestDisableFunction('add');
-   * 
+   *
    * // 重新启用功能
    * requestEnableFunction(token);
    */
-  requestDisableFunction(functionName: 'add' | 'remove' | 'upgrade' | 'degrade' | 'convert' | 'link') {
+  requestDisableFunction(
+    functionName: 'add' | 'remove' | 'upgrade' | 'degrade' | 'convert' | 'link',
+  ) {
     const token = `${functionName}-${uuid()}`;
     const tokens = this.disabledFunctionTokens[functionName] ?? [];
     tokens.push(token);
@@ -1379,21 +1402,24 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
+    canvas.remove(...objects);
     const nodeObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.NODE);
     const pointObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.CURVE_DOT);
+
+    // 更新路径信息
 
     if (nodeObjects.length) {
       const removeNodes: ResponsiveCrood[] = [];
       nodeObjects.forEach((object) => {
-        if (object[Editor.symbol] !== EditorSymbolType.NODE) return;
-
         const { node } = this.objectNodeMap.get(object)!;
         if (!node) return;
 
         removeNodes.push(node);
       });
       this.vizpath.remove(...removeNodes);
-    } else if (pointObjects.length === 1) {
+    }
+
+    if (pointObjects.length) {
       const { type, node } = this.curveDots.find((i) => i.point === pointObjects[0])!;
       this.degrade(node, type);
     }
@@ -1705,6 +1731,7 @@ class Editor extends EditorModule<{
     this._initSelectNodeEvents();
     this._initAddNodeEvents();
     this._initConvertNodeEvents();
+    this._initDeleteNodeEvents();
   }
 }
 

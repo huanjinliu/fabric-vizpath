@@ -12,6 +12,11 @@ import defaultsDeep from 'lodash-es/defaultsDeep';
 
 type EditorBezierOptions = {
   /**
+   * 拆分点的UI key值配置
+   * @default 'splitDot'
+   */
+  splitDotKey: string;
+  /**
    * 是否禁用路径拆分
    * @default false
    */
@@ -26,16 +31,28 @@ type EditorBezierOptions = {
    * @default false
    */
   disabledDbclickConvert: boolean;
-}
+};
 
 const DEFAULT_OPTIONS: EditorBezierOptions = {
+  splitDotKey: 'splitDot',
   disabledSplit: false,
   disabledSplitDot: false,
   disabledDbclickConvert: false,
-}
+};
 
 /**
- * 编辑器 —— 曲线操作模块：1.双击实现指令升降级 2.实现路径选点拆分
+ * 编辑器曲线化操作模块：1.双击实现指令升降级 2.实现路径选点拆分
+ *
+ * @note 注意：拆分点的样式需要在UI模块中配置，没配置默认使用UI模块中路径节点的样式
+ *
+ * @example
+ *
+ * vizpath
+ * .use(new Editor(fabricCanvas))
+ * .use(new EditorBezier())
+ * .use(new EditorUI<EditorBezierThemeConfigurators>({
+ *
+ * }))
  */
 class EditorBezier extends EditorModule {
   static ID = 'editor-bezier';
@@ -217,8 +234,9 @@ class EditorBezier extends EditorModule {
 
   // 创建拆分点
   private _initSpiltDot(vizpath: Vizpath) {
-    const ui = vizpath.context.find(EditorUI);
-    const theme = ui?.theme ?? DEFAULT_THEME;
+    const ui = vizpath.context.find(EditorUI<Record<string, unknown>, { splitDot: fabric.Object }>);
+    const splitDotTheme =
+      ui?.theme?.[this.options.splitDotKey] ?? ui?.theme?.node ?? DEFAULT_THEME.node;
 
     let decorated = false;
 
@@ -252,7 +270,7 @@ class EditorBezier extends EditorModule {
       return customObject;
     };
 
-    let object = theme.splitDot(decorator);
+    let object = splitDotTheme(decorator);
     if (!decorated) object = decorator(object);
 
     return object;
@@ -272,8 +290,6 @@ class EditorBezier extends EditorModule {
   private _initDbclickChangeEvent(vizpath: Vizpath) {
     const editor = vizpath.context.find(Editor);
     if (!editor) return;
-
-    // editor.requestDisableFunction('upgrade');
 
     editor.canvas?.on('mouse:dblclick', (event) => {
       const { target } = event;
@@ -315,8 +331,7 @@ class EditorBezier extends EditorModule {
     editor.addCanvasEvent('mouse:move', (e) => {
       clean();
 
-      // 非添加模式下不可用
-      // if (editor.setting.mode !== Mode.ADD) return;
+      if (editor.setting.mode !== Mode.ADD) return;
 
       if (e.target && e.target[Editor.symbol]) return;
 
@@ -338,7 +353,7 @@ class EditorBezier extends EditorModule {
 
       let d = Math.max((pathObject.strokeWidth ?? 0) / 2 || 1, 1);
 
-      for (let item of segment) {
+      for (const item of segment) {
         let points: Crood[] = [];
 
         if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0])) continue;
@@ -365,7 +380,7 @@ class EditorBezier extends EditorModule {
             { x: item.instruction[5], y: item.instruction[6] },
           ];
         }
-        let bezier = new Bezier(points);
+        const bezier = new Bezier(points);
         const p = bezier.project({ x, y });
 
         if (p.d && p.d < d) {
@@ -389,7 +404,7 @@ class EditorBezier extends EditorModule {
           canvas.requestRenderAll();
         }
 
-        disableAddToken = editor.requestDisableFunction('add')
+        disableAddToken = editor.requestDisableFunction('add');
       }
     });
 
@@ -419,8 +434,8 @@ class EditorBezier extends EditorModule {
       if (node) {
         const object = editor.nodeObjectMap.get(node);
         if (object) editor.focus(object);
+        vizpath.insert(node, splitCurves.next);
       }
-      vizpath.insert(pathNode, splitCurves.next);
 
       clean();
     });

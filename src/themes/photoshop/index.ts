@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import type { ThemeConfigurator } from '../../lib/modules/editor-ui/index.class';
+import type { ThemeConfigurators } from '../../lib/modules/editor-ui/index.class';
 
 export type ThemeShareState = {
   selectedNodes: fabric.Object[];
@@ -7,7 +7,7 @@ export type ThemeShareState = {
   selectedLine: fabric.Line | null;
 };
 
-export default ((editor, shareState) => {
+const photoshopTheme = ((editor, shareState) => {
   editor.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
     shareState.selectedNodes = nodes;
     shareState.selectedPoint = point;
@@ -58,7 +58,7 @@ export default ((editor, shareState) => {
         });
       });
     },
-    line: () => {
+    line: (decorator) => {
       const line = new fabric.Line([0, 0, 0, 0], {
         stroke: '#1884ec',
         strokeWidth: 1,
@@ -67,4 +67,6 @@ export default ((editor, shareState) => {
       return line;
     },
   };
-}) as ThemeConfigurator<ThemeShareState>;
+}) as ThemeConfigurators<ThemeShareState>;
+
+export default photoshopTheme;

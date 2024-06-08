@@ -59,7 +59,7 @@ const EXAMPLE_PATH_D = {
 
   // fabricCanvas.setViewportTransform([0.5, 0, 0, 0.5, 100, 100]);
 
-  const path = new fabric.Path(EXAMPLE_PATH_D.arc, {
+  const path = new fabric.Path(EXAMPLE_PATH_D.bubble, {
     objectCaching: false,
     noScaleCache: false,
     fill: '#e1e1e1',
@@ -110,7 +110,7 @@ const EXAMPLE_PATH_D = {
     .use(new EditorBackground())
     .use(new EditorBezier())
     .use(
-      new EditorUI(
+      new EditorUI<{}, { path: fabric.Object }>(
         defaultTheme,
         {
           hoverNode: null,
@@ -125,9 +125,7 @@ const EXAMPLE_PATH_D = {
         },
       ),
     )
-    .use(
-      new EditorShortcut([]),
-    )
+    .use(new EditorShortcut())
     .initialize();
 
   // // ① 通过路径指令直接绘制

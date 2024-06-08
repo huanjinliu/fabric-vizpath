@@ -778,8 +778,10 @@ class VizPath extends BaseEvent<{
   replace(pathNode: PathNode<ResponsiveCrood>, instruction: Instruction) {
     const segment = pathNode.segment;
 
-    const index = segment.indexOf(pathNode);
+    let index = segment.indexOf(pathNode);
     if (index === -1) return;
+
+    if (index === segment.length - 2 && this.isClosePath(segment)) index = 0;
 
     const updateCommands: {
       type: 'add' | 'update';
@@ -787,7 +789,7 @@ class VizPath extends BaseEvent<{
       instruction: Instruction;
     }[] = [];
 
-    if (index === 0 && this.isClosePath(segment)) {
+    if (index === 0) {
       const newStartInstruction = [
         InstructionType.START,
         ...(instruction.slice(-2) as number[]),
@@ -795,15 +797,17 @@ class VizPath extends BaseEvent<{
 
       updateCommands.push({
         type: 'update',
-        index,
+        index: 0,
         instruction: newStartInstruction,
       });
 
-      updateCommands.push({
-        type: 'update',
-        index: segment.length - 2,
-        instruction,
-      });
+      if (this.isClosePath(segment)) {
+        updateCommands.push({
+          type: 'update',
+          index: segment.length - 2,
+          instruction,
+        });
+      }
     } else {
       updateCommands.push({
         type: 'update',

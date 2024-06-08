@@ -59,6 +59,7 @@ const build_es_lib = () => ({
     json(),
     typescript({
       declaration: false,
+      exclude: ['src/example/*'],
     }),
     babel({
       babelHelpers: 'bundled',
@@ -94,6 +95,7 @@ const build_es_theme = () => {
       json(),
       typescript({
         declaration: false,
+        exclude: ['src/example/*'],
       }),
       babel({
         babelHelpers: 'bundled',

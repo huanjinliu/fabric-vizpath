@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import type { ThemeConfigurator } from '../../lib/modules/editor-ui/index.class';
+import type { ThemeConfigurators } from '../../lib/modules/editor-ui/index.class';
 
 export type ThemeShareState = {
   hoverNode: fabric.Object | null;
@@ -10,7 +10,7 @@ export type ThemeShareState = {
   selectedLine: fabric.Line | null;
 };
 
-export default ((editor, shareState) => {
+const defaultTheme = ((editor, shareState) => {
   editor.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
     shareState.selectedNodes = nodes;
     shareState.selectedPoint = point;
@@ -56,7 +56,7 @@ export default ((editor, shareState) => {
 
       return decorator(object, () => {
         object.set({
-          fill: shareState.selectedNodes.includes(object)
+          fill: shareState.selectedNodes?.includes(object)
             ? '#29ca6e'
             : shareState.hoverNode === object
               ? '#7ef4ad'
@@ -104,4 +104,6 @@ export default ((editor, shareState) => {
       });
     },
   };
-}) as ThemeConfigurator<ThemeShareState>;
+}) as ThemeConfigurators<ThemeShareState>;
+
+export default defaultTheme;

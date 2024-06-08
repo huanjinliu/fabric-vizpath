@@ -29,7 +29,7 @@ class EditorShortcut extends EditorModule {
 
   activeShortcut: Shortcut | undefined;
 
-  constructor(options: ShortcutOptions[]) {
+  constructor(options?: ShortcutOptions[]) {
     super();
 
     this.shortcutOptions = options;
@@ -90,8 +90,10 @@ class EditorShortcut extends EditorModule {
           const editor = vizpath.context.find(Editor);
           if (!editor) return;
 
-          editor.setting.mode = 'convert';
-          editor.setting.forcePointSymmetric = 'entire';
+          if (editor.setting.mode === 'move') {
+            editor.setting.mode = 'convert';
+            editor.setting.forcePointSymmetric = 'entire';
+          }
         },
         onDeactivate: () => {
           const editor = vizpath.context.find(Editor);
@@ -107,8 +109,10 @@ class EditorShortcut extends EditorModule {
           const editor = vizpath.context.find(Editor);
           if (!editor) return;
 
-          editor.setting.mode = 'convert';
-          editor.setting.forcePointSymmetric = 'angle';
+          if (editor.setting.mode === 'move') {
+            editor.setting.mode = 'convert';
+            editor.setting.forcePointSymmetric = 'angle';
+          }
         },
         onDeactivate: () => {
           const editor = vizpath.context.find(Editor);
@@ -125,8 +129,10 @@ class EditorShortcut extends EditorModule {
           const editor = vizpath.context.find(Editor);
           if (!editor) return;
 
-          editor.setting.mode = 'add';
-          editor.setting.forcePointSymmetric = 'entire';
+          if (editor.setting.mode === 'move') {
+            editor.setting.mode = 'add';
+            editor.setting.forcePointSymmetric = 'entire';
+          }
         },
         onDeactivate: () => {
           const editor = vizpath.context.find(Editor);
