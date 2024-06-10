@@ -7,7 +7,6 @@ import {
   calcCroodsAngle,
   calcCroodsDistance,
   deepIterateGroup,
-  fireFabricMouseUp,
   fireMouseUpAndSelect,
   observe,
   repairPath,
@@ -1402,11 +1401,8 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    canvas.remove(...objects);
     const nodeObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.NODE);
     const pointObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.CURVE_DOT);
-
-    // 更新路径信息
 
     if (nodeObjects.length) {
       const removeNodes: ResponsiveCrood[] = [];
@@ -1416,6 +1412,9 @@ class Editor extends EditorModule<{
 
         removeNodes.push(node);
       });
+      this.blur();
+      // 触发鼠标举起事件，避免后续拖动操作生效
+      (this.canvas as any)._onMouseUp(new MouseEvent('mouseup'));
       this.vizpath.remove(...removeNodes);
     }
 

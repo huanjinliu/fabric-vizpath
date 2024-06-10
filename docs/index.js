@@ -149,7 +149,7 @@
     function makeInvokeMethod(e, r, n) {
       var o = h;
       return function (i, a) {
-        if (o === f) throw Error("Generator is already running");
+        if (o === f) throw new Error("Generator is already running");
         if (o === s) {
           if ("throw" === i) throw a;
           return {
@@ -291,7 +291,7 @@
             } else if (c) {
               if (this.prev < i.catchLoc) return handle(i.catchLoc, !0);
             } else {
-              if (!u) throw Error("try statement without catch or finally");
+              if (!u) throw new Error("try statement without catch or finally");
               if (this.prev < i.finallyLoc) return handle(i.finallyLoc);
             }
           }
@@ -331,7 +331,7 @@
             return o;
           }
         }
-        throw Error("illegal catch attempt");
+        throw new Error("illegal catch attempt");
       },
       delegateYield: function (e, r, n) {
         return this.delegate = {
@@ -354,7 +354,7 @@
   }
   function _toPropertyKey(t) {
     var i = _toPrimitive(t, "string");
-    return "symbol" == typeof i ? i : i + "";
+    return "symbol" == typeof i ? i : String(i);
   }
   function _typeof(o) {
     "@babel/helpers - typeof";
@@ -4293,7 +4293,9 @@
               delete pathNode.curveDots;
             }
           });
-          var index = _this3.paths.indexOf(drawPath);
+          var index = _this3.paths.findIndex(function (i) {
+            return i.pathObject === pathObject;
+          });
           if (index === -1) {
             _this3.paths.push(drawPath);
           } else {
@@ -4373,19 +4375,30 @@
     }, {
       key: "replacePathSegments",
       value: function replacePathSegments(path, segments) {
-        var _this5 = this;
-        var pathObject = path.pathObject;
-        var _parsePathJSON = parsePathJSON(pathObject),
-          styles = _parsePathJSON.styles,
-          layout = _parsePathJSON.layout;
-        var newPath = segments.map(function (segment) {
-          var path = new fabric.fabric.Path(fabric.fabric.util.joinPath(pathObject.path));
-          path.set(Object.assign(Object.assign({}, styles), layout));
+        var pathObject = path.pathObject,
+          oldSegment = path.segment;
+        var newPath = segments.map(function (segment, index) {
+          var path = pathObject;
+          if (index > 0) {
+            var _parsePathJSON = parsePathJSON(pathObject),
+              styles = _parsePathJSON.styles,
+              layout = _parsePathJSON.layout;
+            path = new fabric.fabric.Path(fabric.fabric.util.joinPath(pathObject.path));
+            path.set(Object.assign(Object.assign({}, styles), layout));
+          }
           path.path = segment;
           repairPath(path);
           var _segment = [];
           segment.forEach(function (instruction) {
-            _segment.push({
+            var oldInstruction = index === 0 ? oldSegment.find(function (i) {
+              return i.instruction === instruction;
+            }) : undefined;
+            if (oldInstruction) {
+              oldInstruction.segment = _segment;
+              delete oldInstruction.node;
+              delete oldInstruction.curveDots;
+            }
+            _segment.push(oldInstruction !== null && oldInstruction !== void 0 ? oldInstruction : {
               segment: _segment,
               instruction: instruction
             });
@@ -4395,12 +4408,9 @@
             pathObject: path
           };
         });
-        return this.onceRerenderOriginPath(function () {
-          _this5.clear(pathObject);
-          var newResponsivePath = _this5.draw(newPath);
-          _this5._rerenderOriginPath(pathObject);
-          return newResponsivePath;
-        });
+        var result = this.draw(newPath);
+        this._rerenderOriginPath(pathObject);
+        return result;
       }
       /**
        * 移除路径节点
@@ -4413,14 +4423,14 @@
     }, {
       key: "remove",
       value: function remove() {
-        var _this6 = this;
+        var _this5 = this;
         for (var _len2 = arguments.length, targets = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
           targets[_key2] = arguments[_key2];
         }
         // 找出需要删除的路径和指令索引映射，便于后续同路径下节点的批量操作
         var segmentIndexMap = targets.reduce(function (maps, target) {
           var _a;
-          var pathNode = _this6.pathNodeMap.get(target);
+          var pathNode = _this5.pathNodeMap.get(target);
           if (!pathNode) return maps;
           var segment = pathNode.segment,
             instruction = pathNode.instruction;
@@ -4447,27 +4457,28 @@
           var _ref5 = _slicedToArray(_ref4, 2),
             segment = _ref5[0],
             indexes = _ref5[1];
-          var isClosePath = _this6.isClosePath(segment);
+          var path = _this5.getPath(segment);
+          var pathObject = path.pathObject;
+          var isClosePath = _this5.isClosePath(segment);
+          // 先替换掉路径信息，避免被修改到
+          pathObject.path = cloneDeep(segment.map(function (i) {
+            return i.instruction;
+          }));
           // 如果路径所有点都在删除列表列表中，直接移除整个路径
           var isWholePath = indexes.length === segment.length || isClosePath && indexes.length === segment.length - 1;
-          if (isWholePath) {
-            return {
-              path: _this6.paths.find(function (i) {
-                return i.segment === segment;
-              }),
-              segment: []
-            };
-          }
+          if (isWholePath) return {
+            path: path,
+            segment: []
+          };
           /**
            * 删除单节点时
            */
           var removeSingleNode = function removeSingleNode(index) {
             var _a2;
             var _a;
-            // 需要克隆出新的指令列表不然会影响到pathObject
-            var _segments = [cloneDeep(segment.map(function (i) {
+            var _segments = [segment.map(function (i) {
               return i.instruction;
-            }))];
+            })];
             var instructions = _segments[0];
             var pre = instructions.slice(0, index);
             var next = instructions.slice(index);
@@ -4498,12 +4509,12 @@
           /**
            * 删除多节点
            */
-          var removeMulitpleNodes = function removeMulitpleNodes(indexs) {
+          var removeMulitpleNodes = function removeMulitpleNodes(indexes) {
             var _a;
             // 需要克隆出新的指令列表不然会影响到pathObject
-            var _segments = [cloneDeep(segment.map(function (i) {
+            var _segments = [segment.map(function (i) {
               return i.instruction;
-            }))];
+            })];
             var removeIndexes = indexes.length <= 1 ? indexes : indexes.filter(function (i, idx, arr) {
               return arr.length <= 1 || idx >= 1 && arr[idx - 1] + 1 === i;
             });
@@ -4532,17 +4543,15 @@
             return _segments;
           };
           return {
-            path: _this6.paths.find(function (i) {
-              return i.segment === segment;
-            }),
-            segment: indexes.length === 1 ? removeSingleNode(indexes[0]) : removeMulitpleNodes()
+            path: path,
+            segment: indexes.length === 1 ? removeSingleNode(indexes[0]) : removeMulitpleNodes(indexes)
           };
         });
         segments.forEach(function (i) {
           if (i.segment.length) {
-            _this6.replacePathSegments(i.path, i.segment);
+            _this5.replacePathSegments(i.path, i.segment);
           } else {
-            _this6.clear(i.path.pathObject);
+            _this5.clear(i.path.pathObject);
           }
         });
         segmentIndexMap.clear();
@@ -4647,7 +4656,7 @@
     }, {
       key: "_updatePathByCommands",
       value: function _updatePathByCommands(path, queue) {
-        var _this7 = this;
+        var _this6 = this;
         var segment = path.segment;
         queue.sort(function (a, b) {
           return b.index - a.index;
@@ -4666,10 +4675,10 @@
           if (type === 'update') {
             var pathNode = segment[index];
             if (pathNode.node) {
-              _this7.pathNodeMap["delete"](pathNode.node);
-              _this7._observers["delete"](pathNode.node);
-              if ((_a = pathNode.curveDots) === null || _a === void 0 ? void 0 : _a.pre) _this7._observers["delete"](pathNode.curveDots.pre);
-              if ((_b = pathNode.curveDots) === null || _b === void 0 ? void 0 : _b.next) _this7._observers["delete"](pathNode.curveDots.next);
+              _this6.pathNodeMap["delete"](pathNode.node);
+              _this6._observers["delete"](pathNode.node);
+              if ((_a = pathNode.curveDots) === null || _a === void 0 ? void 0 : _a.pre) _this6._observers["delete"](pathNode.curveDots.pre);
+              if ((_b = pathNode.curveDots) === null || _b === void 0 ? void 0 : _b.next) _this6._observers["delete"](pathNode.curveDots.next);
             }
             pathNode.instruction = instruction;
             delete pathNode.node;
@@ -4684,7 +4693,7 @@
     }, {
       key: "clear",
       value: function clear(target) {
-        var _this8 = this;
+        var _this7 = this;
         var index = target instanceof fabric.fabric.Path ? this.paths.findIndex(function (i) {
           return i.pathObject === target;
         }) : this.paths.findIndex(function (i) {
@@ -4700,7 +4709,7 @@
           node.unobserve();
           (_a = curveDots === null || curveDots === void 0 ? void 0 : curveDots.pre) === null || _a === void 0 ? void 0 : _a.unobserve();
           (_b = curveDots === null || curveDots === void 0 ? void 0 : curveDots.next) === null || _b === void 0 ? void 0 : _b.unobserve();
-          _this8.pathNodeMap["delete"](node);
+          _this7.pathNodeMap["delete"](node);
         });
         this.paths.splice(index, 1);
         this._rerenderOriginPath(path.pathObject);
@@ -4859,7 +4868,7 @@
       key: "initialize",
       value: (function () {
         var _initialize = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
-          var _this9 = this;
+          var _this8 = this;
           var vizpath;
           return _regeneratorRuntime().wrap(function _callee3$(_context3) {
             while (1) switch (_context3.prev = _context3.next) {
@@ -4880,7 +4889,7 @@
                       return _regeneratorRuntime().wrap(function _callee2$(_context2) {
                         while (1) switch (_context2.prev = _context2.next) {
                           case 0:
-                            module = _this9.modules[next];
+                            module = _this8.modules[next];
                             if (module) {
                               _context2.next = 4;
                               break;
@@ -5126,11 +5135,11 @@
   }
   var EditorModule = /*#__PURE__*/function (_BaseEvent2) {
     function EditorModule() {
-      var _this10;
+      var _this9;
       _classCallCheck(this, EditorModule);
-      _this10 = _callSuper(this, EditorModule, arguments);
-      _this10.vizpath = null;
-      return _this10;
+      _this9 = _callSuper(this, EditorModule, arguments);
+      _this9.vizpath = null;
+      return _this9;
     }
     _inherits(EditorModule, _BaseEvent2);
     return _createClass(EditorModule, [{
@@ -5218,26 +5227,26 @@
   };
   var EditorUI = /*#__PURE__*/function (_EditorModule) {
     function EditorUI() {
-      var _this11;
+      var _this10;
       var configurator = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : function () {
         return {};
       };
       var initialShareState = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
       var onShareStateUpdate = arguments.length > 2 ? arguments[2] : undefined;
       _classCallCheck(this, EditorUI);
-      _this11 = _callSuper(this, EditorUI);
+      _this10 = _callSuper(this, EditorUI);
       /**
        * 主题
        */
-      _this11.theme = null;
+      _this10.theme = null;
       /**
        * 元素渲染更新回调映射
        */
-      _this11.objectPreRenderCallbackMap = new Map([]);
-      _this11.configurator = configurator;
-      _this11.shareState = initialShareState;
-      _this11._onShareStateUpdate = onShareStateUpdate;
-      return _this11;
+      _this10.objectPreRenderCallbackMap = new Map([]);
+      _this10.configurator = configurator;
+      _this10.shareState = initialShareState;
+      _this10._onShareStateUpdate = onShareStateUpdate;
+      return _this10;
     }
     /**
      * 重新渲染对象样式
@@ -5268,7 +5277,7 @@
     }, {
       key: "load",
       value: function load(vizpath) {
-        var _this12 = this;
+        var _this11 = this;
         var editor = vizpath.context.find(Editor$1);
         if (!editor) {
           throw new TypeError('Please use editor module before using ui module.');
@@ -5278,7 +5287,7 @@
           set: function set(target, p, newValue, receiver) {
             var needRefresh = target[p] !== newValue;
             var result = Reflect.set(target, p, newValue, receiver);
-            if (needRefresh) _this12.refresh();
+            if (needRefresh) _this11.refresh();
             return result;
           }
         });
@@ -5309,57 +5318,57 @@
      * @param options 更多配置
      */
     function Editor(mountCanvas) {
-      var _this13;
+      var _this12;
       var isolation = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
       _classCallCheck(this, Editor);
-      _this13 = _callSuper(this, Editor);
+      _this12 = _callSuper(this, Editor);
       /* ---------------------------- 画布相关配置 ---------------------------- */
       /** 挂载的画布 */
-      _this13.mountCanvas = null;
+      _this12.mountCanvas = null;
       /** 交互所在fabric画布 */
-      _this13.canvas = null;
+      _this12.canvas = null;
       /** 当前编辑器是否使用隔离画布（模拟克隆的新画布对象） */
-      _this13.isolation = false;
+      _this12.isolation = false;
       /** 监听事件 */
-      _this13.listeners = [];
+      _this12.listeners = [];
       /** 功能禁用请求凭证 */
-      _this13.disabledFunctionTokens = {};
+      _this12.disabledFunctionTokens = {};
       /* ---------------------------- 路径相关配置 ---------------------------- */
       /** 路径汇总 */
-      _this13.paths = [];
+      _this12.paths = [];
       /** 节点路径映射 */
-      _this13.nodePathMap = new Map([]);
+      _this12.nodePathMap = new Map([]);
       /* ---------------------------- 节点相关配置 ---------------------------- */
       /**
        * 内置配置，配置的更改会影响编辑器的交互效果
        */
-      _this13.setting = {
+      _this12.setting = {
         mode: Mode.MOVE,
         forcePointSymmetric: 'none'
       };
       /** 路径节点对象 */
-      _this13.nodes = [];
+      _this12.nodes = [];
       /** 路径曲线变换点列表 */
-      _this13.curveDots = [];
+      _this12.curveDots = [];
       /** 元素画布对象 与 路径节点对象 映射 */
-      _this13.objectNodeMap = new Map([]);
+      _this12.objectNodeMap = new Map([]);
       /** 路径节点对象 与 元素画布对象 映射 */
-      _this13.nodeObjectMap = new Map([]);
+      _this12.nodeObjectMap = new Map([]);
       /** 当前活跃的路径节点画布对象列表 */
-      _this13.activeNodes = [];
+      _this12.activeNodes = [];
       /** 当前活跃的曲线变换点画布对象 */
-      _this13.activePoint = null;
+      _this12.activePoint = null;
       /**  临时停用选择监听处理 */
-      _this13._deactivateSelectListeners = false;
+      _this12._deactivateSelectListeners = false;
       /** 废弃的画布对象池，可用于复用减少创建消耗 */
-      _this13._abandonedPool = {
+      _this12._abandonedPool = {
         nodes: [],
         points: [],
         lines: []
       };
-      _this13.mountCanvas = mountCanvas;
-      _this13.isolation = isolation;
-      return _this13;
+      _this12.mountCanvas = mountCanvas;
+      _this12.isolation = isolation;
+      return _this12;
     }
     /**
      * 将画布坐标转化为特定路径的相对指令坐标位置
@@ -5505,11 +5514,11 @@
     }, {
       key: "_initDrawPathListener",
       value: function _initDrawPathListener(vizpath) {
-        var _this14 = this;
+        var _this13 = this;
         var canvas = this.canvas;
         if (!canvas) return;
         var handler = function handler(paths) {
-          var _this14$paths;
+          var _this13$paths;
           var _a;
           var ui = vizpath.context.find(EditorUI);
           var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
@@ -5544,12 +5553,12 @@
           });
           canvas.renderOnAddRemove = false;
           canvas.requestRenderAll();
-          (_this14$paths = _this14.paths).push.apply(_this14$paths, _toConsumableArray(paths));
+          (_this13$paths = _this13.paths).push.apply(_this13$paths, _toConsumableArray(paths));
           // 建立映射关系，便于减少后续计算
-          _this14.paths.forEach(function (item) {
+          _this13.paths.forEach(function (item) {
             item.segment.forEach(function (_ref13) {
               var node = _ref13.node;
-              if (node) _this14.nodePathMap.set(node, item);
+              if (node) _this13.nodePathMap.set(node, item);
             });
           });
         };
@@ -5561,42 +5570,42 @@
     }, {
       key: "_initClearPathListener",
       value: function _initClearPathListener(vizpath) {
-        var _this15 = this;
+        var _this14 = this;
         var canvas = this.canvas;
         if (!canvas) return;
         var handler = function handler(paths) {
           canvas.remove.apply(canvas, _toConsumableArray(paths.map(function (i) {
             return i.pathObject;
           })));
-          _this15.paths = _this15.paths.filter(function (i) {
+          _this14.paths = _this14.paths.filter(function (i) {
             return paths.includes(i);
           });
           // 清除映射
           paths.forEach(function (item) {
             item.segment.forEach(function (_ref14) {
               var node = _ref14.node;
-              if (node) _this15.nodePathMap["delete"](node);
+              if (node) _this14.nodePathMap["delete"](node);
             });
           });
         };
         vizpath.on('clear', handler);
         vizpath.on('clearAll', function () {
-          canvas.remove.apply(canvas, _toConsumableArray(_this15.paths.map(function (i) {
+          canvas.remove.apply(canvas, _toConsumableArray(_this14.paths.map(function (i) {
             return i.pathObject;
           })));
-          _this15.paths.forEach(function (item) {
+          _this14.paths.forEach(function (item) {
             item.segment.forEach(function (_ref15) {
               var node = _ref15.node;
-              if (node) _this15.nodePathMap["delete"](node);
+              if (node) _this14.nodePathMap["delete"](node);
             });
           });
-          _this15.paths = [];
+          _this14.paths = [];
         });
       }
     }, {
       key: "_initPathNodes",
       value: function _initPathNodes() {
-        var _this16 = this;
+        var _this15 = this;
         var _a;
         var objects = [];
         var objectNodeMap = new Map();
@@ -5642,12 +5651,12 @@
           // 加入画布时添加自动响应
           var onAddedNode = function onAddedNode() {
             node.observe(function (x, y) {
-              var position = _this16.calcAbsolutePosition({
+              var position = _this15.calcAbsolutePosition({
                 x: x,
                 y: y
-              }, _this16.nodePathMap.get(node).pathObject);
+              }, _this15.nodePathMap.get(node).pathObject);
               if (object.group) {
-                var relativePosition = _this16.calcRelativeCrood(position, object.group);
+                var relativePosition = _this15.calcRelativeCrood(position, object.group);
                 object.set({
                   left: relativePosition.x,
                   top: relativePosition.y
@@ -5667,7 +5676,7 @@
             object.off('removed', onRemovedNode);
             node.unobserve(object.name);
             observe(object, ['left', 'top'], function () {});
-            _this16._abandonedPool.nodes.push(object);
+            _this15._abandonedPool.nodes.push(object);
           };
           object.on('added', onAddedNode);
           object.on('removed', onRemovedNode);
@@ -5679,7 +5688,7 @@
           segment.forEach(function (item) {
             var node = item.node;
             if (!node) return;
-            var reuseObject = _this16.nodeObjectMap.get(item);
+            var reuseObject = _this15.nodeObjectMap.get(item);
             if (reuseObject) {
               var object = createNodeObject(node, reuseObject);
               if (!object) return;
@@ -5698,7 +5707,7 @@
             if (nodeObjectMap.has(item)) return;
             var recycleObject;
             do {
-              recycleObject = _this16._abandonedPool.nodes.pop();
+              recycleObject = _this15._abandonedPool.nodes.pop();
             } while (recycleObject && objectNodeMap.has(recycleObject));
             var object = createNodeObject(node, recycleObject);
             if (!object) return;
@@ -5719,33 +5728,33 @@
     }, {
       key: "_initDrawNodeEvents",
       value: function _initDrawNodeEvents(vizpath) {
-        var _this17 = this;
+        var _this16 = this;
         var updateNodes = function updateNodes() {
-          var canvas = _this17.canvas;
+          var canvas = _this16.canvas;
           if (!canvas) return;
-          var storeActiveObjects = _this17.activeNodes;
+          var storeActiveObjects = _this16.activeNodes;
           // 失去当前选中状态
-          if (storeActiveObjects.length) _this17.blur();
+          if (storeActiveObjects.length) _this16.blur();
           // 由于需要多次添加路径节点和曲线变换点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
           canvas.renderOnAddRemove = false;
           // 移除旧对象
-          canvas.remove.apply(canvas, _toConsumableArray(_this17.nodes));
+          canvas.remove.apply(canvas, _toConsumableArray(_this16.nodes));
           // 初始路径路径节点
-          var _this17$_initPathNode = _this17._initPathNodes(),
-            objects = _this17$_initPathNode.objects,
-            objectNodeMap = _this17$_initPathNode.objectNodeMap,
-            nodeObjectMap = _this17$_initPathNode.nodeObjectMap;
+          var _this16$_initPathNode = _this16._initPathNodes(),
+            objects = _this16$_initPathNode.objects,
+            objectNodeMap = _this16$_initPathNode.objectNodeMap,
+            nodeObjectMap = _this16$_initPathNode.nodeObjectMap;
           // 添加新对象并重新建立映射关系
-          _this17.nodes = objects;
+          _this16.nodes = objects;
           canvas.add.apply(canvas, _toConsumableArray(objects));
-          _this17.objectNodeMap.clear();
-          _this17.objectNodeMap = objectNodeMap;
-          _this17.nodeObjectMap.clear();
-          _this17.nodeObjectMap = nodeObjectMap;
+          _this16.objectNodeMap.clear();
+          _this16.objectNodeMap = objectNodeMap;
+          _this16.nodeObjectMap.clear();
+          _this16.nodeObjectMap = nodeObjectMap;
           canvas.renderOnAddRemove = true;
           canvas.requestRenderAll();
           // 保留原聚焦状态
-          if (storeActiveObjects.length) _this17.focus.apply(_this17, _toConsumableArray(storeActiveObjects));
+          if (storeActiveObjects.length) _this16.focus.apply(_this16, _toConsumableArray(storeActiveObjects));
         };
         vizpath.on('draw', updateNodes);
       }
@@ -5755,7 +5764,7 @@
     }, {
       key: "_initClearNodeEvents",
       value: function _initClearNodeEvents(vizpath) {
-        var _this18 = this;
+        var _this17 = this;
         var canvas = this.canvas;
         if (!canvas) return;
         vizpath.on('clear', function (path) {
@@ -5763,32 +5772,32 @@
           path.forEach(function (_ref18) {
             var segment = _ref18.segment;
             segment.forEach(function (node) {
-              var object = _this18.nodeObjectMap.get(node);
+              var object = _this17.nodeObjectMap.get(node);
               if (object) removeObjects.push(object);
             });
           });
-          _this18.blur();
+          _this17.blur();
           canvas.remove.apply(canvas, removeObjects);
           removeObjects.forEach(function (object) {
-            var node = _this18.objectNodeMap.get(object);
+            var node = _this17.objectNodeMap.get(object);
             if (node) {
-              _this18.nodeObjectMap["delete"](node);
-              _this18.objectNodeMap["delete"](object);
+              _this17.nodeObjectMap["delete"](node);
+              _this17.objectNodeMap["delete"](object);
             }
           });
-          _this18.nodes = _this18.nodes.filter(function (i) {
+          _this17.nodes = _this17.nodes.filter(function (i) {
             return !removeObjects.includes(i);
           });
         });
         vizpath.on('clearAll', function () {
-          _this18.blur();
-          canvas.remove.apply(canvas, _toConsumableArray(_this18.nodes));
-          _this18.nodes = [];
-          _this18.objectNodeMap.clear();
-          _this18.nodeObjectMap.clear();
+          _this17.blur();
+          canvas.remove.apply(canvas, _toConsumableArray(_this17.nodes));
+          _this17.nodes = [];
+          _this17.objectNodeMap.clear();
+          _this17.nodeObjectMap.clear();
         });
         vizpath.on('destroy', function () {
-          _this18._abandonedPool = {
+          _this17._abandonedPool = {
             nodes: [],
             points: [],
             lines: []
@@ -5801,10 +5810,10 @@
     }, {
       key: "_addActiveSelectionObserve",
       value: function _addActiveSelectionObserve(group) {
-        var _this19 = this;
+        var _this18 = this;
         observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], function (newValue, oldValue) {
           var _a;
-          (_a = _this19.vizpath) === null || _a === void 0 ? void 0 : _a.onceRerenderOriginPath(function () {
+          (_a = _this18.vizpath) === null || _a === void 0 ? void 0 : _a.onceRerenderOriginPath(function () {
             var _a, _b;
             var hadFollowedCroods = new Set([]);
             var _iterator3 = _createForOfIteratorHelper(group._objects),
@@ -5813,8 +5822,8 @@
               var _loop = function _loop() {
                 var object = _step3.value;
                 var followCurveDots = [];
-                var pathNode = _this19.objectNodeMap.get(object);
-                var curveDots = (_b = (_a = _this19.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
+                var pathNode = _this18.objectNodeMap.get(object);
+                var curveDots = (_b = (_a = _this18.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
                 curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref19) {
                   var position = _ref19.position,
                     direction = _ref19.direction,
@@ -5835,7 +5844,7 @@
                 var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix(false));
                 var left = decomposeMatrix.translateX;
                 var top = decomposeMatrix.translateY;
-                _this19._transform(object, {
+                _this18._transform(object, {
                   left: left,
                   top: top,
                   scaleX: newValue.scaleX / oldValue.scaleX,
@@ -5861,15 +5870,15 @@
     }, {
       key: "_addActivePointObserve",
       value: function _addActivePointObserve(object) {
-        var _this20 = this;
+        var _this19 = this;
         observe(object, ['left', 'top'], function (_ref20) {
           var left = _ref20.left,
             top = _ref20.top;
           var _a, _b;
           if (object.group) return;
           var followCurveDots = [];
-          var pathNode = _this20.objectNodeMap.get(object);
-          var curveDots = (_b = (_a = _this20.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
+          var pathNode = _this19.objectNodeMap.get(object);
+          var curveDots = (_b = (_a = _this19.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
           curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref21) {
             var position = _ref21.position,
               direction = _ref21.direction,
@@ -5879,7 +5888,7 @@
             if (position !== 'cur' || !crood) return;
             followCurveDots.push(crood);
           });
-          _this20._transform(object, {
+          _this19._transform(object, {
             left: left,
             top: top
           }, followCurveDots);
@@ -5891,33 +5900,33 @@
     }, {
       key: "_initSelectNodeEvents",
       value: function _initSelectNodeEvents() {
-        var _this21 = this;
+        var _this20 = this;
         this.addCanvasEvent('selection:created', function (e) {
-          if (_this21._deactivateSelectListeners) return;
-          _this21.focus.apply(_this21, _toConsumableArray(e.selected));
+          if (_this20._deactivateSelectListeners) return;
+          _this20.focus.apply(_this20, _toConsumableArray(e.selected));
         });
         this.addCanvasEvent('selection:updated', function (e) {
-          if (_this21._deactivateSelectListeners) return;
-          _this21.focus.apply(_this21, _toConsumableArray(e.selected));
+          if (_this20._deactivateSelectListeners) return;
+          _this20.focus.apply(_this20, _toConsumableArray(e.selected));
         });
         this.addCanvasEvent('selection:cleared', function () {
-          if (_this21._deactivateSelectListeners) return;
-          _this21.focus();
+          if (_this20._deactivateSelectListeners) return;
+          _this20.focus();
         });
         // 选中路径段时自动选中路线段内的所有指令路径节点
         this.addCanvasEvent('mouse:dblclick', function (e) {
           if (e.target && e.target[Editor.symbol]) return;
           var focusPath;
-          for (var _i2 = _this21.paths.length - 1; _i2 >= 0; _i2--) {
-            var path = _this21.paths[_i2];
+          for (var _i2 = _this20.paths.length - 1; _i2 >= 0; _i2--) {
+            var path = _this20.paths[_i2];
             if (path.pathObject.containsPoint(e.pointer)) {
               focusPath = path;
               break;
             }
           }
           if (focusPath) {
-            _this21.focus.apply(_this21, _toConsumableArray(_this21.nodes.filter(function (node) {
-              return _this21.nodePathMap.get(_this21.objectNodeMap.get(node).node) === focusPath;
+            _this20.focus.apply(_this20, _toConsumableArray(_this20.nodes.filter(function (node) {
+              return _this20.nodePathMap.get(_this20.objectNodeMap.get(node).node) === focusPath;
             })));
           }
         });
@@ -5928,23 +5937,23 @@
     }, {
       key: "_initAddNodeEvents",
       value: function _initAddNodeEvents() {
-        var _this22 = this;
+        var _this21 = this;
         var canvas = this.canvas;
         if (!canvas) return;
         var target;
         this.addCanvasEvent('mouse:down:before', function (event) {
           var _a;
-          if ((_a = _this22.disabledFunctionTokens.add) === null || _a === void 0 ? void 0 : _a.length) return;
-          if (_this22.setting.mode !== Mode.ADD) return;
+          if ((_a = _this21.disabledFunctionTokens.add) === null || _a === void 0 ? void 0 : _a.length) return;
+          if (_this21.setting.mode !== Mode.ADD) return;
           if (event.target && event.target[Editor.symbol]) {
-            if (_this22.activeNodes.length === 1 && event.target[Editor.symbol] === EditorSymbolType.NODE) {
-              var joinNode = _this22.link(_this22.objectNodeMap.get(_this22.activeNodes[0]), _this22.objectNodeMap.get(event.target));
-              if (joinNode) target = _this22.nodeObjectMap.get(joinNode);
+            if (_this21.activeNodes.length === 1 && event.target[Editor.symbol] === EditorSymbolType.NODE) {
+              var joinNode = _this21.link(_this21.objectNodeMap.get(_this21.activeNodes[0]), _this21.objectNodeMap.get(event.target));
+              if (joinNode) target = _this21.nodeObjectMap.get(joinNode);
             }
           } else {
             // 新增节点
             var pointer = calcCanvasCrood(canvas, event.pointer);
-            target = _this22.add({
+            target = _this21.add({
               left: pointer.x,
               top: pointer.y
             });
@@ -5958,12 +5967,12 @@
           }
         });
         this.addCanvasEvent('mouse:down', function (event) {
-          if (target) _this22.focus(target);
+          if (target) _this21.focus(target);
         });
         this.addCanvasEvent('mouse:move', function (event) {
           var _a;
           if (!target) return;
-          if (_this22.setting.mode !== Mode.ADD) {
+          if (_this21.setting.mode !== Mode.ADD) {
             target === null || target === void 0 ? void 0 : target.set({
               lockMovementX: false,
               lockMovementY: false
@@ -5974,17 +5983,17 @@
           }
           // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
           if (target.containsPoint(event.pointer)) return;
-          var currentNode = _this22.objectNodeMap.get(target);
+          var currentNode = _this21.objectNodeMap.get(target);
           // 先将两边的点都降到直线级，便于后续拖拽变换
-          _this22.degrade(target, 'both', true);
-          _this22.upgrade(target, 'both');
-          var curveDot = (_a = _this22.curveDots.find(function (i) {
+          _this21.degrade(target, 'both', true);
+          _this21.upgrade(target, 'both');
+          var curveDot = (_a = _this21.curveDots.find(function (i) {
             return i.pathNode === currentNode && i.type === 'next';
-          })) !== null && _a !== void 0 ? _a : _this22.curveDots.find(function (i) {
+          })) !== null && _a !== void 0 ? _a : _this21.curveDots.find(function (i) {
             return i.pathNode === currentNode;
           });
           if (curveDot) {
-            _this22.focus(curveDot.point);
+            _this21.focus(curveDot.point);
             fireMouseUpAndSelect(curveDot.point);
           }
         });
@@ -6003,7 +6012,7 @@
     }, {
       key: "_addActivePointCurveDots",
       value: function _addActivePointCurveDots(nodeObject) {
-        var _this23 = this;
+        var _this22 = this;
         var _a;
         var vizpath = this.vizpath;
         if (!vizpath) return;
@@ -6025,7 +6034,7 @@
           var node = from.node;
           var curveDot = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
           if (!node || !curveDot || curveDotSet.has(curveDot)) return false;
-          var nodeObject = _this23.nodeObjectMap.get(from);
+          var nodeObject = _this22.nodeObjectMap.get(from);
           /**
            * 创建指令曲线变换点
            */
@@ -6051,17 +6060,17 @@
             }
             return customObject;
           };
-          var point = (_b = _this23._abandonedPool.points.pop()) !== null && _b !== void 0 ? _b : theme.dot(pointDecorator);
+          var point = (_b = _this22._abandonedPool.points.pop()) !== null && _b !== void 0 ? _b : theme.dot(pointDecorator);
           if (!point[Editor.symbol]) point = pointDecorator(point);
           // 建立相互响应，指令的数据和元素的位置更改会相互同步
           var onAddedPoint = function onAddedPoint() {
             curveDot.observe(function (x, y) {
               var _a;
               if (((_a = point.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === point) return;
-              var position = _this23.calcAbsolutePosition({
+              var position = _this22.calcAbsolutePosition({
                 x: x,
                 y: y
-              }, _this23.nodePathMap.get(node).pathObject);
+              }, _this22.nodePathMap.get(node).pathObject);
               point.set(position).setCoords();
             }, {
               immediate: true,
@@ -6079,13 +6088,13 @@
               });
               // 响应式更改指令信息
               if (((_a = point.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === point) {
-                var crood = _this23.calcRelativeCrood({
+                var crood = _this22.calcRelativeCrood({
                   left: left,
                   top: top
-                }, _this23.nodePathMap.get(node).pathObject);
+                }, _this22.nodePathMap.get(node).pathObject);
                 // 曲线变换点对称操作
-                if (_this23.setting.forcePointSymmetric !== 'none') {
-                  var symmetricCurveDot = _this23.curveDots.find(function (i) {
+                if (_this22.setting.forcePointSymmetric !== 'none') {
+                  var symmetricCurveDot = _this22.curveDots.find(function (i) {
                     var _a;
                     var antiDirection = {
                       pre: 'next',
@@ -6105,7 +6114,7 @@
                       x: node.x - (crood.x - node.x),
                       y: node.y - (crood.y - node.y)
                     }, node);
-                    var scale = _this23.setting.forcePointSymmetric === 'entire' ? 1 : d / new_d;
+                    var scale = _this22.setting.forcePointSymmetric === 'entire' ? 1 : d / new_d;
                     _curveDot.setCrood({
                       x: node.x - (crood.x - node.x) * scale,
                       y: node.y - (crood.y - node.y) * scale
@@ -6121,7 +6130,7 @@
             point.off('removed', onRemovedPoint);
             curveDot.unobserve(point.name);
             observe(point, ['left', 'top'], function () {});
-            _this23._abandonedPool.points.push(point);
+            _this22._abandonedPool.points.push(point);
           };
           point.on('added', onAddedPoint);
           point.on('removed', onRemovedPoint);
@@ -6148,15 +6157,15 @@
             }
             return customObject;
           };
-          var line = (_c = _this23._abandonedPool.lines.pop()) !== null && _c !== void 0 ? _c : theme.line(lineDecorator);
+          var line = (_c = _this22._abandonedPool.lines.pop()) !== null && _c !== void 0 ? _c : theme.line(lineDecorator);
           if (!line[Editor.symbol]) line = lineDecorator(line);
           // 建立响应式，让连线随时跟随指令的值进行变化
           var onAddedLine = function onAddedLine() {
             node.observe(function (x, y) {
-              var position = _this23.calcAbsolutePosition({
+              var position = _this22.calcAbsolutePosition({
                 x: x,
                 y: y
-              }, _this23.nodePathMap.get(node).pathObject);
+              }, _this22.nodePathMap.get(node).pathObject);
               line.set({
                 x1: position.left,
                 y1: position.top
@@ -6166,10 +6175,10 @@
               id: line.name
             });
             curveDot.observe(function (x, y) {
-              var position = _this23.calcAbsolutePosition({
+              var position = _this22.calcAbsolutePosition({
                 x: x,
                 y: y
-              }, _this23.nodePathMap.get(node).pathObject);
+              }, _this22.nodePathMap.get(node).pathObject);
               line.set({
                 x2: position.left,
                 y2: position.top
@@ -6184,7 +6193,7 @@
             line.off('removed', onRemovedLine);
             node.unobserve(line.name);
             curveDot.unobserve(line.name);
-            _this23._abandonedPool.lines.push(line);
+            _this22._abandonedPool.lines.push(line);
           };
           line.on('added', onAddedLine);
           line.on('removed', onRemovedLine);
@@ -6277,45 +6286,45 @@
     }, {
       key: "_initConvertNodeEvents",
       value: function _initConvertNodeEvents() {
-        var _this24 = this;
+        var _this23 = this;
         var canvas = this.canvas;
         if (!canvas) return;
         var target;
         this.addCanvasEvent('mouse:down:before', function (event) {
           var _a, _b;
-          if ((_a = _this24.disabledFunctionTokens.convert) === null || _a === void 0 ? void 0 : _a.length) return;
-          if (_this24.setting.mode !== Mode.CONVERT) return;
+          if ((_a = _this23.disabledFunctionTokens.convert) === null || _a === void 0 ? void 0 : _a.length) return;
+          if (_this23.setting.mode !== Mode.CONVERT) return;
           if (((_b = event.target) === null || _b === void 0 ? void 0 : _b[Editor.symbol]) !== EditorSymbolType.NODE) return;
-          if (_this24.activeNodes.length > 1) return;
-          var activeObject = _this24.activeNodes[0];
+          if (_this23.activeNodes.length > 1) return;
+          var activeObject = _this23.activeNodes[0];
           var object = event.target;
-          var currentNode = _this24.objectNodeMap.get(object);
+          var currentNode = _this23.objectNodeMap.get(object);
           // 判断指令升降级
           if (activeObject && object !== activeObject) {
-            var activeNode = _this24.objectNodeMap.get(activeObject);
-            var _this24$vizpath$getNe = _this24.vizpath.getNeighboringNodes(activeNode),
-              pre = _this24$vizpath$getNe.pre,
-              next = _this24$vizpath$getNe.next;
-            if (_this24.curveDots.filter(function (i) {
+            var activeNode = _this23.objectNodeMap.get(activeObject);
+            var _this23$vizpath$getNe = _this23.vizpath.getNeighboringNodes(activeNode),
+              pre = _this23$vizpath$getNe.pre,
+              next = _this23$vizpath$getNe.next;
+            if (_this23.curveDots.filter(function (i) {
               return i.node === object;
             }).length === 0) {
               var upgradeDirection;
               if (currentNode === pre) upgradeDirection = 'next';
               if (currentNode === next) upgradeDirection = 'pre';
               if (upgradeDirection) {
-                _this24.upgrade(object, upgradeDirection);
-                var curveDot = _this24.curveDots.find(function (i) {
+                _this23.upgrade(object, upgradeDirection);
+                var curveDot = _this23.curveDots.find(function (i) {
                   return i.pathNode === currentNode && i.type === upgradeDirection;
                 });
                 if (curveDot) {
-                  _this24.focus(curveDot.point);
+                  _this23.focus(curveDot.point);
                   fireMouseUpAndSelect(curveDot.point);
                   return;
                 }
               }
             }
           }
-          _this24.degrade(object, 'both', true);
+          _this23.degrade(object, 'both', true);
           target = object.set({
             lockMovementX: true,
             lockMovementY: true
@@ -6326,15 +6335,15 @@
           // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
           if (target.containsPoint(event.pointer)) return;
           var pointer = calcCanvasCrood(canvas, event.pointer);
-          var targetNode = _this24.objectNodeMap.get(target);
-          var pathObject = _this24.nodePathMap.get(targetNode.node).pathObject;
-          var convertibleNodes = _this24._getConvertibleNodes(targetNode);
-          var neighboringNodes = _this24.vizpath.getNeighboringNodes(targetNode, true);
-          var position = _this24.calcRelativeCrood({
+          var targetNode = _this23.objectNodeMap.get(target);
+          var pathObject = _this23.nodePathMap.get(targetNode.node).pathObject;
+          var convertibleNodes = _this23._getConvertibleNodes(targetNode);
+          var neighboringNodes = _this23.vizpath.getNeighboringNodes(targetNode, true);
+          var position = _this23.calcRelativeCrood({
             left: pointer.x,
             top: pointer.y
           }, pathObject);
-          var antiPosition = _this24.calcRelativeCrood({
+          var antiPosition = _this23.calcRelativeCrood({
             left: target.left - (pointer.x - target.left),
             top: target.top - (pointer.y - target.top)
           }, pathObject);
@@ -6350,14 +6359,14 @@
             var newInstruction = _toConsumableArray(item[1].instruction);
             newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[newInstruction[0]];
             newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCrood.x, newCrood.y);
-            (_a = _this24.vizpath) === null || _a === void 0 ? void 0 : _a.replace(item[1], newInstruction);
+            (_a = _this23.vizpath) === null || _a === void 0 ? void 0 : _a.replace(item[1], newInstruction);
           });
-          var targetCurveDot = _this24.curveDots.find(function (i) {
+          var targetCurveDot = _this23.curveDots.find(function (i) {
             var _a;
             return i.pathNode === targetNode && i.type === ((_a = convertibleNodes[0]) === null || _a === void 0 ? void 0 : _a[0]);
           });
           if (targetCurveDot) {
-            _this24.focus(targetCurveDot.point);
+            _this23.focus(targetCurveDot.point);
             fireMouseUpAndSelect(targetCurveDot.point);
           }
         });
@@ -6377,13 +6386,13 @@
     }, {
       key: "_initDeleteNodeEvents",
       value: function _initDeleteNodeEvents() {
-        var _this25 = this;
+        var _this24 = this;
         this.addCanvasEvent('mouse:down', function (event) {
           var _a, _b, _c;
-          if ((_a = _this25.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
-          if (_this25.setting.mode !== Mode.DELETE) return;
+          if ((_a = _this24.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
+          if (_this24.setting.mode !== Mode.DELETE) return;
           if (((_b = event.target) === null || _b === void 0 ? void 0 : _b[Editor.symbol]) === EditorSymbolType.NODE || ((_c = event.target) === null || _c === void 0 ? void 0 : _c[Editor.symbol]) === EditorSymbolType.CURVE_DOT) {
-            _this25.remove(event.target);
+            _this24.remove(event.target);
           }
         });
       }
@@ -6531,7 +6540,7 @@
     }, {
       key: "remove",
       value: function remove() {
-        var _this26 = this;
+        var _this25 = this;
         var _a;
         if ((_a = this.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
         if (!this.vizpath) return;
@@ -6540,23 +6549,24 @@
         for (var _len3 = arguments.length, objects = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
           objects[_key3] = arguments[_key3];
         }
-        canvas.remove.apply(canvas, objects);
         var nodeObjects = objects.filter(function (i) {
           return i[Editor.symbol] === EditorSymbolType.NODE;
         });
         var pointObjects = objects.filter(function (i) {
           return i[Editor.symbol] === EditorSymbolType.CURVE_DOT;
         });
-        // 更新路径信息
         if (nodeObjects.length) {
           var _this$vizpath;
           var removeNodes = [];
           nodeObjects.forEach(function (object) {
-            var _this26$objectNodeMap = _this26.objectNodeMap.get(object),
-              node = _this26$objectNodeMap.node;
+            var _this25$objectNodeMap = _this25.objectNodeMap.get(object),
+              node = _this25$objectNodeMap.node;
             if (!node) return;
             removeNodes.push(node);
           });
+          this.blur();
+          // 触发鼠标举起事件，避免后续拖动操作生效
+          this.canvas._onMouseUp(new MouseEvent('mouseup'));
           (_this$vizpath = this.vizpath).remove.apply(_this$vizpath, removeNodes);
         }
         if (pointObjects.length) {
@@ -6578,7 +6588,7 @@
     }, {
       key: "upgrade",
       value: function upgrade(object) {
-        var _this27 = this;
+        var _this26 = this;
         var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
         var _a;
         if ((_a = this.disabledFunctionTokens.upgrade) === null || _a === void 0 ? void 0 : _a.length) return;
@@ -6613,7 +6623,7 @@
             pre: -2,
             next: 1
           }[direction], 0, node.x, node.y);
-          _this27.vizpath.replace(pathNode, newInstruction);
+          _this26.vizpath.replace(pathNode, newInstruction);
         });
       }
       /**
@@ -6630,7 +6640,7 @@
     }, {
       key: "degrade",
       value: function degrade(object) {
-        var _this28 = this;
+        var _this27 = this;
         var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
         var lowest = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
         var _a;
@@ -6669,7 +6679,7 @@
               next: 1
             }[direction], 2);
           }
-          _this28.vizpath.replace(pathNode, newInstruction);
+          _this27.vizpath.replace(pathNode, newInstruction);
         });
       }
       /**
@@ -6681,7 +6691,7 @@
     }, {
       key: "link",
       value: function link(source, target) {
-        var _this29 = this;
+        var _this28 = this;
         var _a;
         if ((_a = this.disabledFunctionTokens.link) === null || _a === void 0 ? void 0 : _a.length) return;
         var vizpath = this.vizpath;
@@ -6710,8 +6720,8 @@
         targetPath.map(function (item) {
           var instruction = item;
           for (var _i3 = 0; _i3 < instruction.length - 1; _i3 += 2) {
-            var position = _this29.calcAbsolutePosition(new fabric.fabric.Point(instruction[_i3 + 1], instruction[_i3 + 2]), vizpath.getPath(target.segment).pathObject);
-            var crood = _this29.calcRelativeCrood(position, vizpath.getPath(source.segment).pathObject);
+            var position = _this28.calcAbsolutePosition(new fabric.fabric.Point(instruction[_i3 + 1], instruction[_i3 + 2]), vizpath.getPath(target.segment).pathObject);
+            var crood = _this28.calcRelativeCrood(position, vizpath.getPath(source.segment).pathObject);
             instruction[_i3 + 1] = crood.x;
             instruction[_i3 + 2] = crood.y;
           }
@@ -6728,7 +6738,7 @@
     }, {
       key: "focus",
       value: function focus() {
-        var _this30 = this;
+        var _this29 = this;
         var canvas = this.canvas;
         if (!canvas) return;
         // 提取有效活跃元素
@@ -6789,7 +6799,7 @@
         else if (focusCurveDotPoints.length === 1) {
           this.activePoint = focusCurveDotPoints[0];
           this.activeNodes = [this.curveDots.find(function (i) {
-            return i.point === _this30.activePoint;
+            return i.point === _this29.activePoint;
           }).node];
           canvas.setActiveObject(focusCurveDotPoints[0]);
           this.fire('selected', this.activeNodes, this.activePoint);
@@ -6810,7 +6820,7 @@
     }, {
       key: "unload",
       value: function unload() {
-        var _this31 = this;
+        var _this30 = this;
         var canvas = this.canvas;
         if (!canvas) return;
         canvas.remove.apply(canvas, _toConsumableArray(this.paths.map(function (i) {
@@ -6839,8 +6849,8 @@
           var type = _ref28.type,
             eventName = _ref28.eventName,
             handler = _ref28.handler;
-          if (type === 'global') _this31.removeGlobalEvent(eventName, handler);
-          if (type === 'canvas') _this31.removeCanvasEvent(eventName, handler);
+          if (type === 'global') _this30.removeGlobalEvent(eventName, handler);
+          if (type === 'canvas') _this30.removeCanvasEvent(eventName, handler);
         });
         this.mountCanvas = null;
         this.canvas = null;
@@ -7284,11 +7294,11 @@
   });
   var EditorBackground = /*#__PURE__*/function (_EditorModule3) {
     function EditorBackground() {
-      var _this32;
+      var _this31;
       var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
       _classCallCheck(this, EditorBackground);
-      _this32 = _callSuper(this, EditorBackground);
-      _this32.options = {
+      _this31 = _callSuper(this, EditorBackground);
+      _this31.options = {
         grid: true,
         gridSize: 50,
         gridStyle: {
@@ -7297,8 +7307,8 @@
           strokeDashArray: [4, 2]
         }
       };
-      _this32.options = defaultsDeep(options, _this32.options);
-      return _this32;
+      _this31.options = defaultsDeep(options, _this31.options);
+      return _this31;
     }
     // private _initAlignEvents(editor: Editor) {
     //   const canvas = editor.canvas;
@@ -7873,12 +7883,12 @@
   }
   var EditorShortcut = /*#__PURE__*/function (_EditorModule4) {
     function EditorShortcut(options) {
-      var _this33;
+      var _this32;
       _classCallCheck(this, EditorShortcut);
-      _this33 = _callSuper(this, EditorShortcut);
-      _this33.shortcuts = [];
-      _this33.shortcutOptions = options;
-      return _this33;
+      _this32 = _callSuper(this, EditorShortcut);
+      _this32.shortcuts = [];
+      _this32.shortcutOptions = options;
+      return _this32;
     }
     /**
      * 初始默认快捷键配置
@@ -9561,7 +9571,7 @@
     }, {
       key: "scale",
       value: function scale(d) {
-        var _this34 = this;
+        var _this33 = this;
         var order = this.order;
         var distanceFn = false;
         if (typeof d === "function") {
@@ -9600,7 +9610,7 @@
           [0, 1].forEach(function (t) {
             if (order === 2 && !!t) return;
             var p = np[t * order];
-            var d = _this34.derivative(t);
+            var d = _this33.derivative(t);
             var p2 = {
               x: p.x + d.x,
               y: p.y + d.y
@@ -9758,13 +9768,13 @@
     }, {
       key: "lineIntersects",
       value: function lineIntersects(line) {
-        var _this35 = this;
+        var _this34 = this;
         var mx = min(line.p1.x, line.p2.x),
           my = min(line.p1.y, line.p2.y),
           MX = max(line.p1.x, line.p2.x),
           MY = max(line.p1.y, line.p2.y);
         return utils.roots(this.points, line).filter(function (t) {
-          var p = _this35.get(t);
+          var p = _this34.get(t);
           return utils.between(p.x, mx, MX) && utils.between(p.y, my, MY);
         });
       }
@@ -10041,13 +10051,13 @@
    */
   var EditorBezier = /*#__PURE__*/function (_EditorModule5) {
     function EditorBezier() {
-      var _this36;
+      var _this35;
       var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
       _classCallCheck(this, EditorBezier);
-      _this36 = _callSuper(this, EditorBezier);
-      _this36.splitDot = null;
-      _this36.options = defaultsDeep(options, DEFAULT_OPTIONS);
-      return _this36;
+      _this35 = _callSuper(this, EditorBezier);
+      _this35.splitDot = null;
+      _this35.options = defaultsDeep(options, DEFAULT_OPTIONS);
+      return _this35;
     }
     /**
      * 根据路径指令上的一点拆分路径指令
@@ -10120,7 +10130,7 @@
         editor.degrade(object, 'both', true);
       }
       /**
-       * 自动升级到直线
+       * 自动升级到曲线
        */
     }, {
       key: "upgrade",
@@ -10237,7 +10247,7 @@
     }, {
       key: "_initDbclickChangeEvent",
       value: function _initDbclickChangeEvent(vizpath) {
-        var _this37 = this;
+        var _this36 = this;
         var _a;
         var editor = vizpath.context.find(Editor$1);
         if (!editor) return;
@@ -10247,14 +10257,14 @@
           var curveDots = editor.curveDots.filter(function (i) {
             return i.node === target;
           });
-          if (curveDots.length) _this37.degrade(target);else _this37.upgrade(target);
+          if (curveDots.length) _this36.degrade(target);else _this36.upgrade(target);
         });
       }
       // 注册指令拆分事件
     }, {
       key: "_initSplitEvent",
       value: function _initSplitEvent(vizpath) {
-        var _this38 = this;
+        var _this37 = this;
         var editor = vizpath.context.find(Editor$1);
         if (!editor) return;
         var canvas = editor.canvas;
@@ -10264,7 +10274,7 @@
         var disableAddToken;
         var clean = function clean() {
           if (pathNode) {
-            if (_this38.splitDot) canvas.remove(_this38.splitDot);
+            if (_this37.splitDot) canvas.remove(_this37.splitDot);
             pathNode = undefined;
             splitCrood = undefined;
           }
@@ -10360,10 +10370,10 @@
               }, pathObject),
               left = _editor$calcAbsoluteP.left,
               top = _editor$calcAbsoluteP.top;
-            if (!_this38.splitDot && !_this38.options.disabledSplitDot) {
-              _this38.splitDot = _this38._initSpiltDot(vizpath);
+            if (!_this37.splitDot && !_this37.options.disabledSplitDot) {
+              _this37.splitDot = _this37._initSpiltDot(vizpath);
             }
-            var splitDot = _this38.splitDot;
+            var splitDot = _this37.splitDot;
             if (splitDot) {
               splitDot.set({
                 left: left,
@@ -10380,7 +10390,7 @@
           var _vizpath$getNeighbori7 = vizpath.getNeighboringInstructions(pathNode, true),
             pre = _vizpath$getNeighbori7.pre;
           if (!pre || !pre.node) return;
-          var splitCurves = _this38._splitInstruction([pre.node].concat(_toConsumableArray(pathNode.instruction.slice(1).reduce(function (list, _, i, arr) {
+          var splitCurves = _this37._splitInstruction([pre.node].concat(_toConsumableArray(pathNode.instruction.slice(1).reduce(function (list, _, i, arr) {
             if (i % 2 === 0) {
               list.push({
                 x: arr[i],
@@ -10440,7 +10450,6 @@
           fill: 'transparent',
           strokeUniform: true
         });
-        return pathObject;
       },
       node: function node(decorator) {
         var object = new fabric.fabric.Circle({

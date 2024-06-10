@@ -473,7 +473,7 @@ class VizPath extends BaseEvent<{
         }
       });
 
-      const index = this.paths.indexOf(drawPath);
+      const index = this.paths.findIndex((i) => i.pathObject === pathObject);
       if (index === -1) {
         this.paths.push(drawPath);
       } else {
@@ -553,23 +553,41 @@ class VizPath extends BaseEvent<{
    * 使用新的路径信息绘制旧路径，多个路径段则会使原路径拆分成多个
    */
   replacePathSegments(path: ResponsivePath, segments: Instruction[][]) {
-    const { pathObject } = path;
+    const { pathObject, segment: oldSegment } = path;
 
-    const { styles, layout } = parsePathJSON(pathObject);
-    const newPath = segments.map((segment) => {
-      const path = new fabric.Path(
-        (fabric.util as any).joinPath(pathObject.path as unknown as Instruction[]),
-      );
-      path.set({ ...styles, ...layout });
+    const newPath = segments.map((segment, index) => {
+      let path = pathObject;
+
+      if (index > 0) {
+        const { styles, layout } = parsePathJSON(pathObject);
+        path = new fabric.Path(
+          (fabric.util as any).joinPath(pathObject.path as unknown as Instruction[]),
+        );
+        path.set({ ...styles, ...layout });
+      }
+
       path.path = segment as unknown as fabric.Point[];
+
       repairPath(path);
 
-      const _segment: PathNode[] = [];
+      const _segment: PathNode<ResponsiveCrood>[] = [];
       segment.forEach((instruction) => {
-        _segment.push({
-          segment: _segment,
-          instruction,
-        });
+        const oldInstruction =
+          index === 0 ? oldSegment.find((i) => i.instruction === instruction) : undefined;
+
+        if (oldInstruction) {
+          oldInstruction.segment = _segment;
+
+          delete oldInstruction.node;
+          delete oldInstruction.curveDots;
+        }
+
+        _segment.push(
+          oldInstruction ?? {
+            segment: _segment,
+            instruction,
+          },
+        );
       });
 
       return {
@@ -578,12 +596,9 @@ class VizPath extends BaseEvent<{
       };
     });
 
-    return this.onceRerenderOriginPath(() => {
-      this.clear(pathObject);
-      const newResponsivePath = this.draw(newPath);
-      this._rerenderOriginPath(pathObject);
-      return newResponsivePath;
-    });
+    const result = this.draw(newPath);
+    this._rerenderOriginPath(pathObject);
+    return result;
   }
 
   /**
@@ -627,24 +642,24 @@ class VizPath extends BaseEvent<{
     });
 
     const segments = needRemoveSegments.map(([segment, indexes]) => {
+      const path = this.getPath(segment)!;
+      const pathObject = path.pathObject;
+
       let isClosePath = this.isClosePath(segment);
+
+      // 先替换掉路径信息，避免被修改到
+      pathObject.path = cloneDeep(segment.map((i) => i.instruction)) as any;
 
       // 如果路径所有点都在删除列表列表中，直接移除整个路径
       const isWholePath =
         indexes.length === segment.length || (isClosePath && indexes.length === segment.length - 1);
-      if (isWholePath) {
-        return {
-          path: this.paths.find((i) => i.segment === segment)!,
-          segment: [],
-        };
-      }
+      if (isWholePath) return { path, segment: [] };
 
       /**
        * 删除单节点时
        */
       const removeSingleNode = (index: number) => {
-        // 需要克隆出新的指令列表不然会影响到pathObject
-        const _segments: Instruction[][] = [cloneDeep(segment.map((i) => i.instruction))];
+        const _segments: Instruction[][] = [segment.map((i) => i.instruction)];
 
         const instructions = _segments[0];
 
@@ -686,9 +701,9 @@ class VizPath extends BaseEvent<{
       /**
        * 删除多节点
        */
-      const removeMulitpleNodes = (indexs: number[]) => {
+      const removeMulitpleNodes = (indexes: number[]) => {
         // 需要克隆出新的指令列表不然会影响到pathObject
-        const _segments: Instruction[][] = [cloneDeep(segment.map((i) => i.instruction))];
+        const _segments: Instruction[][] = [segment.map((i) => i.instruction)];
 
         const removeIndexes =
           indexes.length <= 1
@@ -729,7 +744,7 @@ class VizPath extends BaseEvent<{
       };
 
       return {
-        path: this.paths.find((i) => i.segment === segment)!,
+        path,
         segment: indexes.length === 1 ? removeSingleNode(indexes[0]) : removeMulitpleNodes(indexes),
       };
     });

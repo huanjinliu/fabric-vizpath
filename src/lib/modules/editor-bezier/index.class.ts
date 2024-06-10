@@ -128,7 +128,7 @@ class EditorBezier extends EditorModule {
   }
 
   /**
-   * 自动升级到直线
+   * 自动升级到曲线
    */
   upgrade(object: fabric.Object) {
     const vizpath = this.vizpath;
