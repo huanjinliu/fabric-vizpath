@@ -100,7 +100,7 @@ class EditorShortcut extends EditorModule {
           if (!editor) return;
 
           editor.setting.mode = 'move';
-          editor.setting.forcePointSymmetric = 'none';
+          editor.setting.forcePointSymmetric = 'angle';
         },
       },
       {
@@ -111,7 +111,7 @@ class EditorShortcut extends EditorModule {
 
           if (editor.setting.mode === 'move') {
             editor.setting.mode = 'convert';
-            editor.setting.forcePointSymmetric = 'angle';
+            editor.setting.forcePointSymmetric = 'none';
           }
         },
         onDeactivate: () => {
@@ -119,7 +119,7 @@ class EditorShortcut extends EditorModule {
           if (!editor) return;
 
           editor.setting.mode = 'move';
-          editor.setting.forcePointSymmetric = 'none';
+          editor.setting.forcePointSymmetric = 'angle';
         },
       },
       // 更改为添加模式
@@ -139,7 +139,7 @@ class EditorShortcut extends EditorModule {
           if (!editor) return;
 
           editor.setting.mode = 'move';
-          editor.setting.forcePointSymmetric = 'none';
+          editor.setting.forcePointSymmetric = 'angle';
         },
       },
     ] as ShortcutOptions[];

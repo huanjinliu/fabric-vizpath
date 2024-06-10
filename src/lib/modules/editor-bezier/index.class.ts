@@ -97,7 +97,7 @@ class EditorBezier extends EditorModule {
       y: end.y + (point.y - start.y) / 2,
     };
     const curve = (Bezier as any).quadraticFromPoints(...[end, curvePoint, point].flat(1), t);
-    return curve.points[0] as Crood;
+    return curve.points[1] as Crood;
   }
 
   /**
@@ -335,6 +335,8 @@ class EditorBezier extends EditorModule {
 
       if (e.target && e.target[Editor.symbol]) return;
 
+      if (e.target && e.target.type === 'activeSelection') return;
+
       const pointer = calcCanvasCrood(canvas, e.pointer);
 
       // 只有进入路径范围内才开始判定是否触线拆分
@@ -408,7 +410,7 @@ class EditorBezier extends EditorModule {
       }
     });
 
-    editor.addCanvasEvent('mouse:down', (e) => {
+    editor.addCanvasEvent('mouse:down:before', (e) => {
       if (!pathNode || !splitCrood) return;
 
       const { pre } = vizpath.getNeighboringInstructions(pathNode, true);
@@ -435,6 +437,9 @@ class EditorBezier extends EditorModule {
         const object = editor.nodeObjectMap.get(node);
         if (object) editor.focus(object);
         vizpath.insertAfterNode(node, splitCurves.next);
+
+        const insertObject = editor.nodeObjectMap.get(node);
+        editor.currentConvertNodeObject = insertObject ?? null;
       }
 
       clean();

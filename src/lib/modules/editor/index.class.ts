@@ -16,6 +16,7 @@ import {
 import EditorUI, { DEFAULT_THEME, type ThemeDecorator } from '../editor-ui/index.class';
 import VizPath from '../../vizpath.class';
 import VizPathCreator, { InstructionType, type Instruction, type PathNode } from 'src/lib';
+import EditorBezier from '../editor-bezier/index.class';
 
 export enum EditorSymbolType {
   PATH = 'path',
@@ -99,13 +100,13 @@ class Editor extends EditorModule<{
      */
     mode: `${Mode}`;
     /**
-     * 是否开启强制曲线变换点对称
-     * @default 'none'
+     * 是否开启强制曲线变换点对称，默认角度对称
+     * @default 'angle'
      */
     forcePointSymmetric: 'none' | 'angle' | 'entire';
   } = {
     mode: Mode.MOVE,
-    forcePointSymmetric: 'none',
+    forcePointSymmetric: 'angle',
   };
 
   /** 路径节点对象 */
@@ -125,6 +126,9 @@ class Editor extends EditorModule<{
 
   /** 当前活跃的曲线变换点画布对象 */
   activePoint: fabric.Object | null = null;
+
+  /** 当前转换的路径节点 */
+  currentConvertNodeObject: fabric.Object | null = null;
 
   /**  临时停用选择监听处理 */
   private _deactivateSelectListeners = false;
@@ -620,7 +624,11 @@ class Editor extends EditorModule<{
    * 添加活跃组的响应式变化
    */
   private _addActiveSelectionObserve(group: fabric.ActiveSelection) {
+    const initialObjectCount = group._objects.length;
+    group._objects.forEach((object) => observe(object, ['left', 'top'], () => {}));
     observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], (newValue, oldValue) => {
+      if (!group.canvas) return;
+      if (group._objects.length !== initialObjectCount) return;
       this.vizpath?.onceRerenderOriginPath(() => {
         const hadFollowedCroods = new Set<ResponsiveCrood>([]);
         for (const object of group._objects as fabric.Object[]) {
@@ -688,11 +696,11 @@ class Editor extends EditorModule<{
   private _initSelectNodeEvents() {
     this.addCanvasEvent('selection:created', (e) => {
       if (this._deactivateSelectListeners) return;
-      this.focus(...e.selected);
+      this.focus(...this.canvas!.getActiveObjects());
     });
     this.addCanvasEvent('selection:updated', (e) => {
       if (this._deactivateSelectListeners) return;
-      this.focus(...e.selected);
+      this.focus(...this.canvas!.getActiveObjects());
     });
     this.addCanvasEvent('selection:cleared', () => {
       if (this._deactivateSelectListeners) return;
@@ -727,11 +735,11 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    let target: fabric.Object | undefined;
     this.addCanvasEvent('mouse:down:before', (event) => {
       if (this.disabledFunctionTokens.add?.length) return;
       if (this.setting.mode !== Mode.ADD) return;
 
+      let target: fabric.Object | undefined;
       if (event.target && event.target[Editor.symbol]) {
         if (
           this.activeNodes.length === 1 &&
@@ -747,49 +755,14 @@ class Editor extends EditorModule<{
         // 新增节点
         const pointer = calcCanvasCrood(canvas, event.pointer);
         target = this.add({ left: pointer.x, top: pointer.y });
+
+        if (target) {
+          const bezier = this.vizpath?.context.find(EditorBezier);
+          if (bezier) bezier.upgrade(target);
+        }
       }
 
-      if (target) {
-        target.set({ lockMovementX: true, lockMovementY: true });
-
-        canvas.selection = false;
-      }
-    });
-    this.addCanvasEvent('mouse:down', (event) => {
-      if (target) this.focus(target);
-    });
-    this.addCanvasEvent('mouse:move', (event) => {
-      if (!target) return;
-
-      if (this.setting.mode !== Mode.ADD) {
-        target?.set({ lockMovementX: false, lockMovementY: false });
-        target = undefined;
-        canvas.selection = true;
-        return;
-      }
-
-      // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-      if (target.containsPoint(event.pointer)) return;
-
-      const currentNode = this.objectNodeMap.get(target)!;
-
-      // 先将两边的点都降到直线级，便于后续拖拽变换
-      this.degrade(target!, 'both', true);
-      this.upgrade(target, 'both');
-
-      const curveDot =
-        this.curveDots.find((i) => i.pathNode === currentNode && i.type === 'next') ??
-        this.curveDots.find((i) => i.pathNode === currentNode);
-
-      if (curveDot) {
-        this.focus(curveDot.point);
-        fireMouseUpAndSelect(curveDot.point);
-      }
-    });
-    this.addCanvasEvent('mouse:up', () => {
-      target?.set({ lockMovementX: false, lockMovementY: false });
-      target = undefined;
-      canvas.selection = true;
+      if (target) this.currentConvertNodeObject = target;
     });
   }
 
@@ -874,6 +847,8 @@ class Editor extends EditorModule<{
           point,
           ['left', 'top'],
           ({ left, top }) => {
+            if (point.group) return;
+
             // 与中心点相对角度固定
             const nodeCenter = nodeObject.getCenterPoint();
             const pointCenter = point.getCenterPoint();
@@ -1120,49 +1095,24 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    let target: fabric.Object | undefined;
-    this.addCanvasEvent('mouse:down:before', (event) => {
+    this.addCanvasEvent('mouse:down', (event) => {
       if (this.disabledFunctionTokens.convert?.length) return;
-      if (this.setting.mode !== Mode.CONVERT) return;
 
-      if (event.target?.[Editor.symbol] !== EditorSymbolType.NODE) return;
-
-      if (this.activeNodes.length > 1) return;
-
-      const activeObject = this.activeNodes[0];
-      const object = event.target;
-
-      const currentNode = this.objectNodeMap.get(object)!;
-
-      // 判断指令升降级
-      if (activeObject && object !== activeObject) {
-        const activeNode = this.objectNodeMap.get(activeObject)!;
-        const { pre, next } = this.vizpath!.getNeighboringNodes(activeNode);
-
-        if (this.curveDots.filter((i) => i.node === object).length === 0) {
-          let upgradeDirection: 'pre' | 'next' | undefined;
-          if (currentNode === pre) upgradeDirection = 'next';
-          if (currentNode === next) upgradeDirection = 'pre';
-          if (upgradeDirection) {
-            this.upgrade(object, upgradeDirection);
-            const curveDot = this.curveDots.find(
-              (i) => i.pathNode === currentNode && i.type === upgradeDirection,
-            );
-            if (curveDot) {
-              this.focus(curveDot.point);
-              fireMouseUpAndSelect(curveDot.point);
-              return;
-            }
-          }
-        }
+      if (!this.currentConvertNodeObject) {
+        if (this.setting.mode !== Mode.CONVERT) return;
+        if (event.target?.[Editor.symbol] !== EditorSymbolType.NODE) return;
+        this.currentConvertNodeObject = event.target as fabric.Object;
       }
 
-      this.degrade(object, 'both', true);
-
-      target = object.set({ lockMovementX: true, lockMovementY: true });
+      if (this.currentConvertNodeObject) {
+        fireMouseUpAndSelect(this.currentConvertNodeObject);
+        this.currentConvertNodeObject.set({ lockMovementX: true, lockMovementY: true });
+        canvas.selection = false;
+      }
     });
 
     this.addCanvasEvent('mouse:move', (event) => {
+      const target = this.currentConvertNodeObject;
       if (!target) return;
 
       // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
@@ -1217,9 +1167,10 @@ class Editor extends EditorModule<{
     });
 
     this.addCanvasEvent('mouse:up', () => {
-      if (target) {
-        target.set({ lockMovementX: false, lockMovementY: false });
-        target = undefined;
+      if (this.currentConvertNodeObject) {
+        this.currentConvertNodeObject.set({ lockMovementX: false, lockMovementY: false });
+        this.currentConvertNodeObject = null;
+        canvas.selection = true;
       }
     });
   }
@@ -1707,6 +1658,7 @@ class Editor extends EditorModule<{
     this.curveDots.length = 0;
     this.activeNodes.length = 0;
     this.activePoint = null;
+    this.currentConvertNodeObject = null;
     this.objectNodeMap.clear();
     this.nodeObjectMap.clear();
 

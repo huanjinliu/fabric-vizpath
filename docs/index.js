@@ -5329,1627 +5329,1924 @@
     }]);
   }(EditorModule);
   EditorUI.ID = 'editor-ui';
-  var EditorSymbolType;
-  (function (EditorSymbolType) {
-    EditorSymbolType["PATH"] = "path";
-    EditorSymbolType["NODE"] = "node";
-    EditorSymbolType["CURVE_DOT"] = "curve-dot";
-    EditorSymbolType["LINE"] = "line";
-    EditorSymbolType["OTHER"] = "other";
-  })(EditorSymbolType || (EditorSymbolType = {}));
-  var Mode;
-  (function (Mode) {
-    Mode["MOVE"] = "move";
-    Mode["ADD"] = "add";
-    Mode["DELETE"] = "delete";
-    Mode["CONVERT"] = "convert";
-  })(Mode || (Mode = {}));
-  var Editor = /*#__PURE__*/function (_EditorModule2) {
-    /**
-     * 构造函数
-     * @param options 更多配置
-     */
-    function Editor(mountCanvas) {
-      var _this12;
-      var isolation = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-      _classCallCheck(this, Editor);
-      _this12 = _callSuper(this, Editor);
-      /* ---------------------------- 画布相关配置 ---------------------------- */
-      /** 挂载的画布 */
-      _this12.mountCanvas = null;
-      /** 交互所在fabric画布 */
-      _this12.canvas = null;
-      /** 当前编辑器是否使用隔离画布（模拟克隆的新画布对象） */
-      _this12.isolation = false;
-      /** 监听事件 */
-      _this12.listeners = [];
-      /** 功能禁用请求凭证 */
-      _this12.disabledFunctionTokens = {};
-      /* ---------------------------- 路径相关配置 ---------------------------- */
-      /** 路径汇总 */
-      _this12.paths = [];
-      /** 节点路径映射 */
-      _this12.nodePathMap = new Map([]);
-      /* ---------------------------- 节点相关配置 ---------------------------- */
-      /**
-       * 内置配置，配置的更改会影响编辑器的交互效果
-       */
-      _this12.setting = {
-        mode: Mode.MOVE,
-        forcePointSymmetric: 'none'
-      };
-      /** 路径节点对象 */
-      _this12.nodes = [];
-      /** 路径曲线变换点列表 */
-      _this12.curveDots = [];
-      /** 元素画布对象 与 路径节点对象 映射 */
-      _this12.objectNodeMap = new Map([]);
-      /** 路径节点对象 与 元素画布对象 映射 */
-      _this12.nodeObjectMap = new Map([]);
-      /** 当前活跃的路径节点画布对象列表 */
-      _this12.activeNodes = [];
-      /** 当前活跃的曲线变换点画布对象 */
-      _this12.activePoint = null;
-      /**  临时停用选择监听处理 */
-      _this12._deactivateSelectListeners = false;
-      /** 废弃的画布对象池，可用于复用减少创建消耗 */
-      _this12._abandonedPool = {
-        nodes: [],
-        points: [],
-        lines: []
-      };
-      _this12.mountCanvas = mountCanvas;
-      _this12.isolation = isolation;
-      return _this12;
-    }
-    /**
-     * 将画布坐标转化为特定路径的相对指令坐标位置
-     */
-    _inherits(Editor, _EditorModule2);
-    return _createClass(Editor, [{
-      key: "calcAbsolutePosition",
-      value: function calcAbsolutePosition(crood, object) {
-        var matrix = _toConsumableArray(object.calcOwnMatrix());
-        // 路径如果带有偏移则需要移除偏移带来的影响
-        if (object.type === 'path') {
-          var offset = fabric.fabric.util.transformPoint(object.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
-          matrix[4] -= offset.x;
-          matrix[5] -= offset.y;
-        }
-        var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(crood.x, crood.y), matrix);
-        return {
-          left: point.x,
-          top: point.y
-        };
-      }
-      /**
-       * 将路径内的相对指令坐标位置转为所在画布的坐标位置
-       */
-    }, {
-      key: "calcRelativeCrood",
-      value: function calcRelativeCrood(position, object) {
-        var matrix = _toConsumableArray(object.calcOwnMatrix());
-        if (object.type === 'path') {
-          var offset = fabric.fabric.util.transformPoint(object.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
-          matrix[4] -= offset.x;
-          matrix[5] -= offset.y;
-        }
-        var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(position.left, position.top), fabric.fabric.util.invertTransform(matrix));
-        return point;
-      }
-      /**
-       * 重新修正路径的尺寸和位置
-       *
-       * @param path 路径对象
-       *
-       * @note
-       *
-       * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
-       * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
-       */
-    }, {
-      key: "updatePathStatus",
-      value: function updatePathStatus(path) {
-        var _a;
-        repairPath(path);
-        (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
-      }
-      /**
-       * 基于挂载画布构建编辑器画布
-       */
-    }, {
-      key: "_createEditorCanvas",
-      value: function _createEditorCanvas(canvas) {
-        var _a;
-        var container = canvas.getElement().parentNode;
-        if (!container) {
-          throw new TypeError('Please use fabric.Canvas which is mounted into the document.');
-        }
-        // 如果使用隔离画布则会参考配置构造新画布使与原画布隔离
-        if (this.isolation) {
-          var editorCanvas = document.createElement('canvas');
-          container.appendChild(editorCanvas);
-          var editorFabricCanvas = new fabric.fabric.Canvas(editorCanvas, {
-            // 跟随尺寸
-            width: container.clientWidth,
-            height: container.clientHeight,
-            // 允许画布多选
-            selection: true,
-            // 画布渲染不跳过离屏元素
-            skipOffscreen: false,
-            // 保持选中元素的层级关系
-            preserveObjectStacking: true
-          });
-          // 保留画布变换
-          editorFabricCanvas.setViewportTransform((_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0]);
-          // 更多画布配置需要使用者外部配置
-          return editorFabricCanvas;
-        }
-        return canvas;
-      }
-      /**
-       * 添加元素事件监听
-       */
-    }, {
-      key: "addGlobalEvent",
-      value: function addGlobalEvent(eventName, handler) {
-        window.addEventListener(eventName, handler);
-        this.listeners.push({
-          type: 'global',
-          eventName: eventName,
-          handler: handler
-        });
-      }
-    }, {
-      key: "addCanvasEvent",
-      value: function addCanvasEvent(eventName, handler) {
-        if (!this.canvas) return;
-        this.canvas.on(eventName, handler);
-        this.listeners.push({
-          type: 'canvas',
-          eventName: eventName,
-          handler: handler
-        });
-      }
-      /**
-       * 移除事件监听
-       */
-    }, {
-      key: "removeGlobalEvent",
-      value: function removeGlobalEvent(eventName, handler) {
-        this.listeners = this.listeners.filter(function (listener) {
-          if (handler && handler !== listener.handler) return true;
-          if (eventName === listener.eventName) {
-            window.removeEventListener(listener.eventName, listener.handler);
-            return false;
-          }
-          return true;
-        });
-      }
-    }, {
-      key: "removeCanvasEvent",
-      value: function removeCanvasEvent(eventName, handler) {
-        var canvas = this.canvas;
-        if (!canvas) return;
-        this.listeners = this.listeners.filter(function (listener) {
-          if (handler && handler !== listener.handler) return true;
-          if (eventName === listener.eventName) {
-            canvas.off(listener.eventName, listener.handler);
-            return false;
-          }
-          return true;
-        });
-      }
-      /**
-       * 初始化路径绘制监听
-       */
-    }, {
-      key: "_initDrawPathListener",
-      value: function _initDrawPathListener(vizpath) {
-        var _this13 = this;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        var handler = function handler(paths) {
-          var _this13$paths;
-          var _a;
-          var ui = vizpath.context.find(EditorUI);
-          var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
-          paths.forEach(function (item) {
-            var pathObject = item.pathObject;
-            // 如果已经带有标志则是已经添加进画布的路径
-            if (pathObject[Editor.symbol]) return;
-            var decorator = function decorator(customPath, callback) {
-              customPath.set({
-                name: v4(),
-                // 路径本身不可选中，后续通过操纵点和线条来更改路径
-                selectable: false,
-                // 不触发事件
-                evented: false,
-                // 防止因为缓存没有显示正确的路径
-                objectCaching: false
-              });
-              customPath[Editor.symbol] = EditorSymbolType.PATH;
-              if (ui && callback) {
-                ui.objectPreRenderCallbackMap.set(customPath, callback);
-              }
-              return customPath;
-            };
-            theme.path(decorator, pathObject);
-            if (!pathObject[Editor.symbol]) decorator(pathObject);
-          });
-          // 添加新的路径对象
-          canvas.renderOnAddRemove = true;
-          paths.forEach(function (_ref12) {
-            var pathObject = _ref12.pathObject;
-            if (!canvas.contains(pathObject)) canvas.add(pathObject);
-          });
-          canvas.renderOnAddRemove = false;
-          canvas.requestRenderAll();
-          (_this13$paths = _this13.paths).push.apply(_this13$paths, _toConsumableArray(paths));
-          // 建立映射关系，便于减少后续计算
-          _this13.paths.forEach(function (item) {
-            item.segment.forEach(function (_ref13) {
-              var node = _ref13.node;
-              if (node) _this13.nodePathMap.set(node, item);
-            });
-          });
-        };
-        vizpath.on('draw', handler);
-      }
-      /**
-       * 初始化路径清除监听
-       */
-    }, {
-      key: "_initClearPathListener",
-      value: function _initClearPathListener(vizpath) {
-        var _this14 = this;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        var handler = function handler(paths) {
-          canvas.remove.apply(canvas, _toConsumableArray(paths.map(function (i) {
-            return i.pathObject;
-          })));
-          _this14.paths = _this14.paths.filter(function (i) {
-            return paths.includes(i);
-          });
-          // 清除映射
-          paths.forEach(function (item) {
-            item.segment.forEach(function (_ref14) {
-              var node = _ref14.node;
-              if (node) _this14.nodePathMap["delete"](node);
-            });
-          });
-        };
-        vizpath.on('clear', handler);
-        vizpath.on('clearAll', function () {
-          canvas.remove.apply(canvas, _toConsumableArray(_this14.paths.map(function (i) {
-            return i.pathObject;
-          })));
-          _this14.paths.forEach(function (item) {
-            item.segment.forEach(function (_ref15) {
-              var node = _ref15.node;
-              if (node) _this14.nodePathMap["delete"](node);
-            });
-          });
-          _this14.paths = [];
-        });
-      }
-    }, {
-      key: "_initPathNodes",
-      value: function _initPathNodes() {
-        var _this15 = this;
-        var _a;
-        var objects = [];
-        var objectNodeMap = new Map();
-        var nodeObjectMap = new Map();
-        var vizpath = this.vizpath;
-        if (!vizpath) return {
-          objects: objects,
-          objectNodeMap: objectNodeMap,
-          nodeObjectMap: nodeObjectMap
-        };
-        var ui = vizpath.context.find(EditorUI);
-        var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
-        /**
-         * 创建路径节点对应的fabric对象
-         * @param node 路径节点
-         * @param originObject 来源对象
-         */
-        var createNodeObject = function createNodeObject(node, originObject) {
-          var decorator = function decorator(customObject, callback) {
-            customObject.set({
-              name: v4(),
-              // 选中时不出现选中框
-              hasBorders: false,
-              hasControls: false,
-              // 保持居中
-              originX: 'center',
-              originY: 'center'
-            });
-            // 不做另外的画布缓存
-            deepIterateGroup(customObject, function (object) {
-              object.set({
-                objectCaching: false
-              });
-            });
-            customObject[Editor.symbol] = EditorSymbolType.NODE;
-            if (ui && callback) {
-              ui.objectPreRenderCallbackMap.set(customObject, callback);
-            }
-            return customObject;
-          };
-          var object = originObject !== null && originObject !== void 0 ? originObject : theme.node(decorator);
-          if (!object[Editor.symbol]) object = decorator(object);
-          // 加入画布时添加自动响应
-          var onAddedNode = function onAddedNode() {
-            node.observe(function (x, y) {
-              var position = _this15.calcAbsolutePosition({
-                x: x,
-                y: y
-              }, _this15.nodePathMap.get(node).pathObject);
-              if (object.group) {
-                var relativePosition = _this15.calcRelativeCrood(position, object.group);
-                object.set({
-                  left: relativePosition.x,
-                  top: relativePosition.y
-                }).setCoords();
-                object.group.addWithUpdate();
-              } else {
-                object.set(position).setCoords();
-              }
-            }, {
-              id: object.name,
-              immediate: true
-            });
-          };
-          // 移除时结束自动响应
-          var onRemovedNode = function onRemovedNode() {
-            object.off('added', onAddedNode);
-            object.off('removed', onRemovedNode);
-            node.unobserve(object.name);
-            observe(object, ['left', 'top'], function () {});
-            _this15._abandonedPool.nodes.push(object);
-          };
-          object.on('added', onAddedNode);
-          object.on('removed', onRemovedNode);
-          return object;
-        };
-        // 第一轮遍历为了重用旧对象，避免每次更新fabric对象都变化还需要重新处理聚焦事件
-        vizpath.paths.forEach(function (_ref16) {
-          var segment = _ref16.segment;
-          segment.forEach(function (item) {
-            var node = item.node;
-            if (!node) return;
-            var reuseObject = _this15.nodeObjectMap.get(item);
-            if (reuseObject) {
-              var object = createNodeObject(node, reuseObject);
-              if (!object) return;
-              objects.push(object);
-              objectNodeMap.set(object, item);
-              nodeObjectMap.set(item, object);
-            }
-          });
-        });
-        // 第二轮遍历则是为了创建新对象
-        vizpath.paths.forEach(function (_ref17) {
-          var segment = _ref17.segment;
-          segment.forEach(function (item) {
-            var node = item.node;
-            if (!node) return;
-            if (nodeObjectMap.has(item)) return;
-            var recycleObject;
-            do {
-              recycleObject = _this15._abandonedPool.nodes.pop();
-            } while (recycleObject && objectNodeMap.has(recycleObject));
-            var object = createNodeObject(node, recycleObject);
-            if (!object) return;
-            objects.push(object);
-            objectNodeMap.set(object, item);
-            nodeObjectMap.set(item, object);
-          });
-        });
-        return {
-          objects: objects,
-          objectNodeMap: objectNodeMap,
-          nodeObjectMap: nodeObjectMap
-        };
-      }
-      /**
-       * 初始路径节点绘制事件
-       */
-    }, {
-      key: "_initDrawNodeEvents",
-      value: function _initDrawNodeEvents(vizpath) {
-        var _this16 = this;
-        var updateNodes = function updateNodes() {
-          var canvas = _this16.canvas;
-          if (!canvas) return;
-          var storeActiveObjects = _this16.activeNodes;
-          // 失去当前选中状态
-          if (storeActiveObjects.length) _this16.blur();
-          // 由于需要多次添加路径节点和曲线变换点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
-          canvas.renderOnAddRemove = false;
-          // 移除旧对象
-          canvas.remove.apply(canvas, _toConsumableArray(_this16.nodes));
-          // 初始路径路径节点
-          var _this16$_initPathNode = _this16._initPathNodes(),
-            objects = _this16$_initPathNode.objects,
-            objectNodeMap = _this16$_initPathNode.objectNodeMap,
-            nodeObjectMap = _this16$_initPathNode.nodeObjectMap;
-          // 添加新对象并重新建立映射关系
-          _this16.nodes = objects;
-          canvas.add.apply(canvas, _toConsumableArray(objects));
-          _this16.objectNodeMap.clear();
-          _this16.objectNodeMap = objectNodeMap;
-          _this16.nodeObjectMap.clear();
-          _this16.nodeObjectMap = nodeObjectMap;
-          canvas.renderOnAddRemove = true;
-          canvas.requestRenderAll();
-          // 保留原聚焦状态
-          if (storeActiveObjects.length) _this16.focus.apply(_this16, _toConsumableArray(storeActiveObjects));
-        };
-        vizpath.on('draw', updateNodes);
-      }
-      /**
-       * 初始路径节点清除事件
-       */
-    }, {
-      key: "_initClearNodeEvents",
-      value: function _initClearNodeEvents(vizpath) {
-        var _this17 = this;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        vizpath.on('clear', function (path) {
-          var removeObjects = [];
-          path.forEach(function (_ref18) {
-            var segment = _ref18.segment;
-            segment.forEach(function (node) {
-              var object = _this17.nodeObjectMap.get(node);
-              if (object) removeObjects.push(object);
-            });
-          });
-          _this17.blur();
-          canvas.remove.apply(canvas, removeObjects);
-          removeObjects.forEach(function (object) {
-            var node = _this17.objectNodeMap.get(object);
-            if (node) {
-              _this17.nodeObjectMap["delete"](node);
-              _this17.objectNodeMap["delete"](object);
-            }
-          });
-          _this17.nodes = _this17.nodes.filter(function (i) {
-            return !removeObjects.includes(i);
-          });
-        });
-        vizpath.on('clearAll', function () {
-          _this17.blur();
-          canvas.remove.apply(canvas, _toConsumableArray(_this17.nodes));
-          _this17.nodes = [];
-          _this17.objectNodeMap.clear();
-          _this17.nodeObjectMap.clear();
-        });
-        vizpath.on('destroy', function () {
-          _this17._abandonedPool = {
-            nodes: [],
-            points: [],
-            lines: []
-          };
-        });
-      }
-      /**
-       * 添加活跃组的响应式变化
-       */
-    }, {
-      key: "_addActiveSelectionObserve",
-      value: function _addActiveSelectionObserve(group) {
-        var _this18 = this;
-        observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], function (newValue, oldValue) {
-          var _a;
-          (_a = _this18.vizpath) === null || _a === void 0 ? void 0 : _a.onceRerenderOriginPath(function () {
-            var _a, _b;
-            var hadFollowedCroods = new Set([]);
-            var _iterator3 = _createForOfIteratorHelper(group._objects),
-              _step3;
-            try {
-              var _loop = function _loop() {
-                var object = _step3.value;
-                var followCurveDots = [];
-                var pathNode = _this18.objectNodeMap.get(object);
-                var curveDots = (_b = (_a = _this18.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
-                curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref19) {
-                  var position = _ref19.position,
-                    direction = _ref19.direction,
-                    from = _ref19.from;
-                  var _a;
-                  var crood = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
-                  if (position !== 'cur' || !crood) return;
-                  // 避免重复的曲线变换点跟随更改
-                  if (hadFollowedCroods.has(crood)) return;
-                  followCurveDots.push(crood);
-                  hadFollowedCroods.add(crood);
-                });
-                object.set({
-                  scaleX: object.scaleX / (newValue.scaleX / oldValue.scaleX),
-                  scaleY: object.scaleY / (newValue.scaleY / oldValue.scaleY),
-                  angle: object.angle - (newValue.angle - oldValue.angle)
-                });
-                var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix(false));
-                var left = decomposeMatrix.translateX;
-                var top = decomposeMatrix.translateY;
-                _this18._transform(object, {
-                  left: left,
-                  top: top,
-                  scaleX: newValue.scaleX / oldValue.scaleX,
-                  scaleY: newValue.scaleY / oldValue.scaleY,
-                  angle: newValue.angle - oldValue.angle
-                }, followCurveDots);
-              };
-              for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
-                _loop();
-              }
-            } catch (err) {
-              _iterator3.e(err);
-            } finally {
-              _iterator3.f();
-            }
-            hadFollowedCroods.clear();
-          });
-        });
-      }
-      /**
-       * 添加单个活跃对象的响应式变化
-       */
-    }, {
-      key: "_addActivePointObserve",
-      value: function _addActivePointObserve(object) {
-        var _this19 = this;
-        observe(object, ['left', 'top'], function (_ref20) {
-          var left = _ref20.left,
-            top = _ref20.top;
-          var _a, _b;
-          if (object.group) return;
-          var followCurveDots = [];
-          var pathNode = _this19.objectNodeMap.get(object);
-          var curveDots = (_b = (_a = _this19.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
-          curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref21) {
-            var position = _ref21.position,
-              direction = _ref21.direction,
-              from = _ref21.from;
-            var _a;
-            var crood = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
-            if (position !== 'cur' || !crood) return;
-            followCurveDots.push(crood);
-          });
-          _this19._transform(object, {
-            left: left,
-            top: top
-          }, followCurveDots);
-        });
-      }
-      /**
-       * 初始画布节点选中事件
-       */
-    }, {
-      key: "_initSelectNodeEvents",
-      value: function _initSelectNodeEvents() {
-        var _this20 = this;
-        this.addCanvasEvent('selection:created', function (e) {
-          if (_this20._deactivateSelectListeners) return;
-          _this20.focus.apply(_this20, _toConsumableArray(e.selected));
-        });
-        this.addCanvasEvent('selection:updated', function (e) {
-          if (_this20._deactivateSelectListeners) return;
-          _this20.focus.apply(_this20, _toConsumableArray(e.selected));
-        });
-        this.addCanvasEvent('selection:cleared', function () {
-          if (_this20._deactivateSelectListeners) return;
-          _this20.focus();
-        });
-        // 选中路径段时自动选中路线段内的所有指令路径节点
-        this.addCanvasEvent('mouse:dblclick', function (e) {
-          if (e.target && e.target[Editor.symbol]) return;
-          var focusPath;
-          for (var _i2 = _this20.paths.length - 1; _i2 >= 0; _i2--) {
-            var path = _this20.paths[_i2];
-            if (path.pathObject.containsPoint(e.pointer)) {
-              focusPath = path;
-              break;
-            }
-          }
-          if (focusPath) {
-            _this20.focus.apply(_this20, _toConsumableArray(_this20.nodes.filter(function (node) {
-              return _this20.nodePathMap.get(_this20.objectNodeMap.get(node).node) === focusPath;
-            })));
-          }
-        });
-      }
-      /**
-       * 初始路径点添加事件
-       */
-    }, {
-      key: "_initAddNodeEvents",
-      value: function _initAddNodeEvents() {
-        var _this21 = this;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        var target;
-        this.addCanvasEvent('mouse:down:before', function (event) {
-          var _a;
-          if ((_a = _this21.disabledFunctionTokens.add) === null || _a === void 0 ? void 0 : _a.length) return;
-          if (_this21.setting.mode !== Mode.ADD) return;
-          if (event.target && event.target[Editor.symbol]) {
-            if (_this21.activeNodes.length === 1 && event.target[Editor.symbol] === EditorSymbolType.NODE) {
-              var joinNode = _this21.link(_this21.objectNodeMap.get(_this21.activeNodes[0]), _this21.objectNodeMap.get(event.target));
-              if (joinNode) target = _this21.nodeObjectMap.get(joinNode);
-            }
-          } else {
-            // 新增节点
-            var pointer = calcCanvasCrood(canvas, event.pointer);
-            target = _this21.add({
-              left: pointer.x,
-              top: pointer.y
-            });
-          }
-          if (target) {
-            target.set({
-              lockMovementX: true,
-              lockMovementY: true
-            });
-            canvas.selection = false;
-          }
-        });
-        this.addCanvasEvent('mouse:down', function (event) {
-          if (target) _this21.focus(target);
-        });
-        this.addCanvasEvent('mouse:move', function (event) {
-          var _a;
-          if (!target) return;
-          if (_this21.setting.mode !== Mode.ADD) {
-            target === null || target === void 0 ? void 0 : target.set({
-              lockMovementX: false,
-              lockMovementY: false
-            });
-            target = undefined;
-            canvas.selection = true;
-            return;
-          }
-          // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-          if (target.containsPoint(event.pointer)) return;
-          var currentNode = _this21.objectNodeMap.get(target);
-          // 先将两边的点都降到直线级，便于后续拖拽变换
-          _this21.degrade(target, 'both', true);
-          _this21.upgrade(target, 'both');
-          var curveDot = (_a = _this21.curveDots.find(function (i) {
-            return i.pathNode === currentNode && i.type === 'next';
-          })) !== null && _a !== void 0 ? _a : _this21.curveDots.find(function (i) {
-            return i.pathNode === currentNode;
-          });
-          if (curveDot) {
-            _this21.focus(curveDot.point);
-            fireMouseUpAndSelect(curveDot.point);
-          }
-        });
-        this.addCanvasEvent('mouse:up', function () {
-          target === null || target === void 0 ? void 0 : target.set({
-            lockMovementX: false,
-            lockMovementY: false
-          });
-          target = undefined;
-          canvas.selection = true;
-        });
-      }
-      /**
-       * 添加活跃节点的周围曲线变换点
-       */
-    }, {
-      key: "_addActivePointCurveDots",
-      value: function _addActivePointCurveDots(nodeObject) {
-        var _this22 = this;
-        var _a;
-        var vizpath = this.vizpath;
-        if (!vizpath) return;
-        var canvas = nodeObject.canvas;
-        if (!canvas) return;
-        var curPathNode = this.objectNodeMap.get(nodeObject);
-        if (!curPathNode) return;
-        var ui = vizpath.context.find(EditorUI);
-        var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
-        // 创建新的路径曲线变换点
-        var curveDots = [];
-        var curveDotSet = new WeakSet([]);
-        var neighboringCurveDots = vizpath.getNeighboringCurveDots(curPathNode);
-        neighboringCurveDots.forEach(function (_ref22) {
-          var position = _ref22.position,
-            direction = _ref22.direction,
-            from = _ref22.from;
-          var _a, _b, _c;
-          var node = from.node;
-          var curveDot = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
-          if (!node || !curveDot || curveDotSet.has(curveDot)) return false;
-          var nodeObject = _this22.nodeObjectMap.get(from);
-          /**
-           * 创建指令曲线变换点
-           */
-          var pointDecorator = function pointDecorator(customObject, callback) {
-            customObject.set({
-              name: v4(),
-              // 选中时不出现选中框
-              hasBorders: false,
-              hasControls: false,
-              // 保持居中
-              originX: 'center',
-              originY: 'center'
-            });
-            // 不做另外的画布缓存
-            deepIterateGroup(customObject, function (object) {
-              object.set({
-                objectCaching: false
-              });
-            });
-            customObject[Editor.symbol] = EditorSymbolType.CURVE_DOT;
-            if (ui && callback) {
-              ui.objectPreRenderCallbackMap.set(customObject, callback);
-            }
-            return customObject;
-          };
-          var point = (_b = _this22._abandonedPool.points.pop()) !== null && _b !== void 0 ? _b : theme.dot(pointDecorator);
-          if (!point[Editor.symbol]) point = pointDecorator(point);
-          // 建立相互响应，指令的数据和元素的位置更改会相互同步
-          var onAddedPoint = function onAddedPoint() {
-            curveDot.observe(function (x, y) {
-              var _a;
-              if (((_a = point.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === point) return;
-              var position = _this22.calcAbsolutePosition({
-                x: x,
-                y: y
-              }, _this22.nodePathMap.get(node).pathObject);
-              point.set(position).setCoords();
-            }, {
-              immediate: true,
-              id: point.name
-            });
-            observe(point, ['left', 'top'], function (_ref23) {
-              var left = _ref23.left,
-                top = _ref23.top;
-              var _a;
-              // 与中心点相对角度固定
-              var nodeCenter = nodeObject.getCenterPoint();
-              var pointCenter = point.getCenterPoint();
-              point.set({
-                angle: 45 + Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180 / Math.PI
-              });
-              // 响应式更改指令信息
-              if (((_a = point.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === point) {
-                var crood = _this22.calcRelativeCrood({
-                  left: left,
-                  top: top
-                }, _this22.nodePathMap.get(node).pathObject);
-                // 曲线变换点对称操作
-                if (_this22.setting.forcePointSymmetric !== 'none') {
-                  var symmetricCurveDot = _this22.curveDots.find(function (i) {
-                    var _a;
-                    var antiDirection = {
-                      pre: 'next',
-                      next: 'pre'
-                    }[direction];
-                    if (i.type !== antiDirection) return false;
-                    return i.pathNode === ((_a = neighboringCurveDots.find(function (i) {
-                      return i.position === position && i.direction === antiDirection;
-                    })) === null || _a === void 0 ? void 0 : _a.from);
-                  });
-                  if (symmetricCurveDot) {
-                    var _curveDot = symmetricCurveDot.curveDot;
-                    // 旧镜像曲线变换点到路径节点的距离
-                    var d = calcCroodsDistance(_curveDot, node);
-                    // 新镜像曲线变换点到路径节点的距离
-                    var new_d = calcCroodsDistance({
-                      x: node.x - (crood.x - node.x),
-                      y: node.y - (crood.y - node.y)
-                    }, node);
-                    var scale = _this22.setting.forcePointSymmetric === 'entire' ? 1 : d / new_d;
-                    _curveDot.setCrood({
-                      x: node.x - (crood.x - node.x) * scale,
-                      y: node.y - (crood.y - node.y) * scale
-                    });
-                  }
-                }
-                curveDot.setCrood(crood, [point.name]);
-              }
-            }, true);
-          };
-          var onRemovedPoint = function onRemovedPoint() {
-            point.off('added', onAddedPoint);
-            point.off('removed', onRemovedPoint);
-            curveDot.unobserve(point.name);
-            observe(point, ['left', 'top'], function () {});
-            _this22._abandonedPool.points.push(point);
-          };
-          point.on('added', onAddedPoint);
-          point.on('removed', onRemovedPoint);
-          /**
-           * 创建曲线变换点和节点的连线
-           */
-          var lineDecorator = function lineDecorator(customObject, callback) {
-            customObject.set({
-              name: v4(),
-              // 保持比例
-              strokeUniform: true,
-              // 不允许选中
-              selectable: false,
-              evented: false,
-              // 保持居中
-              originX: 'center',
-              originY: 'center',
-              // 不做另外的画布缓存
-              objectCaching: false
-            });
-            customObject[Editor.symbol] = EditorSymbolType.LINE;
-            if (ui && callback) {
-              ui.objectPreRenderCallbackMap.set(customObject, callback);
-            }
-            return customObject;
-          };
-          var line = (_c = _this22._abandonedPool.lines.pop()) !== null && _c !== void 0 ? _c : theme.line(lineDecorator);
-          if (!line[Editor.symbol]) line = lineDecorator(line);
-          // 建立响应式，让连线随时跟随指令的值进行变化
-          var onAddedLine = function onAddedLine() {
-            node.observe(function (x, y) {
-              var position = _this22.calcAbsolutePosition({
-                x: x,
-                y: y
-              }, _this22.nodePathMap.get(node).pathObject);
-              line.set({
-                x1: position.left,
-                y1: position.top
-              });
-            }, {
-              immediate: true,
-              id: line.name
-            });
-            curveDot.observe(function (x, y) {
-              var position = _this22.calcAbsolutePosition({
-                x: x,
-                y: y
-              }, _this22.nodePathMap.get(node).pathObject);
-              line.set({
-                x2: position.left,
-                y2: position.top
-              });
-            }, {
-              immediate: true,
-              id: line.name
-            });
-          };
-          var onRemovedLine = function onRemovedLine() {
-            line.off('added', onAddedLine);
-            line.off('removed', onRemovedLine);
-            node.unobserve(line.name);
-            curveDot.unobserve(line.name);
-            _this22._abandonedPool.lines.push(line);
-          };
-          line.on('added', onAddedLine);
-          line.on('removed', onRemovedLine);
-          curveDots.push({
-            type: direction,
-            pathNode: from,
-            curveDot: curveDot,
-            node: nodeObject,
-            point: point,
-            line: line
-          });
-          curveDotSet.add(curveDot);
-        });
-        // 移除旧对象并添加新对象
-        canvas.renderOnAddRemove = false;
-        canvas.remove.apply(canvas, _toConsumableArray(this.curveDots.map(function (i) {
-          return [i.point, i.line];
-        }).flat(1)));
-        var baseIndex = canvas._objects.indexOf(this.paths[0].pathObject) + this.paths.length;
-        curveDots.forEach(function (i, idx) {
-          canvas.insertAt(i.line, baseIndex + idx, false);
-          canvas.add(i.point);
-        });
-        this.curveDots = curveDots;
-        canvas.renderOnAddRemove = true;
-        canvas.requestRenderAll();
-      }
-      /**
-       * 移除当前曲线变换点
-       */
-    }, {
-      key: "_removeCurrentCurveDots",
-      value: function _removeCurrentCurveDots() {
-        var _a;
-        var editor = (_a = this.vizpath) === null || _a === void 0 ? void 0 : _a.context.find(Editor);
-        var canvas = editor === null || editor === void 0 ? void 0 : editor.canvas;
-        if (!canvas) return;
-        canvas.renderOnAddRemove = false;
-        this.curveDots.forEach(function (i) {
-          canvas.remove(i.point, i.line);
-        });
-        this.curveDots = [];
-        canvas.renderOnAddRemove = true;
-        canvas.requestRenderAll();
-      }
-      /**
-       * 获取路径节点进行转换的配置
-       */
-    }, {
-      key: "_getConvertibleNodes",
-      value: function _getConvertibleNodes(node) {
-        if (!this.vizpath) return [];
-        var instruction = node.instruction;
-        var _this$vizpath$getNeig = this.vizpath.getNeighboringInstructions(node),
-          pre = _this$vizpath$getNeig.pre,
-          next = _this$vizpath$getNeig.next;
-        var convertibleNodes = [];
-        switch (instruction[0]) {
-          case InstructionType.START:
-            if ((pre === null || pre === void 0 ? void 0 : pre.instruction[0]) === InstructionType.LINE || (pre === null || pre === void 0 ? void 0 : pre.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-              convertibleNodes.push(['pre', pre]);
-            }
-            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-              convertibleNodes.push(['next', next]);
-            }
-            break;
-          case InstructionType.LINE:
-            convertibleNodes.push(['pre', node]);
-            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-              convertibleNodes.push(['next', next]);
-            }
-            break;
-          case InstructionType.QUADRATIC_CURCE:
-            convertibleNodes.push(['pre', node]);
-            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-              convertibleNodes.push(['next', next]);
-            }
-            break;
-          case InstructionType.BEZIER_CURVE:
-            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-              convertibleNodes.push(['next', next]);
-            }
-            break;
-        }
-        return convertibleNodes;
-      }
-      /**
-       * 初始路径指令转换事件
-       */
-    }, {
-      key: "_initConvertNodeEvents",
-      value: function _initConvertNodeEvents() {
-        var _this23 = this;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        var target;
-        this.addCanvasEvent('mouse:down:before', function (event) {
-          var _a, _b;
-          if ((_a = _this23.disabledFunctionTokens.convert) === null || _a === void 0 ? void 0 : _a.length) return;
-          if (_this23.setting.mode !== Mode.CONVERT) return;
-          if (((_b = event.target) === null || _b === void 0 ? void 0 : _b[Editor.symbol]) !== EditorSymbolType.NODE) return;
-          if (_this23.activeNodes.length > 1) return;
-          var activeObject = _this23.activeNodes[0];
-          var object = event.target;
-          var currentNode = _this23.objectNodeMap.get(object);
-          // 判断指令升降级
-          if (activeObject && object !== activeObject) {
-            var activeNode = _this23.objectNodeMap.get(activeObject);
-            var _this23$vizpath$getNe = _this23.vizpath.getNeighboringNodes(activeNode),
-              pre = _this23$vizpath$getNe.pre,
-              next = _this23$vizpath$getNe.next;
-            if (_this23.curveDots.filter(function (i) {
-              return i.node === object;
-            }).length === 0) {
-              var upgradeDirection;
-              if (currentNode === pre) upgradeDirection = 'next';
-              if (currentNode === next) upgradeDirection = 'pre';
-              if (upgradeDirection) {
-                _this23.upgrade(object, upgradeDirection);
-                var curveDot = _this23.curveDots.find(function (i) {
-                  return i.pathNode === currentNode && i.type === upgradeDirection;
-                });
-                if (curveDot) {
-                  _this23.focus(curveDot.point);
-                  fireMouseUpAndSelect(curveDot.point);
-                  return;
-                }
-              }
-            }
-          }
-          _this23.degrade(object, 'both', true);
-          target = object.set({
-            lockMovementX: true,
-            lockMovementY: true
-          });
-        });
-        this.addCanvasEvent('mouse:move', function (event) {
-          if (!target) return;
-          // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-          if (target.containsPoint(event.pointer)) return;
-          var pointer = calcCanvasCrood(canvas, event.pointer);
-          var targetNode = _this23.objectNodeMap.get(target);
-          var pathObject = _this23.nodePathMap.get(targetNode.node).pathObject;
-          var convertibleNodes = _this23._getConvertibleNodes(targetNode);
-          var neighboringNodes = _this23.vizpath.getNeighboringNodes(targetNode, true);
-          var position = _this23.calcRelativeCrood({
-            left: pointer.x,
-            top: pointer.y
-          }, pathObject);
-          var antiPosition = _this23.calcRelativeCrood({
-            left: target.left - (pointer.x - target.left),
-            top: target.top - (pointer.y - target.top)
-          }, pathObject);
-          // 根据夹角大小排序，夹角越小意味鼠标越接近
-          if (convertibleNodes.length > 1) {
-            convertibleNodes.sort(function (a, b) {
-              return calcCroodsAngle(position, targetNode.node, neighboringNodes[a[0]].node) - calcCroodsAngle(position, targetNode.node, neighboringNodes[b[0]].node);
-            });
-          }
-          convertibleNodes.forEach(function (item, index) {
-            var _a;
-            var newCrood = [position, antiPosition][index];
-            var newInstruction = _toConsumableArray(item[1].instruction);
-            newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[newInstruction[0]];
-            newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCrood.x, newCrood.y);
-            (_a = _this23.vizpath) === null || _a === void 0 ? void 0 : _a.replace(item[1], newInstruction);
-          });
-          var targetCurveDot = _this23.curveDots.find(function (i) {
-            var _a;
-            return i.pathNode === targetNode && i.type === ((_a = convertibleNodes[0]) === null || _a === void 0 ? void 0 : _a[0]);
-          });
-          if (targetCurveDot) {
-            _this23.focus(targetCurveDot.point);
-            fireMouseUpAndSelect(targetCurveDot.point);
-          }
-        });
-        this.addCanvasEvent('mouse:up', function () {
-          if (target) {
-            target.set({
-              lockMovementX: false,
-              lockMovementY: false
-            });
-            target = undefined;
-          }
-        });
-      }
-      /**
-       * 初始路径节点删除事件
-       */
-    }, {
-      key: "_initDeleteNodeEvents",
-      value: function _initDeleteNodeEvents() {
-        var _this24 = this;
-        this.addCanvasEvent('mouse:down', function (event) {
-          var _a, _b, _c;
-          if ((_a = _this24.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
-          if (_this24.setting.mode !== Mode.DELETE) return;
-          if (((_b = event.target) === null || _b === void 0 ? void 0 : _b[Editor.symbol]) === EditorSymbolType.NODE || ((_c = event.target) === null || _c === void 0 ? void 0 : _c[Editor.symbol]) === EditorSymbolType.CURVE_DOT) {
-            _this24.remove(event.target);
-          }
-        });
-      }
-      /**
-       * 变换节点
-       * @param object 路径节点
-       * @param options 变换配置
-       * @param followCurveDots 跟随变换的曲线变换点
-       * @returns
-       */
-    }, {
-      key: "_transform",
-      value: function _transform(object, options) {
-        var followCurveDots = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
-        var _a;
-        var pathNode = this.objectNodeMap.get(object);
-        if (!pathNode) return;
-        var node = pathNode.node;
-        var left = options.left,
-          top = options.top,
-          _options$scaleX = options.scaleX,
-          scaleX = _options$scaleX === void 0 ? 1 : _options$scaleX,
-          _options$scaleY = options.scaleY,
-          scaleY = _options$scaleY === void 0 ? 1 : _options$scaleY,
-          _options$angle = options.angle,
-          angle = _options$angle === void 0 ? 0 : _options$angle;
-        var newCrood = this.calcRelativeCrood({
-          left: left,
-          top: top
-        }, this.nodePathMap.get(node).pathObject);
-        // 需要跟随变化的曲线曲线变换点
-        followCurveDots.forEach(function (curveDot) {
-          if (!curveDot) return;
-          var relativeDiff = transform({
-            x: curveDot.x - newCrood.x,
-            y: curveDot.y - newCrood.y
-          }, [{
-            translate: {
-              x: newCrood.x - node.x,
-              y: newCrood.y - node.y
-            }
-          }, {
-            scale: {
-              x: scaleX,
-              y: scaleY
-            }
-          }, {
-            rotate: angle
-          }]);
-          curveDot.x = newCrood.x + relativeDiff.x;
-          curveDot.y = newCrood.y + relativeDiff.y;
-        });
-        // 节点位置更新
-        node.setCrood(newCrood, [object.name]);
-        (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
-      }
-      /**
-       * 请求对特定功能禁用
-       *
-       * @param functionName 禁用功能名称
-       *
-       * @example
-       *
-       * // 持有凭证用于重新启用功能
-       * const token = requestDisableFunction('add');
-       *
-       * // 重新启用功能
-       * requestEnableFunction(token);
-       */
-    }, {
-      key: "requestDisableFunction",
-      value: function requestDisableFunction(functionName) {
-        var _a;
-        var token = "".concat(functionName, "-").concat(v4());
-        var tokens = (_a = this.disabledFunctionTokens[functionName]) !== null && _a !== void 0 ? _a : [];
-        tokens.push(token);
-        this.disabledFunctionTokens[functionName] = tokens;
-        return token;
-      }
-      /**
-       * 请求启用特定功能
-       */
-    }, {
-      key: "requestEnableFunction",
-      value: function requestEnableFunction(token) {
-        var functionName = token.split('-')[0];
-        var tokens = this.disabledFunctionTokens[functionName];
-        if (!tokens) return false;
-        var index = tokens.indexOf(token);
-        if (index === -1) return false;
-        tokens.splice(index, 1);
-        return true;
-      }
-      /**
-       * 添加新的路径节点
-       *
-       * @note
-       *
-       * 1）在选中单一路径节点后，将在该点后添加新的路径节点
-       *
-       * 2）在未选中节点/选中多个节点时，将直接以该参数位置创建新的起始点以开启一段新的路径
-       *
-       * @param position 新节点的画布绝对位置
-       */
-    }, {
-      key: "add",
-      value: function add(position) {
-        var _a;
-        if ((_a = this.disabledFunctionTokens.add) === null || _a === void 0 ? void 0 : _a.length) return;
-        var vizpath = this.vizpath;
-        if (!vizpath) return;
-        if (this.activeNodes.length === 1) {
-          var node = this.activeNodes[0];
-          var pathNode = this.objectNodeMap.get(node);
-          if (!pathNode) return;
-          var segment = pathNode.segment;
-          // 如果当前节点已闭合或非端点，无法实现节点添加
-          if (vizpath.isClosePath(segment)) return;
-          var newCrood = this.calcRelativeCrood(position, this.nodePathMap.get(pathNode.node).pathObject);
-          // 如果是起始点
-          if (pathNode === segment[0]) {
-            // 添加新的起始
-            var addPathNode = vizpath.insertBeforeNode(pathNode, [InstructionType.START, newCrood.x, newCrood.y]);
-            if (!addPathNode) return;
-            return this.nodeObjectMap.get(addPathNode);
-          }
-          // 如果是末尾端点
-          else if (pathNode === segment[segment.length - 1]) {
-            var _addPathNode = vizpath.insertAfterNode(pathNode, [InstructionType.LINE, newCrood.x, newCrood.y]);
-            if (!_addPathNode) return;
-            return this.nodeObjectMap.get(_addPathNode);
-          }
-        } else {
-          var path = VizPathCreator.parseFabricPath(new fabric.fabric.Path('M 0 0', position));
-          var responsivePath = vizpath.draw(path);
-          return this.nodeObjectMap.get(responsivePath[0].segment[0]);
-        }
-      }
-      /**
-       * 删除节点或变换点
-       *
-       * @note
-       *
-       * 只有以下两种情况是有效删除操作：
-       *
-       * 1） 删除1~n个路径节点:
-       *
-       * ① 删除单一点时，删除节点，并将存在前后邻近节点的前提下连接前后节点。
-       *
-       * ② 删除多点时，删除点与点间的连线实现拆分路径效果。
-       *
-       * ③ 删除的点包含路径上所有点时，直接删除整个路径
-       *
-       * 2）删除1个变换点，实现曲线路径降级为直线路径
-       *
-       * @param objects 点对象(路径节点、变换点)列表
-       */
-    }, {
-      key: "remove",
-      value: function remove() {
-        var _this25 = this;
-        var _a;
-        if ((_a = this.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
-        if (!this.vizpath) return;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        for (var _len3 = arguments.length, objects = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
-          objects[_key3] = arguments[_key3];
-        }
-        var nodeObjects = objects.filter(function (i) {
-          return i[Editor.symbol] === EditorSymbolType.NODE;
-        });
-        var pointObjects = objects.filter(function (i) {
-          return i[Editor.symbol] === EditorSymbolType.CURVE_DOT;
-        });
-        if (nodeObjects.length) {
-          var _this$vizpath;
-          var removeNodes = [];
-          nodeObjects.forEach(function (object) {
-            var _this25$objectNodeMap = _this25.objectNodeMap.get(object),
-              node = _this25$objectNodeMap.node;
-            if (!node) return;
-            removeNodes.push(node);
-          });
-          this.blur();
-          // 触发鼠标举起事件，避免后续拖动操作生效
-          this.canvas._onMouseUp(new MouseEvent('mouseup'));
-          (_this$vizpath = this.vizpath).remove.apply(_this$vizpath, removeNodes);
-        }
-        if (pointObjects.length) {
-          var _this$curveDots$find = this.curveDots.find(function (i) {
-              return i.point === pointObjects[0];
-            }),
-            type = _this$curveDots$find.type,
-            node = _this$curveDots$find.node;
-          this.degrade(node, type);
-        }
-      }
-      /**
-       * 路径升级
-       *
-       * @note
-       *
-       * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
-       */
-    }, {
-      key: "upgrade",
-      value: function upgrade(object) {
-        var _this26 = this;
-        var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
-        var _a;
-        if ((_a = this.disabledFunctionTokens.upgrade) === null || _a === void 0 ? void 0 : _a.length) return;
-        if (!this.vizpath) return;
-        var pathNode = this.objectNodeMap.get(object);
-        if (!pathNode) return;
-        var instruction = pathNode.instruction,
-          node = pathNode.node;
-        var _this$vizpath$getNeig2 = this.vizpath.getNeighboringInstructions(pathNode, true),
-          pre = _this$vizpath$getNeig2.pre,
-          next = _this$vizpath$getNeig2.next;
-        var directionNodeMap = {
-          pre: instruction[0] === InstructionType.START ? pre : pathNode,
-          next: next
-        };
-        var targets = [];
-        if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
-          targets.push(['pre', directionNodeMap.pre]);
-        }
-        if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
-          targets.push(['next', directionNodeMap.next]);
-        }
-        targets.forEach(function (_ref24) {
-          var _ref25 = _slicedToArray(_ref24, 2),
-            direction = _ref25[0],
-            pathNode = _ref25[1];
-          var oldInstruction = pathNode.instruction;
-          if (oldInstruction[0] === InstructionType.BEZIER_CURVE) return;
-          var newInstruction = _toConsumableArray(oldInstruction);
-          newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[newInstruction[0]];
-          newInstruction.splice({
-            pre: -2,
-            next: 1
-          }[direction], 0, node.x, node.y);
-          _this26.vizpath.replace(pathNode, newInstruction);
-        });
-      }
-      /**
-       * 路径降级
-       *
-       * @note
-       *
-       * 二阶贝塞尔曲线会降级为直线；三阶贝塞尔曲线会先降级为二阶贝塞尔曲线，再降级才会转化为直线。
-       *
-       * @param object 节点
-       * @param [direction='both'] 降级范围
-       * @param [lowest=false] 是否直接降到直线级别
-       */
-    }, {
-      key: "degrade",
-      value: function degrade(object) {
-        var _this27 = this;
-        var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
-        var lowest = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
-        var _a;
-        if ((_a = this.disabledFunctionTokens.degrade) === null || _a === void 0 ? void 0 : _a.length) return;
-        if (!this.vizpath) return;
-        var pathNode = this.objectNodeMap.get(object);
-        if (!pathNode) return;
-        var _this$vizpath$getNeig3 = this.vizpath.getNeighboringInstructions(pathNode, true),
-          pre = _this$vizpath$getNeig3.pre,
-          next = _this$vizpath$getNeig3.next;
-        var directionNodeMap = {
-          pre: pathNode.instruction[0] === InstructionType.START ? pre : pathNode,
-          next: next
-        };
-        var targets = [];
-        if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
-          targets.push(['pre', directionNodeMap.pre]);
-        }
-        if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
-          targets.push(['next', directionNodeMap.next]);
-        }
-        targets.forEach(function (_ref26) {
-          var _ref27 = _slicedToArray(_ref26, 2),
-            direction = _ref27[0],
-            pathNode = _ref27[1];
-          var oldInstruction = pathNode.instruction;
-          if ([InstructionType.START, InstructionType.LINE].includes(oldInstruction[0])) return;
-          var newInstruction = _toConsumableArray(oldInstruction);
-          if (lowest) {
-            newInstruction[0] = InstructionType.LINE;
-            newInstruction.splice(1, newInstruction.length - 3);
-          } else {
-            newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.QUADRATIC_CURCE, InstructionType.LINE), InstructionType.BEZIER_CURVE, InstructionType.QUADRATIC_CURCE)[newInstruction[0]];
-            newInstruction.splice({
-              pre: -4,
-              next: 1
-            }[direction], 2);
-          }
-          _this27.vizpath.replace(pathNode, newInstruction);
-        });
-      }
-      /**
-       * 连接两个节点，可以实现路径闭合和路径拼接，仅在两点都是路径端点（即首尾点）时生效。
-       *
-       * @param source 当前点
-       * @param target 目标点
-       */
-    }, {
-      key: "link",
-      value: function link(source, target) {
-        var _this28 = this;
-        var _a;
-        if ((_a = this.disabledFunctionTokens.link) === null || _a === void 0 ? void 0 : _a.length) return;
-        var vizpath = this.vizpath;
-        if (!vizpath) return;
-        if (source === target) return;
-        if (!vizpath.isTerminalNode(source) || !vizpath.isTerminalNode(target)) return;
-        // 自身合并，直接加'z'闭合指令即可
-        if (source.segment === target.segment) {
-          vizpath.close(source);
-          return target;
-        }
-        // 不同路径需要进行合并
-        var sourcePath = source.segment.map(function (i) {
-          return i.instruction;
-        });
-        var targetPath = target.segment.map(function (i) {
-          return i.instruction;
-        });
-        if (source.instruction === sourcePath[0]) {
-          sourcePath = reversePath(sourcePath);
-        }
-        if (target.instruction === targetPath[targetPath.length - 1]) {
-          targetPath = reversePath(targetPath);
-        }
-        targetPath.splice(0, 1, [InstructionType.LINE, targetPath[0][1], targetPath[0][2]]);
-        targetPath.map(function (item) {
-          var instruction = item;
-          for (var _i3 = 0; _i3 < instruction.length - 1; _i3 += 2) {
-            var position = _this28.calcAbsolutePosition(new fabric.fabric.Point(instruction[_i3 + 1], instruction[_i3 + 2]), vizpath.getPath(target.segment).pathObject);
-            var crood = _this28.calcRelativeCrood(position, vizpath.getPath(source.segment).pathObject);
-            instruction[_i3 + 1] = crood.x;
-            instruction[_i3 + 2] = crood.y;
-          }
-        });
-        var joinIndex = sourcePath.length;
-        var mergePath = sourcePath.concat(targetPath);
-        // 合并后添加回路径段集合
-        var newPath = vizpath.onceRerenderOriginPath(function () {
-          vizpath.clear(target.segment);
-          return vizpath.replacePathSegments(vizpath.getPath(source.segment), [mergePath]);
-        });
-        return newPath[0].segment[joinIndex];
-      }
-    }, {
-      key: "focus",
-      value: function focus() {
-        var _this29 = this;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        // 提取有效活跃元素
-        var focusNodes = [];
-        var focusCurveDotPoints = [];
-        for (var _len4 = arguments.length, selectedObjects = new Array(_len4), _key4 = 0; _key4 < _len4; _key4++) {
-          selectedObjects[_key4] = arguments[_key4];
-        }
-        selectedObjects.forEach(function (object) {
-          switch (object[Editor.symbol]) {
-            case EditorSymbolType.NODE:
-              focusNodes.push(object);
-              break;
-            case EditorSymbolType.CURVE_DOT:
-              focusCurveDotPoints.push(object);
-              break;
-          }
-        });
-        // 触发内置失焦事件
-        if (this.activePoint || this.activeNodes.length) {
-          this.fire('deselected', this.activeNodes, this.activePoint);
-        }
-        // 只要包含路径节点则只处理聚焦路径节点逻辑
-        if (focusNodes.length) {
-          this._deactivateSelectListeners = true;
-          // 取消画布选中重新构造只包含路径节点的选中框对象
-          canvas.discardActiveObject();
-          this.activeNodes = focusNodes;
-          this.activePoint = null;
-          // 是否只选中单一路径节点
-          if (focusNodes.length === 1) {
-            var focusNode = focusNodes[0];
-            this._addActivePointObserve(focusNode);
-            this._addActivePointCurveDots(focusNode);
-            canvas.setActiveObject(focusNode);
-          }
-          // 多选则成组选择
-          else if (focusNodes.length > 1) {
-            var activeSelection = new fabric.fabric.ActiveSelection(focusNodes, {
-              canvas: canvas,
-              lockScalingFlip: true,
-              // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
-              lockRotation: true,
-              originX: 'center',
-              originY: 'center'
-            });
-            if (activeSelection.lockRotation) {
-              activeSelection.setControlVisible('mtr', false);
-            }
-            this._addActiveSelectionObserve(activeSelection);
-            this._removeCurrentCurveDots();
-            canvas.setActiveObject(activeSelection);
-          }
-          this._deactivateSelectListeners = false;
-          this.fire('selected', focusNodes, null);
-        }
-        // 考虑是否只有一个曲线变换点聚焦情况，不允许多曲线变换点同时聚焦
-        else if (focusCurveDotPoints.length === 1) {
-          this.activePoint = focusCurveDotPoints[0];
-          this.activeNodes = [this.curveDots.find(function (i) {
-            return i.point === _this29.activePoint;
-          }).node];
-          canvas.setActiveObject(focusCurveDotPoints[0]);
-          this.fire('selected', this.activeNodes, this.activePoint);
-        }
-        // 如都不符合上面情况则是所有节点都失去焦点
-        else {
-          this.activeNodes = [];
-          this.activePoint = null;
-          this._removeCurrentCurveDots();
-          canvas.discardActiveObject();
-        }
-      }
-    }, {
-      key: "blur",
-      value: function blur() {
-        this.focus();
-      }
-    }, {
-      key: "unload",
-      value: function unload() {
-        var _this30 = this;
-        var canvas = this.canvas;
-        if (!canvas) return;
-        canvas.remove.apply(canvas, _toConsumableArray(this.paths.map(function (i) {
-          return i.pathObject;
-        })).concat(_toConsumableArray(this.nodes), _toConsumableArray(this.curveDots.map(function (i) {
-          return i.point;
-        })), _toConsumableArray(this.curveDots.map(function (i) {
-          return i.line;
-        }))));
-        // 节点相关配置
-        this.nodes.length = 0;
-        this.curveDots.length = 0;
-        this.activeNodes.length = 0;
-        this.activePoint = null;
-        this.objectNodeMap.clear();
-        this.nodeObjectMap.clear();
-        this._deactivateSelectListeners = false;
-        this._abandonedPool.nodes.length = 0;
-        this._abandonedPool.points.length = 0;
-        this._abandonedPool.lines.length = 0;
-        // 路径相关配置
-        this.paths.length = 0;
-        this.nodePathMap.clear();
-        // 画布相关配置
-        this.listeners.forEach(function (_ref28) {
-          var type = _ref28.type,
-            eventName = _ref28.eventName,
-            handler = _ref28.handler;
-          if (type === 'global') _this30.removeGlobalEvent(eventName, handler);
-          if (type === 'canvas') _this30.removeCanvasEvent(eventName, handler);
-        });
-        this.mountCanvas = null;
-        this.canvas = null;
-        this.isolation = false;
-        this.listeners.length = 0;
-        this.disabledFunctionTokens = {};
-        // 如果是隔离画布要销毁克隆画布
-        if (this.isolation) canvas.dispose();else canvas.requestRenderAll();
-      }
-    }, {
-      key: "load",
-      value: function () {
-        var _load2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7(vizpath) {
-          return _regeneratorRuntime().wrap(function _callee7$(_context7) {
-            while (1) switch (_context7.prev = _context7.next) {
-              case 0:
-                if (this.mountCanvas) {
-                  _context7.next = 2;
-                  break;
-                }
-                throw new TypeError('Please use valid canvas object.');
-              case 2:
-                if (this.mountCanvas instanceof fabric.fabric.Canvas) {
-                  _context7.next = 4;
-                  break;
-                }
-                throw new TypeError('Please use fabric.Canvas instead of fabric.StaticCanvas.');
-              case 4:
-                this.canvas = this._createEditorCanvas(this.mountCanvas);
-                this._initDrawPathListener(vizpath);
-                this._initClearPathListener(vizpath);
-                this._initDrawNodeEvents(vizpath);
-                this._initClearNodeEvents(vizpath);
-                this._initSelectNodeEvents();
-                this._initAddNodeEvents();
-                this._initConvertNodeEvents();
-                this._initDeleteNodeEvents();
-              case 13:
-              case "end":
-                return _context7.stop();
-            }
-          }, _callee7, this);
-        }));
-        function load(_x6) {
-          return _load2.apply(this, arguments);
-        }
-        return load;
-      }()
-    }]);
-  }(EditorModule);
-  Editor.ID = 'editor';
-  Editor.symbol = Symbol('editor');
-  var Editor$1 = Editor;
 
+  // math-inlining.
+  var abs$1 = Math.abs,
+    cos$1 = Math.cos,
+    sin$1 = Math.sin,
+    acos$1 = Math.acos,
+    atan2 = Math.atan2,
+    sqrt$1 = Math.sqrt,
+    pow = Math.pow;
+
+  // cube root function yielding real roots
+  function crt(v) {
+    return v < 0 ? -pow(-v, 1 / 3) : pow(v, 1 / 3);
+  }
+
+  // trig constants
+  var pi$1 = Math.PI,
+    tau = 2 * pi$1,
+    quart = pi$1 / 2,
+    // float precision significant decimal
+    epsilon = 0.000001,
+    // extremas used in bbox calculation and similar algorithms
+    nMax = Number.MAX_SAFE_INTEGER || 9007199254740991,
+    nMin = Number.MIN_SAFE_INTEGER || -9007199254740991,
+    // a zero coordinate, which is surprisingly useful
+    ZERO = {
+      x: 0,
+      y: 0,
+      z: 0
+    };
+
+  // Bezier utility functions
+  var utils = {
+    // Legendre-Gauss abscissae with n=24 (x_i values, defined at i=n as the roots of the nth order Legendre polynomial Pn(x))
+    Tvalues: [-0.0640568928626056260850430826247450385909, 0.0640568928626056260850430826247450385909, -0.1911188674736163091586398207570696318404, 0.1911188674736163091586398207570696318404, -0.3150426796961633743867932913198102407864, 0.3150426796961633743867932913198102407864, -0.4337935076260451384870842319133497124524, 0.4337935076260451384870842319133497124524, -0.5454214713888395356583756172183723700107, 0.5454214713888395356583756172183723700107, -0.6480936519369755692524957869107476266696, 0.6480936519369755692524957869107476266696, -0.7401241915785543642438281030999784255232, 0.7401241915785543642438281030999784255232, -0.8200019859739029219539498726697452080761, 0.8200019859739029219539498726697452080761, -0.8864155270044010342131543419821967550873, 0.8864155270044010342131543419821967550873, -0.9382745520027327585236490017087214496548, 0.9382745520027327585236490017087214496548, -0.9747285559713094981983919930081690617411, 0.9747285559713094981983919930081690617411, -0.9951872199970213601799974097007368118745, 0.9951872199970213601799974097007368118745],
+    // Legendre-Gauss weights with n=24 (w_i values, defined by a function linked to in the Bezier primer article)
+    Cvalues: [0.1279381953467521569740561652246953718517, 0.1279381953467521569740561652246953718517, 0.1258374563468282961213753825111836887264, 0.1258374563468282961213753825111836887264, 0.121670472927803391204463153476262425607, 0.121670472927803391204463153476262425607, 0.1155056680537256013533444839067835598622, 0.1155056680537256013533444839067835598622, 0.1074442701159656347825773424466062227946, 0.1074442701159656347825773424466062227946, 0.0976186521041138882698806644642471544279, 0.0976186521041138882698806644642471544279, 0.086190161531953275917185202983742667185, 0.086190161531953275917185202983742667185, 0.0733464814110803057340336152531165181193, 0.0733464814110803057340336152531165181193, 0.0592985849154367807463677585001085845412, 0.0592985849154367807463677585001085845412, 0.0442774388174198061686027482113382288593, 0.0442774388174198061686027482113382288593, 0.0285313886289336631813078159518782864491, 0.0285313886289336631813078159518782864491, 0.0123412297999871995468056670700372915759, 0.0123412297999871995468056670700372915759],
+    arcfn: function arcfn(t, derivativeFn) {
+      var d = derivativeFn(t);
+      var l = d.x * d.x + d.y * d.y;
+      if (typeof d.z !== "undefined") {
+        l += d.z * d.z;
+      }
+      return sqrt$1(l);
+    },
+    compute: function compute(t, points, _3d) {
+      // shortcuts
+      if (t === 0) {
+        points[0].t = 0;
+        return points[0];
+      }
+      var order = points.length - 1;
+      if (t === 1) {
+        points[order].t = 1;
+        return points[order];
+      }
+      var mt = 1 - t;
+      var p = points;
+
+      // constant?
+      if (order === 0) {
+        points[0].t = t;
+        return points[0];
+      }
+
+      // linear?
+      if (order === 1) {
+        var ret = {
+          x: mt * p[0].x + t * p[1].x,
+          y: mt * p[0].y + t * p[1].y,
+          t: t
+        };
+        if (_3d) {
+          ret.z = mt * p[0].z + t * p[1].z;
+        }
+        return ret;
+      }
+
+      // quadratic/cubic curve?
+      if (order < 4) {
+        var mt2 = mt * mt,
+          t2 = t * t,
+          a,
+          b,
+          c,
+          d = 0;
+        if (order === 2) {
+          p = [p[0], p[1], p[2], ZERO];
+          a = mt2;
+          b = mt * t * 2;
+          c = t2;
+        } else if (order === 3) {
+          a = mt2 * mt;
+          b = mt2 * t * 3;
+          c = mt * t2 * 3;
+          d = t * t2;
+        }
+        var _ret = {
+          x: a * p[0].x + b * p[1].x + c * p[2].x + d * p[3].x,
+          y: a * p[0].y + b * p[1].y + c * p[2].y + d * p[3].y,
+          t: t
+        };
+        if (_3d) {
+          _ret.z = a * p[0].z + b * p[1].z + c * p[2].z + d * p[3].z;
+        }
+        return _ret;
+      }
+
+      // higher order curves: use de Casteljau's computation
+      var dCpts = JSON.parse(JSON.stringify(points));
+      while (dCpts.length > 1) {
+        for (var _i2 = 0; _i2 < dCpts.length - 1; _i2++) {
+          dCpts[_i2] = {
+            x: dCpts[_i2].x + (dCpts[_i2 + 1].x - dCpts[_i2].x) * t,
+            y: dCpts[_i2].y + (dCpts[_i2 + 1].y - dCpts[_i2].y) * t
+          };
+          if (typeof dCpts[_i2].z !== "undefined") {
+            dCpts[_i2].z = dCpts[_i2].z + (dCpts[_i2 + 1].z - dCpts[_i2].z) * t;
+          }
+        }
+        dCpts.splice(dCpts.length - 1, 1);
+      }
+      dCpts[0].t = t;
+      return dCpts[0];
+    },
+    computeWithRatios: function computeWithRatios(t, points, ratios, _3d) {
+      var mt = 1 - t,
+        r = ratios,
+        p = points;
+      var f1 = r[0],
+        f2 = r[1],
+        f3 = r[2],
+        f4 = r[3],
+        d;
+
+      // spec for linear
+      f1 *= mt;
+      f2 *= t;
+      if (p.length === 2) {
+        d = f1 + f2;
+        return {
+          x: (f1 * p[0].x + f2 * p[1].x) / d,
+          y: (f1 * p[0].y + f2 * p[1].y) / d,
+          z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z) / d,
+          t: t
+        };
+      }
+
+      // upgrade to quadratic
+      f1 *= mt;
+      f2 *= 2 * mt;
+      f3 *= t * t;
+      if (p.length === 3) {
+        d = f1 + f2 + f3;
+        return {
+          x: (f1 * p[0].x + f2 * p[1].x + f3 * p[2].x) / d,
+          y: (f1 * p[0].y + f2 * p[1].y + f3 * p[2].y) / d,
+          z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z + f3 * p[2].z) / d,
+          t: t
+        };
+      }
+
+      // upgrade to cubic
+      f1 *= mt;
+      f2 *= 1.5 * mt;
+      f3 *= 3 * mt;
+      f4 *= t * t * t;
+      if (p.length === 4) {
+        d = f1 + f2 + f3 + f4;
+        return {
+          x: (f1 * p[0].x + f2 * p[1].x + f3 * p[2].x + f4 * p[3].x) / d,
+          y: (f1 * p[0].y + f2 * p[1].y + f3 * p[2].y + f4 * p[3].y) / d,
+          z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z + f3 * p[2].z + f4 * p[3].z) / d,
+          t: t
+        };
+      }
+    },
+    derive: function derive(points, _3d) {
+      var dpoints = [];
+      for (var p = points, d = p.length, c = d - 1; d > 1; d--, c--) {
+        var list = [];
+        for (var j = 0, dpt; j < c; j++) {
+          dpt = {
+            x: c * (p[j + 1].x - p[j].x),
+            y: c * (p[j + 1].y - p[j].y)
+          };
+          if (_3d) {
+            dpt.z = c * (p[j + 1].z - p[j].z);
+          }
+          list.push(dpt);
+        }
+        dpoints.push(list);
+        p = list;
+      }
+      return dpoints;
+    },
+    between: function between(v, m, M) {
+      return m <= v && v <= M || utils.approximately(v, m) || utils.approximately(v, M);
+    },
+    approximately: function approximately(a, b, precision) {
+      return abs$1(a - b) <= (precision || epsilon);
+    },
+    length: function length(derivativeFn) {
+      var z = 0.5,
+        len = utils.Tvalues.length;
+      var sum = 0;
+      for (var _i3 = 0, _t; _i3 < len; _i3++) {
+        _t = z * utils.Tvalues[_i3] + z;
+        sum += utils.Cvalues[_i3] * utils.arcfn(_t, derivativeFn);
+      }
+      return z * sum;
+    },
+    map: function map(v, ds, de, ts, te) {
+      var d1 = de - ds,
+        d2 = te - ts,
+        v2 = v - ds,
+        r = v2 / d1;
+      return ts + d2 * r;
+    },
+    lerp: function lerp(r, v1, v2) {
+      var ret = {
+        x: v1.x + r * (v2.x - v1.x),
+        y: v1.y + r * (v2.y - v1.y)
+      };
+      if (v1.z !== undefined && v2.z !== undefined) {
+        ret.z = v1.z + r * (v2.z - v1.z);
+      }
+      return ret;
+    },
+    pointToString: function pointToString(p) {
+      var s = p.x + "/" + p.y;
+      if (typeof p.z !== "undefined") {
+        s += "/" + p.z;
+      }
+      return s;
+    },
+    pointsToString: function pointsToString(points) {
+      return "[" + points.map(utils.pointToString).join(", ") + "]";
+    },
+    copy: function copy(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    },
+    angle: function angle(o, v1, v2) {
+      var dx1 = v1.x - o.x,
+        dy1 = v1.y - o.y,
+        dx2 = v2.x - o.x,
+        dy2 = v2.y - o.y,
+        cross = dx1 * dy2 - dy1 * dx2,
+        dot = dx1 * dx2 + dy1 * dy2;
+      return atan2(cross, dot);
+    },
+    // round as string, to avoid rounding errors
+    round: function round(v, d) {
+      var s = "" + v;
+      var pos = s.indexOf(".");
+      return parseFloat(s.substring(0, pos + 1 + d));
+    },
+    dist: function dist(p1, p2) {
+      var dx = p1.x - p2.x,
+        dy = p1.y - p2.y;
+      return sqrt$1(dx * dx + dy * dy);
+    },
+    closest: function closest(LUT, point) {
+      var mdist = pow(2, 63),
+        mpos,
+        d;
+      LUT.forEach(function (p, idx) {
+        d = utils.dist(point, p);
+        if (d < mdist) {
+          mdist = d;
+          mpos = idx;
+        }
+      });
+      return {
+        mdist: mdist,
+        mpos: mpos
+      };
+    },
+    abcratio: function abcratio(t, n) {
+      // see ratio(t) note on http://pomax.github.io/bezierinfo/#abc
+      if (n !== 2 && n !== 3) {
+        return false;
+      }
+      if (typeof t === "undefined") {
+        t = 0.5;
+      } else if (t === 0 || t === 1) {
+        return t;
+      }
+      var bottom = pow(t, n) + pow(1 - t, n),
+        top = bottom - 1;
+      return abs$1(top / bottom);
+    },
+    projectionratio: function projectionratio(t, n) {
+      // see u(t) note on http://pomax.github.io/bezierinfo/#abc
+      if (n !== 2 && n !== 3) {
+        return false;
+      }
+      if (typeof t === "undefined") {
+        t = 0.5;
+      } else if (t === 0 || t === 1) {
+        return t;
+      }
+      var top = pow(1 - t, n),
+        bottom = pow(t, n) + top;
+      return top / bottom;
+    },
+    lli8: function lli8(x1, y1, x2, y2, x3, y3, x4, y4) {
+      var nx = (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4),
+        ny = (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4),
+        d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+      if (d == 0) {
+        return false;
+      }
+      return {
+        x: nx / d,
+        y: ny / d
+      };
+    },
+    lli4: function lli4(p1, p2, p3, p4) {
+      var x1 = p1.x,
+        y1 = p1.y,
+        x2 = p2.x,
+        y2 = p2.y,
+        x3 = p3.x,
+        y3 = p3.y,
+        x4 = p4.x,
+        y4 = p4.y;
+      return utils.lli8(x1, y1, x2, y2, x3, y3, x4, y4);
+    },
+    lli: function lli(v1, v2) {
+      return utils.lli4(v1, v1.c, v2, v2.c);
+    },
+    makeline: function makeline(p1, p2) {
+      return new Bezier(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2, p2.x, p2.y);
+    },
+    findbbox: function findbbox(sections) {
+      var mx = nMax,
+        my = nMax,
+        MX = nMin,
+        MY = nMin;
+      sections.forEach(function (s) {
+        var bbox = s.bbox();
+        if (mx > bbox.x.min) mx = bbox.x.min;
+        if (my > bbox.y.min) my = bbox.y.min;
+        if (MX < bbox.x.max) MX = bbox.x.max;
+        if (MY < bbox.y.max) MY = bbox.y.max;
+      });
+      return {
+        x: {
+          min: mx,
+          mid: (mx + MX) / 2,
+          max: MX,
+          size: MX - mx
+        },
+        y: {
+          min: my,
+          mid: (my + MY) / 2,
+          max: MY,
+          size: MY - my
+        }
+      };
+    },
+    shapeintersections: function shapeintersections(s1, bbox1, s2, bbox2, curveIntersectionThreshold) {
+      if (!utils.bboxoverlap(bbox1, bbox2)) return [];
+      var intersections = [];
+      var a1 = [s1.startcap, s1.forward, s1.back, s1.endcap];
+      var a2 = [s2.startcap, s2.forward, s2.back, s2.endcap];
+      a1.forEach(function (l1) {
+        if (l1.virtual) return;
+        a2.forEach(function (l2) {
+          if (l2.virtual) return;
+          var iss = l1.intersects(l2, curveIntersectionThreshold);
+          if (iss.length > 0) {
+            iss.c1 = l1;
+            iss.c2 = l2;
+            iss.s1 = s1;
+            iss.s2 = s2;
+            intersections.push(iss);
+          }
+        });
+      });
+      return intersections;
+    },
+    makeshape: function makeshape(forward, back, curveIntersectionThreshold) {
+      var bpl = back.points.length;
+      var fpl = forward.points.length;
+      var start = utils.makeline(back.points[bpl - 1], forward.points[0]);
+      var end = utils.makeline(forward.points[fpl - 1], back.points[0]);
+      var shape = {
+        startcap: start,
+        forward: forward,
+        back: back,
+        endcap: end,
+        bbox: utils.findbbox([start, forward, back, end])
+      };
+      shape.intersections = function (s2) {
+        return utils.shapeintersections(shape, shape.bbox, s2, s2.bbox, curveIntersectionThreshold);
+      };
+      return shape;
+    },
+    getminmax: function getminmax(curve, d, list) {
+      if (!list) return {
+        min: 0,
+        max: 0
+      };
+      var min = nMax,
+        max = nMin,
+        t,
+        c;
+      if (list.indexOf(0) === -1) {
+        list = [0].concat(list);
+      }
+      if (list.indexOf(1) === -1) {
+        list.push(1);
+      }
+      for (var _i4 = 0, len = list.length; _i4 < len; _i4++) {
+        t = list[_i4];
+        c = curve.get(t);
+        if (c[d] < min) {
+          min = c[d];
+        }
+        if (c[d] > max) {
+          max = c[d];
+        }
+      }
+      return {
+        min: min,
+        mid: (min + max) / 2,
+        max: max,
+        size: max - min
+      };
+    },
+    align: function align(points, line) {
+      var tx = line.p1.x,
+        ty = line.p1.y,
+        a = -atan2(line.p2.y - ty, line.p2.x - tx),
+        d = function d(v) {
+          return {
+            x: (v.x - tx) * cos$1(a) - (v.y - ty) * sin$1(a),
+            y: (v.x - tx) * sin$1(a) + (v.y - ty) * cos$1(a)
+          };
+        };
+      return points.map(d);
+    },
+    roots: function roots(points, line) {
+      line = line || {
+        p1: {
+          x: 0,
+          y: 0
+        },
+        p2: {
+          x: 1,
+          y: 0
+        }
+      };
+      var order = points.length - 1;
+      var aligned = utils.align(points, line);
+      var reduce = function reduce(t) {
+        return 0 <= t && t <= 1;
+      };
+      if (order === 2) {
+        var _a4 = aligned[0].y,
+          _b2 = aligned[1].y,
+          _c2 = aligned[2].y,
+          _d2 = _a4 - 2 * _b2 + _c2;
+        if (_d2 !== 0) {
+          var m1 = -sqrt$1(_b2 * _b2 - _a4 * _c2),
+            m2 = -_a4 + _b2,
+            _v = -(m1 + m2) / _d2,
+            v2 = -(-m1 + m2) / _d2;
+          return [_v, v2].filter(reduce);
+        } else if (_b2 !== _c2 && _d2 === 0) {
+          return [(2 * _b2 - _c2) / (2 * _b2 - 2 * _c2)].filter(reduce);
+        }
+        return [];
+      }
+
+      // see http://www.trans4mind.com/personal_development/mathematics/polynomials/cubicAlgebra.htm
+      var pa = aligned[0].y,
+        pb = aligned[1].y,
+        pc = aligned[2].y,
+        pd = aligned[3].y;
+      var d = -pa + 3 * pb - 3 * pc + pd,
+        a = 3 * pa - 6 * pb + 3 * pc,
+        b = -3 * pa + 3 * pb,
+        c = pa;
+      if (utils.approximately(d, 0)) {
+        // this is not a cubic curve.
+        if (utils.approximately(a, 0)) {
+          // in fact, this is not a quadratic curve either.
+          if (utils.approximately(b, 0)) {
+            // in fact in fact, there are no solutions.
+            return [];
+          }
+          // linear solution:
+          return [-c / b].filter(reduce);
+        }
+        // quadratic solution:
+        var _q = sqrt$1(b * b - 4 * a * c),
+          a2 = 2 * a;
+        return [(_q - b) / a2, (-b - _q) / a2].filter(reduce);
+      }
+
+      // at this point, we know we need a cubic solution:
+
+      a /= d;
+      b /= d;
+      c /= d;
+      var p = (3 * b - a * a) / 3,
+        p3 = p / 3,
+        q = (2 * a * a * a - 9 * a * b + 27 * c) / 27,
+        q2 = q / 2,
+        discriminant = q2 * q2 + p3 * p3 * p3;
+      var u1, v1, x1, x2, x3;
+      if (discriminant < 0) {
+        var mp3 = -p / 3,
+          mp33 = mp3 * mp3 * mp3,
+          r = sqrt$1(mp33),
+          _t2 = -q / (2 * r),
+          cosphi = _t2 < -1 ? -1 : _t2 > 1 ? 1 : _t2,
+          phi = acos$1(cosphi),
+          crtr = crt(r),
+          t1 = 2 * crtr;
+        x1 = t1 * cos$1(phi / 3) - a / 3;
+        x2 = t1 * cos$1((phi + tau) / 3) - a / 3;
+        x3 = t1 * cos$1((phi + 2 * tau) / 3) - a / 3;
+        return [x1, x2, x3].filter(reduce);
+      } else if (discriminant === 0) {
+        u1 = q2 < 0 ? crt(-q2) : -crt(q2);
+        x1 = 2 * u1 - a / 3;
+        x2 = -u1 - a / 3;
+        return [x1, x2].filter(reduce);
+      } else {
+        var sd = sqrt$1(discriminant);
+        u1 = crt(-q2 + sd);
+        v1 = crt(q2 + sd);
+        return [u1 - v1 - a / 3].filter(reduce);
+      }
+    },
+    droots: function droots(p) {
+      // quadratic roots are easy
+      if (p.length === 3) {
+        var a = p[0],
+          b = p[1],
+          c = p[2],
+          d = a - 2 * b + c;
+        if (d !== 0) {
+          var m1 = -sqrt$1(b * b - a * c),
+            m2 = -a + b,
+            v1 = -(m1 + m2) / d,
+            v2 = -(-m1 + m2) / d;
+          return [v1, v2];
+        } else if (b !== c && d === 0) {
+          return [(2 * b - c) / (2 * (b - c))];
+        }
+        return [];
+      }
+
+      // linear roots are even easier
+      if (p.length === 2) {
+        var _a5 = p[0],
+          _b3 = p[1];
+        if (_a5 !== _b3) {
+          return [_a5 / (_a5 - _b3)];
+        }
+        return [];
+      }
+      return [];
+    },
+    curvature: function curvature(t, d1, d2, _3d, kOnly) {
+      var num,
+        dnm,
+        adk,
+        dk,
+        k = 0,
+        r = 0;
+
+      //
+      // We're using the following formula for curvature:
+      //
+      //              x'y" - y'x"
+      //   k(t) = ------------------
+      //           (x'² + y'²)^(3/2)
+      //
+      // from https://en.wikipedia.org/wiki/Radius_of_curvature#Definition
+      //
+      // With it corresponding 3D counterpart:
+      //
+      //          sqrt( (y'z" - y"z')² + (z'x" - z"x')² + (x'y" - x"y')²)
+      //   k(t) = -------------------------------------------------------
+      //                     (x'² + y'² + z'²)^(3/2)
+      //
+
+      var d = utils.compute(t, d1);
+      var dd = utils.compute(t, d2);
+      var qdsum = d.x * d.x + d.y * d.y;
+      if (_3d) {
+        num = sqrt$1(pow(d.y * dd.z - dd.y * d.z, 2) + pow(d.z * dd.x - dd.z * d.x, 2) + pow(d.x * dd.y - dd.x * d.y, 2));
+        dnm = pow(qdsum + d.z * d.z, 3 / 2);
+      } else {
+        num = d.x * dd.y - d.y * dd.x;
+        dnm = pow(qdsum, 3 / 2);
+      }
+      if (num === 0 || dnm === 0) {
+        return {
+          k: 0,
+          r: 0
+        };
+      }
+      k = num / dnm;
+      r = dnm / num;
+
+      // We're also computing the derivative of kappa, because
+      // there is value in knowing the rate of change for the
+      // curvature along the curve. And we're just going to
+      // ballpark it based on an epsilon.
+      if (!kOnly) {
+        // compute k'(t) based on the interval before, and after it,
+        // to at least try to not introduce forward/backward pass bias.
+        var pk = utils.curvature(t - 0.001, d1, d2, _3d, true).k;
+        var nk = utils.curvature(t + 0.001, d1, d2, _3d, true).k;
+        dk = (nk - k + (k - pk)) / 2;
+        adk = (abs$1(nk - k) + abs$1(k - pk)) / 2;
+      }
+      return {
+        k: k,
+        r: r,
+        dk: dk,
+        adk: adk
+      };
+    },
+    inflections: function inflections(points) {
+      if (points.length < 4) return [];
+
+      // FIXME: TODO: add in inflection abstraction for quartic+ curves?
+
+      var p = utils.align(points, {
+          p1: points[0],
+          p2: points.slice(-1)[0]
+        }),
+        a = p[2].x * p[1].y,
+        b = p[3].x * p[1].y,
+        c = p[1].x * p[2].y,
+        d = p[3].x * p[2].y,
+        v1 = 18 * (-3 * a + 2 * b + 3 * c - d),
+        v2 = 18 * (3 * a - b - 3 * c),
+        v3 = 18 * (c - a);
+      if (utils.approximately(v1, 0)) {
+        if (!utils.approximately(v2, 0)) {
+          var _t3 = -v3 / v2;
+          if (0 <= _t3 && _t3 <= 1) return [_t3];
+        }
+        return [];
+      }
+      var d2 = 2 * v1;
+      if (utils.approximately(d2, 0)) return [];
+      var trm = v2 * v2 - 4 * v1 * v3;
+      if (trm < 0) return [];
+      var sq = Math.sqrt(trm);
+      return [(sq - v2) / d2, -(v2 + sq) / d2].filter(function (r) {
+        return 0 <= r && r <= 1;
+      });
+    },
+    bboxoverlap: function bboxoverlap(b1, b2) {
+      var dims = ["x", "y"],
+        len = dims.length;
+      for (var _i5 = 0, dim, l, _t4, d; _i5 < len; _i5++) {
+        dim = dims[_i5];
+        l = b1[dim].mid;
+        _t4 = b2[dim].mid;
+        d = (b1[dim].size + b2[dim].size) / 2;
+        if (abs$1(l - _t4) >= d) return false;
+      }
+      return true;
+    },
+    expandbox: function expandbox(bbox, _bbox) {
+      if (_bbox.x.min < bbox.x.min) {
+        bbox.x.min = _bbox.x.min;
+      }
+      if (_bbox.y.min < bbox.y.min) {
+        bbox.y.min = _bbox.y.min;
+      }
+      if (_bbox.z && _bbox.z.min < bbox.z.min) {
+        bbox.z.min = _bbox.z.min;
+      }
+      if (_bbox.x.max > bbox.x.max) {
+        bbox.x.max = _bbox.x.max;
+      }
+      if (_bbox.y.max > bbox.y.max) {
+        bbox.y.max = _bbox.y.max;
+      }
+      if (_bbox.z && _bbox.z.max > bbox.z.max) {
+        bbox.z.max = _bbox.z.max;
+      }
+      bbox.x.mid = (bbox.x.min + bbox.x.max) / 2;
+      bbox.y.mid = (bbox.y.min + bbox.y.max) / 2;
+      if (bbox.z) {
+        bbox.z.mid = (bbox.z.min + bbox.z.max) / 2;
+      }
+      bbox.x.size = bbox.x.max - bbox.x.min;
+      bbox.y.size = bbox.y.max - bbox.y.min;
+      if (bbox.z) {
+        bbox.z.size = bbox.z.max - bbox.z.min;
+      }
+    },
+    pairiteration: function pairiteration(c1, c2, curveIntersectionThreshold) {
+      var c1b = c1.bbox(),
+        c2b = c2.bbox(),
+        r = 100000,
+        threshold = curveIntersectionThreshold || 0.5;
+      if (c1b.x.size + c1b.y.size < threshold && c2b.x.size + c2b.y.size < threshold) {
+        return [(r * (c1._t1 + c1._t2) / 2 | 0) / r + "/" + (r * (c2._t1 + c2._t2) / 2 | 0) / r];
+      }
+      var cc1 = c1.split(0.5),
+        cc2 = c2.split(0.5),
+        pairs = [{
+          left: cc1.left,
+          right: cc2.left
+        }, {
+          left: cc1.left,
+          right: cc2.right
+        }, {
+          left: cc1.right,
+          right: cc2.right
+        }, {
+          left: cc1.right,
+          right: cc2.left
+        }];
+      pairs = pairs.filter(function (pair) {
+        return utils.bboxoverlap(pair.left.bbox(), pair.right.bbox());
+      });
+      var results = [];
+      if (pairs.length === 0) return results;
+      pairs.forEach(function (pair) {
+        results = results.concat(utils.pairiteration(pair.left, pair.right, threshold));
+      });
+      results = results.filter(function (v, i) {
+        return results.indexOf(v) === i;
+      });
+      return results;
+    },
+    getccenter: function getccenter(p1, p2, p3) {
+      var dx1 = p2.x - p1.x,
+        dy1 = p2.y - p1.y,
+        dx2 = p3.x - p2.x,
+        dy2 = p3.y - p2.y,
+        dx1p = dx1 * cos$1(quart) - dy1 * sin$1(quart),
+        dy1p = dx1 * sin$1(quart) + dy1 * cos$1(quart),
+        dx2p = dx2 * cos$1(quart) - dy2 * sin$1(quart),
+        dy2p = dx2 * sin$1(quart) + dy2 * cos$1(quart),
+        // chord midpoints
+        mx1 = (p1.x + p2.x) / 2,
+        my1 = (p1.y + p2.y) / 2,
+        mx2 = (p2.x + p3.x) / 2,
+        my2 = (p2.y + p3.y) / 2,
+        // midpoint offsets
+        mx1n = mx1 + dx1p,
+        my1n = my1 + dy1p,
+        mx2n = mx2 + dx2p,
+        my2n = my2 + dy2p,
+        // intersection of these lines:
+        arc = utils.lli8(mx1, my1, mx1n, my1n, mx2, my2, mx2n, my2n),
+        r = utils.dist(arc, p1);
+
+      // arc start/end values, over mid point:
+      var s = atan2(p1.y - arc.y, p1.x - arc.x),
+        m = atan2(p2.y - arc.y, p2.x - arc.x),
+        e = atan2(p3.y - arc.y, p3.x - arc.x),
+        _;
+
+      // determine arc direction (cw/ccw correction)
+      if (s < e) {
+        // if s<m<e, arc(s, e)
+        // if m<s<e, arc(e, s + tau)
+        // if s<e<m, arc(e, s + tau)
+        if (s > m || m > e) {
+          s += tau;
+        }
+        if (s > e) {
+          _ = e;
+          e = s;
+          s = _;
+        }
+      } else {
+        // if e<m<s, arc(e, s)
+        // if m<e<s, arc(s, e + tau)
+        // if e<s<m, arc(s, e + tau)
+        if (e < m && m < s) {
+          _ = e;
+          e = s;
+          s = _;
+        } else {
+          e += tau;
+        }
+      }
+      // assign and done.
+      arc.s = s;
+      arc.e = e;
+      arc.r = r;
+      return arc;
+    },
+    numberSort: function numberSort(a, b) {
+      return a - b;
+    }
+  };
+
+  /**
+   * Poly Bezier
+   * @param {[type]} curves [description]
+   */
+  var PolyBezier = /*#__PURE__*/function () {
+    function PolyBezier(curves) {
+      _classCallCheck(this, PolyBezier);
+      this.curves = [];
+      this._3d = false;
+      if (!!curves) {
+        this.curves = curves;
+        this._3d = this.curves[0]._3d;
+      }
+    }
+    return _createClass(PolyBezier, [{
+      key: "valueOf",
+      value: function valueOf() {
+        return this.toString();
+      }
+    }, {
+      key: "toString",
+      value: function toString() {
+        return "[" + this.curves.map(function (curve) {
+          return utils.pointsToString(curve.points);
+        }).join(", ") + "]";
+      }
+    }, {
+      key: "addCurve",
+      value: function addCurve(curve) {
+        this.curves.push(curve);
+        this._3d = this._3d || curve._3d;
+      }
+    }, {
+      key: "length",
+      value: function length() {
+        return this.curves.map(function (v) {
+          return v.length();
+        }).reduce(function (a, b) {
+          return a + b;
+        });
+      }
+    }, {
+      key: "curve",
+      value: function curve(idx) {
+        return this.curves[idx];
+      }
+    }, {
+      key: "bbox",
+      value: function bbox() {
+        var c = this.curves;
+        var bbox = c[0].bbox();
+        for (var i = 1; i < c.length; i++) {
+          utils.expandbox(bbox, c[i].bbox());
+        }
+        return bbox;
+      }
+    }, {
+      key: "offset",
+      value: function offset(d) {
+        var offset = [];
+        this.curves.forEach(function (v) {
+          offset.push.apply(offset, _toConsumableArray(v.offset(d)));
+        });
+        return new PolyBezier(offset);
+      }
+    }]);
+  }();
+  /**
+    A javascript Bezier curve library by Pomax.
+
+    Based on http://pomax.github.io/bezierinfo
+
+    This code is MIT licensed.
+  **/
+  // math-inlining.
+  var abs = Math.abs,
+    min = Math.min,
+    max = Math.max,
+    cos = Math.cos,
+    sin = Math.sin,
+    acos = Math.acos,
+    sqrt = Math.sqrt;
+  var pi = Math.PI;
+
+  /**
+   * Bezier curve constructor.
+   *
+   * ...docs pending...
+   */
+  var Bezier = /*#__PURE__*/function () {
+    function Bezier(coords) {
+      _classCallCheck(this, Bezier);
+      var args = coords && coords.forEach ? coords : Array.from(arguments).slice();
+      var coordlen = false;
+      if (_typeof(args[0]) === "object") {
+        coordlen = args.length;
+        var newargs = [];
+        args.forEach(function (point) {
+          ["x", "y", "z"].forEach(function (d) {
+            if (typeof point[d] !== "undefined") {
+              newargs.push(point[d]);
+            }
+          });
+        });
+        args = newargs;
+      }
+      var higher = false;
+      var len = args.length;
+      if (coordlen) {
+        if (coordlen > 4) {
+          if (arguments.length !== 1) {
+            throw new Error("Only new Bezier(point[]) is accepted for 4th and higher order curves");
+          }
+          higher = true;
+        }
+      } else {
+        if (len !== 6 && len !== 8 && len !== 9 && len !== 12) {
+          if (arguments.length !== 1) {
+            throw new Error("Only new Bezier(point[]) is accepted for 4th and higher order curves");
+          }
+        }
+      }
+      var _3d = this._3d = !higher && (len === 9 || len === 12) || coords && coords[0] && typeof coords[0].z !== "undefined";
+      var points = this.points = [];
+      for (var idx = 0, step = _3d ? 3 : 2; idx < len; idx += step) {
+        var point = {
+          x: args[idx],
+          y: args[idx + 1]
+        };
+        if (_3d) {
+          point.z = args[idx + 2];
+        }
+        points.push(point);
+      }
+      var order = this.order = points.length - 1;
+      var dims = this.dims = ["x", "y"];
+      if (_3d) dims.push("z");
+      this.dimlen = dims.length;
+
+      // is this curve, practically speaking, a straight line?
+      var aligned = utils.align(points, {
+        p1: points[0],
+        p2: points[order]
+      });
+      var baselength = utils.dist(points[0], points[order]);
+      this._linear = aligned.reduce(function (t, p) {
+        return t + abs(p.y);
+      }, 0) < baselength / 50;
+      this._lut = [];
+      this._t1 = 0;
+      this._t2 = 1;
+      this.update();
+    }
+    return _createClass(Bezier, [{
+      key: "getUtils",
+      value: function getUtils() {
+        return Bezier.getUtils();
+      }
+    }, {
+      key: "valueOf",
+      value: function valueOf() {
+        return this.toString();
+      }
+    }, {
+      key: "toString",
+      value: function toString() {
+        return utils.pointsToString(this.points);
+      }
+    }, {
+      key: "toSVG",
+      value: function toSVG() {
+        if (this._3d) return false;
+        var p = this.points,
+          x = p[0].x,
+          y = p[0].y,
+          s = ["M", x, y, this.order === 2 ? "Q" : "C"];
+        for (var _i6 = 1, last = p.length; _i6 < last; _i6++) {
+          s.push(p[_i6].x);
+          s.push(p[_i6].y);
+        }
+        return s.join(" ");
+      }
+    }, {
+      key: "setRatios",
+      value: function setRatios(ratios) {
+        if (ratios.length !== this.points.length) {
+          throw new Error("incorrect number of ratio values");
+        }
+        this.ratios = ratios;
+        this._lut = []; //  invalidate any precomputed LUT
+      }
+    }, {
+      key: "verify",
+      value: function verify() {
+        var print = this.coordDigest();
+        if (print !== this._print) {
+          this._print = print;
+          this.update();
+        }
+      }
+    }, {
+      key: "coordDigest",
+      value: function coordDigest() {
+        return this.points.map(function (c, pos) {
+          return "" + pos + c.x + c.y + (c.z ? c.z : 0);
+        }).join("");
+      }
+    }, {
+      key: "update",
+      value: function update() {
+        // invalidate any precomputed LUT
+        this._lut = [];
+        this.dpoints = utils.derive(this.points, this._3d);
+        this.computedirection();
+      }
+    }, {
+      key: "computedirection",
+      value: function computedirection() {
+        var points = this.points;
+        var angle = utils.angle(points[0], points[this.order], points[1]);
+        this.clockwise = angle > 0;
+      }
+    }, {
+      key: "length",
+      value: function length() {
+        return utils.length(this.derivative.bind(this));
+      }
+    }, {
+      key: "getABC",
+      value: function getABC(t, B) {
+        B = B || this.get(t);
+        var S = this.points[0];
+        var E = this.points[this.order];
+        return Bezier.getABC(this.order, S, B, E, t);
+      }
+    }, {
+      key: "getLUT",
+      value: function getLUT(steps) {
+        this.verify();
+        steps = steps || 100;
+        if (this._lut.length === steps + 1) {
+          return this._lut;
+        }
+        this._lut = [];
+        // n steps means n+1 points
+        steps++;
+        this._lut = [];
+        for (var _i7 = 0, p, _t5; _i7 < steps; _i7++) {
+          _t5 = _i7 / (steps - 1);
+          p = this.compute(_t5);
+          p.t = _t5;
+          this._lut.push(p);
+        }
+        return this._lut;
+      }
+    }, {
+      key: "on",
+      value: function on(point, error) {
+        error = error || 5;
+        var lut = this.getLUT(),
+          hits = [];
+        for (var _i8 = 0, c, _t6 = 0; _i8 < lut.length; _i8++) {
+          c = lut[_i8];
+          if (utils.dist(c, point) < error) {
+            hits.push(c);
+            _t6 += _i8 / lut.length;
+          }
+        }
+        if (!hits.length) return false;
+        return t /= hits.length;
+      }
+    }, {
+      key: "project",
+      value: function project(point) {
+        // step 1: coarse check
+        var LUT = this.getLUT(),
+          l = LUT.length - 1,
+          closest = utils.closest(LUT, point),
+          mpos = closest.mpos,
+          t1 = (mpos - 1) / l,
+          t2 = (mpos + 1) / l,
+          step = 0.1 / l;
+
+        // step 2: fine check
+        var mdist = closest.mdist,
+          t = t1,
+          ft = t,
+          p;
+        mdist += 1;
+        for (var d; t < t2 + step; t += step) {
+          p = this.compute(t);
+          d = utils.dist(point, p);
+          if (d < mdist) {
+            mdist = d;
+            ft = t;
+          }
+        }
+        ft = ft < 0 ? 0 : ft > 1 ? 1 : ft;
+        p = this.compute(ft);
+        p.t = ft;
+        p.d = mdist;
+        return p;
+      }
+    }, {
+      key: "get",
+      value: function get(t) {
+        return this.compute(t);
+      }
+    }, {
+      key: "point",
+      value: function point(idx) {
+        return this.points[idx];
+      }
+    }, {
+      key: "compute",
+      value: function compute(t) {
+        if (this.ratios) {
+          return utils.computeWithRatios(t, this.points, this.ratios, this._3d);
+        }
+        return utils.compute(t, this.points, this._3d, this.ratios);
+      }
+    }, {
+      key: "raise",
+      value: function raise() {
+        var p = this.points,
+          np = [p[0]],
+          k = p.length;
+        for (var _i9 = 1, _pi, pim; _i9 < k; _i9++) {
+          _pi = p[_i9];
+          pim = p[_i9 - 1];
+          np[_i9] = {
+            x: (k - _i9) / k * _pi.x + _i9 / k * pim.x,
+            y: (k - _i9) / k * _pi.y + _i9 / k * pim.y
+          };
+        }
+        np[k] = p[k - 1];
+        return new Bezier(np);
+      }
+    }, {
+      key: "derivative",
+      value: function derivative(t) {
+        return utils.compute(t, this.dpoints[0], this._3d);
+      }
+    }, {
+      key: "dderivative",
+      value: function dderivative(t) {
+        return utils.compute(t, this.dpoints[1], this._3d);
+      }
+    }, {
+      key: "align",
+      value: function align() {
+        var p = this.points;
+        return new Bezier(utils.align(p, {
+          p1: p[0],
+          p2: p[p.length - 1]
+        }));
+      }
+    }, {
+      key: "curvature",
+      value: function curvature(t) {
+        return utils.curvature(t, this.dpoints[0], this.dpoints[1], this._3d);
+      }
+    }, {
+      key: "inflections",
+      value: function inflections() {
+        return utils.inflections(this.points);
+      }
+    }, {
+      key: "normal",
+      value: function normal(t) {
+        return this._3d ? this.__normal3(t) : this.__normal2(t);
+      }
+    }, {
+      key: "__normal2",
+      value: function __normal2(t) {
+        var d = this.derivative(t);
+        var q = sqrt(d.x * d.x + d.y * d.y);
+        return {
+          t: t,
+          x: -d.y / q,
+          y: d.x / q
+        };
+      }
+    }, {
+      key: "__normal3",
+      value: function __normal3(t) {
+        // see http://stackoverflow.com/questions/25453159
+        var r1 = this.derivative(t),
+          r2 = this.derivative(t + 0.01),
+          q1 = sqrt(r1.x * r1.x + r1.y * r1.y + r1.z * r1.z),
+          q2 = sqrt(r2.x * r2.x + r2.y * r2.y + r2.z * r2.z);
+        r1.x /= q1;
+        r1.y /= q1;
+        r1.z /= q1;
+        r2.x /= q2;
+        r2.y /= q2;
+        r2.z /= q2;
+        // cross product
+        var c = {
+          x: r2.y * r1.z - r2.z * r1.y,
+          y: r2.z * r1.x - r2.x * r1.z,
+          z: r2.x * r1.y - r2.y * r1.x
+        };
+        var m = sqrt(c.x * c.x + c.y * c.y + c.z * c.z);
+        c.x /= m;
+        c.y /= m;
+        c.z /= m;
+        // rotation matrix
+        var R = [c.x * c.x, c.x * c.y - c.z, c.x * c.z + c.y, c.x * c.y + c.z, c.y * c.y, c.y * c.z - c.x, c.x * c.z - c.y, c.y * c.z + c.x, c.z * c.z];
+        // normal vector:
+        var n = {
+          t: t,
+          x: R[0] * r1.x + R[1] * r1.y + R[2] * r1.z,
+          y: R[3] * r1.x + R[4] * r1.y + R[5] * r1.z,
+          z: R[6] * r1.x + R[7] * r1.y + R[8] * r1.z
+        };
+        return n;
+      }
+    }, {
+      key: "hull",
+      value: function hull(t) {
+        var p = this.points,
+          _p = [],
+          q = [],
+          idx = 0;
+        q[idx++] = p[0];
+        q[idx++] = p[1];
+        q[idx++] = p[2];
+        if (this.order === 3) {
+          q[idx++] = p[3];
+        }
+        // we lerp between all points at each iteration, until we have 1 point left.
+        while (p.length > 1) {
+          _p = [];
+          for (var _i10 = 0, pt, l = p.length - 1; _i10 < l; _i10++) {
+            pt = utils.lerp(t, p[_i10], p[_i10 + 1]);
+            q[idx++] = pt;
+            _p.push(pt);
+          }
+          p = _p;
+        }
+        return q;
+      }
+    }, {
+      key: "split",
+      value: function split(t1, t2) {
+        // shortcuts
+        if (t1 === 0 && !!t2) {
+          return this.split(t2).left;
+        }
+        if (t2 === 1) {
+          return this.split(t1).right;
+        }
+
+        // no shortcut: use "de Casteljau" iteration.
+        var q = this.hull(t1);
+        var result = {
+          left: this.order === 2 ? new Bezier([q[0], q[3], q[5]]) : new Bezier([q[0], q[4], q[7], q[9]]),
+          right: this.order === 2 ? new Bezier([q[5], q[4], q[2]]) : new Bezier([q[9], q[8], q[6], q[3]]),
+          span: q
+        };
+
+        // make sure we bind _t1/_t2 information!
+        result.left._t1 = utils.map(0, 0, 1, this._t1, this._t2);
+        result.left._t2 = utils.map(t1, 0, 1, this._t1, this._t2);
+        result.right._t1 = utils.map(t1, 0, 1, this._t1, this._t2);
+        result.right._t2 = utils.map(1, 0, 1, this._t1, this._t2);
+
+        // if we have no t2, we're done
+        if (!t2) {
+          return result;
+        }
+
+        // if we have a t2, split again:
+        t2 = utils.map(t2, t1, 1, 0, 1);
+        return result.right.split(t2).left;
+      }
+    }, {
+      key: "extrema",
+      value: function extrema() {
+        var result = {};
+        var roots = [];
+        this.dims.forEach(function (dim) {
+          var mfn = function mfn(v) {
+            return v[dim];
+          };
+          var p = this.dpoints[0].map(mfn);
+          result[dim] = utils.droots(p);
+          if (this.order === 3) {
+            p = this.dpoints[1].map(mfn);
+            result[dim] = result[dim].concat(utils.droots(p));
+          }
+          result[dim] = result[dim].filter(function (t) {
+            return t >= 0 && t <= 1;
+          });
+          roots = roots.concat(result[dim].sort(utils.numberSort));
+        }.bind(this));
+        result.values = roots.sort(utils.numberSort).filter(function (v, idx) {
+          return roots.indexOf(v) === idx;
+        });
+        return result;
+      }
+    }, {
+      key: "bbox",
+      value: function bbox() {
+        var extrema = this.extrema(),
+          result = {};
+        this.dims.forEach(function (d) {
+          result[d] = utils.getminmax(this, d, extrema[d]);
+        }.bind(this));
+        return result;
+      }
+    }, {
+      key: "overlaps",
+      value: function overlaps(curve) {
+        var lbbox = this.bbox(),
+          tbbox = curve.bbox();
+        return utils.bboxoverlap(lbbox, tbbox);
+      }
+    }, {
+      key: "offset",
+      value: function offset(t, d) {
+        if (typeof d !== "undefined") {
+          var c = this.get(t),
+            n = this.normal(t);
+          var ret = {
+            c: c,
+            n: n,
+            x: c.x + n.x * d,
+            y: c.y + n.y * d
+          };
+          if (this._3d) {
+            ret.z = c.z + n.z * d;
+          }
+          return ret;
+        }
+        if (this._linear) {
+          var nv = this.normal(0),
+            coords = this.points.map(function (p) {
+              var ret = {
+                x: p.x + t * nv.x,
+                y: p.y + t * nv.y
+              };
+              if (p.z && nv.z) {
+                ret.z = p.z + t * nv.z;
+              }
+              return ret;
+            });
+          return [new Bezier(coords)];
+        }
+        return this.reduce().map(function (s) {
+          if (s._linear) {
+            return s.offset(t)[0];
+          }
+          return s.scale(t);
+        });
+      }
+    }, {
+      key: "simple",
+      value: function simple() {
+        if (this.order === 3) {
+          var a1 = utils.angle(this.points[0], this.points[3], this.points[1]);
+          var a2 = utils.angle(this.points[0], this.points[3], this.points[2]);
+          if (a1 > 0 && a2 < 0 || a1 < 0 && a2 > 0) return false;
+        }
+        var n1 = this.normal(0);
+        var n2 = this.normal(1);
+        var s = n1.x * n2.x + n1.y * n2.y;
+        if (this._3d) {
+          s += n1.z * n2.z;
+        }
+        return abs(acos(s)) < pi / 3;
+      }
+    }, {
+      key: "reduce",
+      value: function reduce() {
+        // TODO: examine these var types in more detail...
+        var i,
+          t1 = 0,
+          t2 = 0,
+          step = 0.01,
+          segment,
+          pass1 = [],
+          pass2 = [];
+        // first pass: split on extrema
+        var extrema = this.extrema().values;
+        if (extrema.indexOf(0) === -1) {
+          extrema = [0].concat(extrema);
+        }
+        if (extrema.indexOf(1) === -1) {
+          extrema.push(1);
+        }
+        for (t1 = extrema[0], i = 1; i < extrema.length; i++) {
+          t2 = extrema[i];
+          segment = this.split(t1, t2);
+          segment._t1 = t1;
+          segment._t2 = t2;
+          pass1.push(segment);
+          t1 = t2;
+        }
+
+        // second pass: further reduce these segments to simple segments
+        pass1.forEach(function (p1) {
+          t1 = 0;
+          t2 = 0;
+          while (t2 <= 1) {
+            for (t2 = t1 + step; t2 <= 1 + step; t2 += step) {
+              segment = p1.split(t1, t2);
+              if (!segment.simple()) {
+                t2 -= step;
+                if (abs(t1 - t2) < step) {
+                  // we can never form a reduction
+                  return [];
+                }
+                segment = p1.split(t1, t2);
+                segment._t1 = utils.map(t1, 0, 1, p1._t1, p1._t2);
+                segment._t2 = utils.map(t2, 0, 1, p1._t1, p1._t2);
+                pass2.push(segment);
+                t1 = t2;
+                break;
+              }
+            }
+          }
+          if (t1 < 1) {
+            segment = p1.split(t1, 1);
+            segment._t1 = utils.map(t1, 0, 1, p1._t1, p1._t2);
+            segment._t2 = p1._t2;
+            pass2.push(segment);
+          }
+        });
+        return pass2;
+      }
+    }, {
+      key: "translate",
+      value: function translate(v, d1, d2) {
+        d2 = typeof d2 === "number" ? d2 : d1;
+
+        // TODO: make this take curves with control points outside
+        //       of the start-end interval into account
+
+        var o = this.order;
+        var d = this.points.map(function (_, i) {
+          return (1 - i / o) * d1 + i / o * d2;
+        });
+        return new Bezier(this.points.map(function (p, i) {
+          return {
+            x: p.x + v.x * d[i],
+            y: p.y + v.y * d[i]
+          };
+        }));
+      }
+    }, {
+      key: "scale",
+      value: function scale(d) {
+        var _this12 = this;
+        var order = this.order;
+        var distanceFn = false;
+        if (typeof d === "function") {
+          distanceFn = d;
+        }
+        if (distanceFn && order === 2) {
+          return this.raise().scale(distanceFn);
+        }
+
+        // TODO: add special handling for non-linear degenerate curves.
+
+        var clockwise = this.clockwise;
+        var points = this.points;
+        if (this._linear) {
+          return this.translate(this.normal(0), distanceFn ? distanceFn(0) : d, distanceFn ? distanceFn(1) : d);
+        }
+        var r1 = distanceFn ? distanceFn(0) : d;
+        var r2 = distanceFn ? distanceFn(1) : d;
+        var v = [this.offset(0, 10), this.offset(1, 10)];
+        var np = [];
+        var o = utils.lli4(v[0], v[0].c, v[1], v[1].c);
+        if (!o) {
+          throw new Error("cannot scale this curve. Try reducing it first.");
+        }
+
+        // move all points by distance 'd' wrt the origin 'o',
+        // and move end points by fixed distance along normal.
+        [0, 1].forEach(function (t) {
+          var p = np[t * order] = utils.copy(points[t * order]);
+          p.x += (t ? r2 : r1) * v[t].n.x;
+          p.y += (t ? r2 : r1) * v[t].n.y;
+        });
+        if (!distanceFn) {
+          // move control points to lie on the intersection of the offset
+          // derivative vector, and the origin-through-control vector
+          [0, 1].forEach(function (t) {
+            if (order === 2 && !!t) return;
+            var p = np[t * order];
+            var d = _this12.derivative(t);
+            var p2 = {
+              x: p.x + d.x,
+              y: p.y + d.y
+            };
+            np[t + 1] = utils.lli4(p, p2, o, points[t + 1]);
+          });
+          return new Bezier(np);
+        }
+
+        // move control points by "however much necessary to
+        // ensure the correct tangent to endpoint".
+        [0, 1].forEach(function (t) {
+          if (order === 2 && !!t) return;
+          var p = points[t + 1];
+          var ov = {
+            x: p.x - o.x,
+            y: p.y - o.y
+          };
+          var rc = distanceFn ? distanceFn((t + 1) / order) : d;
+          if (distanceFn && !clockwise) rc = -rc;
+          var m = sqrt(ov.x * ov.x + ov.y * ov.y);
+          ov.x /= m;
+          ov.y /= m;
+          np[t + 1] = {
+            x: p.x + rc * ov.x,
+            y: p.y + rc * ov.y
+          };
+        });
+        return new Bezier(np);
+      }
+    }, {
+      key: "outline",
+      value: function outline(d1, d2, d3, d4) {
+        d2 = d2 === undefined ? d1 : d2;
+        if (this._linear) {
+          // TODO: find the actual extrema, because they might
+          //       be before the start, or past the end.
+
+          var n = this.normal(0);
+          var start = this.points[0];
+          var end = this.points[this.points.length - 1];
+          var s, mid, e;
+          if (d3 === undefined) {
+            d3 = d1;
+            d4 = d2;
+          }
+          s = {
+            x: start.x + n.x * d1,
+            y: start.y + n.y * d1
+          };
+          e = {
+            x: end.x + n.x * d3,
+            y: end.y + n.y * d3
+          };
+          mid = {
+            x: (s.x + e.x) / 2,
+            y: (s.y + e.y) / 2
+          };
+          var fline = [s, mid, e];
+          s = {
+            x: start.x - n.x * d2,
+            y: start.y - n.y * d2
+          };
+          e = {
+            x: end.x - n.x * d4,
+            y: end.y - n.y * d4
+          };
+          mid = {
+            x: (s.x + e.x) / 2,
+            y: (s.y + e.y) / 2
+          };
+          var bline = [e, mid, s];
+          var _ls = utils.makeline(bline[2], fline[0]);
+          var _le = utils.makeline(fline[2], bline[0]);
+          var _segments2 = [_ls, new Bezier(fline), _le, new Bezier(bline)];
+          return new PolyBezier(_segments2);
+        }
+        var reduced = this.reduce(),
+          len = reduced.length,
+          fcurves = [];
+        var bcurves = [],
+          p,
+          alen = 0,
+          tlen = this.length();
+        var graduated = typeof d3 !== "undefined" && typeof d4 !== "undefined";
+        function linearDistanceFunction(s, e, tlen, alen, slen) {
+          return function (v) {
+            var f1 = alen / tlen,
+              f2 = (alen + slen) / tlen,
+              d = e - s;
+            return utils.map(v, 0, 1, s + f1 * d, s + f2 * d);
+          };
+        }
+
+        // form curve oulines
+        reduced.forEach(function (segment) {
+          var slen = segment.length();
+          if (graduated) {
+            fcurves.push(segment.scale(linearDistanceFunction(d1, d3, tlen, alen, slen)));
+            bcurves.push(segment.scale(linearDistanceFunction(-d2, -d4, tlen, alen, slen)));
+          } else {
+            fcurves.push(segment.scale(d1));
+            bcurves.push(segment.scale(-d2));
+          }
+          alen += slen;
+        });
+
+        // reverse the "return" outline
+        bcurves = bcurves.map(function (s) {
+          p = s.points;
+          if (p[3]) {
+            s.points = [p[3], p[2], p[1], p[0]];
+          } else {
+            s.points = [p[2], p[1], p[0]];
+          }
+          return s;
+        }).reverse();
+
+        // form the endcaps as lines
+        var fs = fcurves[0].points[0],
+          fe = fcurves[len - 1].points[fcurves[len - 1].points.length - 1],
+          bs = bcurves[len - 1].points[bcurves[len - 1].points.length - 1],
+          be = bcurves[0].points[0],
+          ls = utils.makeline(bs, fs),
+          le = utils.makeline(fe, be),
+          segments = [ls].concat(fcurves).concat([le]).concat(bcurves);
+        return new PolyBezier(segments);
+      }
+    }, {
+      key: "outlineshapes",
+      value: function outlineshapes(d1, d2, curveIntersectionThreshold) {
+        d2 = d2 || d1;
+        var outline = this.outline(d1, d2).curves;
+        var shapes = [];
+        for (var _i11 = 1, len = outline.length; _i11 < len / 2; _i11++) {
+          var shape = utils.makeshape(outline[_i11], outline[len - _i11], curveIntersectionThreshold);
+          shape.startcap.virtual = _i11 > 1;
+          shape.endcap.virtual = _i11 < len / 2 - 1;
+          shapes.push(shape);
+        }
+        return shapes;
+      }
+    }, {
+      key: "intersects",
+      value: function intersects(curve, curveIntersectionThreshold) {
+        if (!curve) return this.selfintersects(curveIntersectionThreshold);
+        if (curve.p1 && curve.p2) {
+          return this.lineIntersects(curve);
+        }
+        if (curve instanceof Bezier) {
+          curve = curve.reduce();
+        }
+        return this.curveintersects(this.reduce(), curve, curveIntersectionThreshold);
+      }
+    }, {
+      key: "lineIntersects",
+      value: function lineIntersects(line) {
+        var _this13 = this;
+        var mx = min(line.p1.x, line.p2.x),
+          my = min(line.p1.y, line.p2.y),
+          MX = max(line.p1.x, line.p2.x),
+          MY = max(line.p1.y, line.p2.y);
+        return utils.roots(this.points, line).filter(function (t) {
+          var p = _this13.get(t);
+          return utils.between(p.x, mx, MX) && utils.between(p.y, my, MY);
+        });
+      }
+    }, {
+      key: "selfintersects",
+      value: function selfintersects(curveIntersectionThreshold) {
+        // "simple" curves cannot intersect with their direct
+        // neighbour, so for each segment X we check whether
+        // it intersects [0:x-2][x+2:last].
+
+        var reduced = this.reduce(),
+          len = reduced.length - 2,
+          results = [];
+        for (var _i12 = 0, result, left, right; _i12 < len; _i12++) {
+          left = reduced.slice(_i12, _i12 + 1);
+          right = reduced.slice(_i12 + 2);
+          result = this.curveintersects(left, right, curveIntersectionThreshold);
+          results.push.apply(results, _toConsumableArray(result));
+        }
+        return results;
+      }
+    }, {
+      key: "curveintersects",
+      value: function curveintersects(c1, c2, curveIntersectionThreshold) {
+        var pairs = [];
+        // step 1: pair off any overlapping segments
+        c1.forEach(function (l) {
+          c2.forEach(function (r) {
+            if (l.overlaps(r)) {
+              pairs.push({
+                left: l,
+                right: r
+              });
+            }
+          });
+        });
+        // step 2: for each pairing, run through the convergence algorithm.
+        var intersections = [];
+        pairs.forEach(function (pair) {
+          var result = utils.pairiteration(pair.left, pair.right, curveIntersectionThreshold);
+          if (result.length > 0) {
+            intersections = intersections.concat(result);
+          }
+        });
+        return intersections;
+      }
+    }, {
+      key: "arcs",
+      value: function arcs(errorThreshold) {
+        errorThreshold = errorThreshold || 0.5;
+        return this._iterate(errorThreshold, []);
+      }
+    }, {
+      key: "_error",
+      value: function _error(pc, np1, s, e) {
+        var q = (e - s) / 4,
+          c1 = this.get(s + q),
+          c2 = this.get(e - q),
+          ref = utils.dist(pc, np1),
+          d1 = utils.dist(pc, c1),
+          d2 = utils.dist(pc, c2);
+        return abs(d1 - ref) + abs(d2 - ref);
+      }
+    }, {
+      key: "_iterate",
+      value: function _iterate(errorThreshold, circles) {
+        var t_s = 0,
+          t_e = 1,
+          safety;
+        // we do a binary search to find the "good `t` closest to no-longer-good"
+        do {
+          safety = 0;
+
+          // step 1: start with the maximum possible arc
+          t_e = 1;
+
+          // points:
+          var np1 = this.get(t_s),
+            np2 = void 0,
+            np3 = void 0,
+            arc = void 0,
+            prev_arc = void 0;
+
+          // booleans:
+          var curr_good = false,
+            prev_good = false,
+            done = void 0;
+
+          // numbers:
+          var t_m = t_e,
+            prev_e = 1;
+
+          // step 2: find the best possible arc
+          do {
+            prev_good = curr_good;
+            prev_arc = arc;
+            t_m = (t_s + t_e) / 2;
+            np2 = this.get(t_m);
+            np3 = this.get(t_e);
+            arc = utils.getccenter(np1, np2, np3);
+
+            //also save the t values
+            arc.interval = {
+              start: t_s,
+              end: t_e
+            };
+            var error = this._error(arc, np1, t_s, t_e);
+            curr_good = error <= errorThreshold;
+            done = prev_good && !curr_good;
+            if (!done) prev_e = t_e;
+
+            // this arc is fine: we can move 'e' up to see if we can find a wider arc
+            if (curr_good) {
+              // if e is already at max, then we're done for this arc.
+              if (t_e >= 1) {
+                // make sure we cap at t=1
+                arc.interval.end = prev_e = 1;
+                prev_arc = arc;
+                // if we capped the arc segment to t=1 we also need to make sure that
+                // the arc's end angle is correct with respect to the bezier end point.
+                if (t_e > 1) {
+                  var d = {
+                    x: arc.x + arc.r * cos(arc.e),
+                    y: arc.y + arc.r * sin(arc.e)
+                  };
+                  arc.e += utils.angle({
+                    x: arc.x,
+                    y: arc.y
+                  }, d, this.get(1));
+                }
+                break;
+              }
+              // if not, move it up by half the iteration distance
+              t_e = t_e + (t_e - t_s) / 2;
+            } else {
+              // this is a bad arc: we need to move 'e' down to find a good arc
+              t_e = t_m;
+            }
+          } while (!done && safety++ < 100);
+          if (safety >= 100) {
+            break;
+          }
+
+          // console.log("L835: [F] arc found", t_s, prev_e, prev_arc.x, prev_arc.y, prev_arc.s, prev_arc.e);
+
+          prev_arc = prev_arc ? prev_arc : arc;
+          circles.push(prev_arc);
+          t_s = prev_e;
+        } while (t_e < 1);
+        return circles;
+      }
+    }], [{
+      key: "quadraticFromPoints",
+      value: function quadraticFromPoints(p1, p2, p3, t) {
+        if (typeof t === "undefined") {
+          t = 0.5;
+        }
+        // shortcuts, although they're really dumb
+        if (t === 0) {
+          return new Bezier(p2, p2, p3);
+        }
+        if (t === 1) {
+          return new Bezier(p1, p2, p2);
+        }
+        // real fitting.
+        var abc = Bezier.getABC(2, p1, p2, p3, t);
+        return new Bezier(p1, abc.A, p3);
+      }
+    }, {
+      key: "cubicFromPoints",
+      value: function cubicFromPoints(S, B, E, t, d1) {
+        if (typeof t === "undefined") {
+          t = 0.5;
+        }
+        var abc = Bezier.getABC(3, S, B, E, t);
+        if (typeof d1 === "undefined") {
+          d1 = utils.dist(B, abc.C);
+        }
+        var d2 = d1 * (1 - t) / t;
+        var selen = utils.dist(S, E),
+          lx = (E.x - S.x) / selen,
+          ly = (E.y - S.y) / selen,
+          bx1 = d1 * lx,
+          by1 = d1 * ly,
+          bx2 = d2 * lx,
+          by2 = d2 * ly;
+        // derivation of new hull coordinates
+        var e1 = {
+            x: B.x - bx1,
+            y: B.y - by1
+          },
+          e2 = {
+            x: B.x + bx2,
+            y: B.y + by2
+          },
+          A = abc.A,
+          v1 = {
+            x: A.x + (e1.x - A.x) / (1 - t),
+            y: A.y + (e1.y - A.y) / (1 - t)
+          },
+          v2 = {
+            x: A.x + (e2.x - A.x) / t,
+            y: A.y + (e2.y - A.y) / t
+          },
+          nc1 = {
+            x: S.x + (v1.x - S.x) / t,
+            y: S.y + (v1.y - S.y) / t
+          },
+          nc2 = {
+            x: E.x + (v2.x - E.x) / (1 - t),
+            y: E.y + (v2.y - E.y) / (1 - t)
+          };
+        // ...done
+        return new Bezier(S, nc1, nc2, E);
+      }
+    }, {
+      key: "getUtils",
+      value: function getUtils() {
+        return utils;
+      }
+    }, {
+      key: "PolyBezier",
+      get: function get() {
+        return PolyBezier;
+      }
+    }, {
+      key: "getABC",
+      value: function getABC() {
+        var order = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 2;
+        var S = arguments.length > 1 ? arguments[1] : undefined;
+        var B = arguments.length > 2 ? arguments[2] : undefined;
+        var E = arguments.length > 3 ? arguments[3] : undefined;
+        var t = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 0.5;
+        var u = utils.projectionratio(t, order),
+          um = 1 - u,
+          C = {
+            x: u * S.x + um * E.x,
+            y: u * S.y + um * E.y
+          },
+          s = utils.abcratio(t, order),
+          A = {
+            x: B.x + (B.x - C.x) / s,
+            y: B.y + (B.y - C.y) / s
+          };
+        return {
+          A: A,
+          B: B,
+          C: C,
+          S: S,
+          E: E
+        };
+      }
+    }]);
+  }();
   /**
    * This function is like `assignValue` except that it doesn't assign
    * `undefined` values.
@@ -7337,13 +7634,1979 @@
     args.push(undefined, customDefaultsMerge);
     return apply(mergeWith$1, undefined, args);
   });
-  var EditorBackground = /*#__PURE__*/function (_EditorModule3) {
+  var DEFAULT_OPTIONS = {
+    splitDotKey: 'splitDot',
+    disabledSplit: false,
+    disabledSplitDot: false,
+    disabledDbclickConvert: false
+  };
+  /**
+   * 编辑器曲线化操作模块：1.双击实现指令升降级 2.实现路径选点拆分
+   *
+   * @note 注意：拆分点的样式需要在UI模块中配置，没配置默认使用UI模块中路径节点的样式
+   *
+   * @example
+   *
+   * vizpath
+   * .use(new Editor(fabricCanvas))
+   * .use(new EditorBezier())
+   * .use(new EditorUI<EditorBezierThemeConfigurators>({
+   *
+   * }))
+   */
+  var EditorBezier = /*#__PURE__*/function (_EditorModule2) {
+    function EditorBezier() {
+      var _this14;
+      var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+      _classCallCheck(this, EditorBezier);
+      _this14 = _callSuper(this, EditorBezier);
+      _this14.splitDot = null;
+      _this14.options = defaultsDeep(options, DEFAULT_OPTIONS);
+      return _this14;
+    }
+    /**
+     * 根据路径指令上的一点拆分路径指令
+     */
+    _inherits(EditorBezier, _EditorModule2);
+    return _createClass(EditorBezier, [{
+      key: "_splitInstruction",
+      value: function _splitInstruction(points, point) {
+        if (points.length === 2) {
+          return {
+            pre: [InstructionType.LINE, point.x, point.y],
+            next: [InstructionType.LINE, points[1].x, points[1].y]
+          };
+        } else {
+          var curve = new Bezier(points);
+          var _curve$project = curve.project(point),
+            _t7 = _curve$project.t;
+          var splitCurves = curve.split(_t7);
+          var path = new fabric.fabric.Path(splitCurves.left.toSVG() + splitCurves.right.toSVG()).path;
+          return {
+            pre: path[1],
+            next: path[3]
+          };
+        }
+      }
+      /**
+       * 通过线与点实现曲线化
+       */
+    }, {
+      key: "curveFromLine",
+      value: function curveFromLine(line, point) {
+        var t = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0.71;
+        var _line = _slicedToArray(line, 2),
+          start = _line[0],
+          end = _line[1];
+        var curvePoint = {
+          x: end.x + (point.x - start.x) / 2,
+          y: end.y + (point.y - start.y) / 2
+        };
+        var curve = Bezier.quadraticFromPoints.apply(Bezier, _toConsumableArray([end, curvePoint, point].flat(1)).concat([t]));
+        return curve.points[1];
+      }
+      /**
+       * 通过点与点实现曲线化
+       */
+    }, {
+      key: "curveFromPoint",
+      value: function curveFromPoint(point0, point) {
+        var centerPoint = {
+          x: (point.x + point0.x) / 2,
+          y: (point.y + point0.y) / 2
+        };
+        var dx = point.x - centerPoint.x;
+        var dy = point.y - centerPoint.y;
+        var midPoint = {
+          x: centerPoint.x - dy,
+          y: centerPoint.y + dx
+        };
+        return midPoint;
+      }
+      /**
+       * 自动降级到直线
+       */
+    }, {
+      key: "degrade",
+      value: function degrade(object) {
+        var _a;
+        var editor = (_a = this.vizpath) === null || _a === void 0 ? void 0 : _a.context.find(Editor$1);
+        if (!editor) return;
+        editor.degrade(object, 'both', true);
+      }
+      /**
+       * 自动升级到曲线
+       */
+    }, {
+      key: "upgrade",
+      value: function upgrade(object) {
+        var _a, _b, _c;
+        var vizpath = this.vizpath;
+        if (!vizpath) return;
+        var editor = (_a = this.vizpath) === null || _a === void 0 ? void 0 : _a.context.find(Editor$1);
+        if (!editor) return;
+        var pathNode = editor.objectNodeMap.get(object);
+        var _vizpath$getNeighbori = vizpath.getNeighboringNodes(pathNode),
+          pre = _vizpath$getNeighbori.pre,
+          next = _vizpath$getNeighbori.next;
+        if (pre && next) {
+          var centerPoint = {
+            x: (pre.node.x + next.node.x) / 2,
+            y: (pre.node.y + next.node.y) / 2
+          };
+          var preCurvePoint = {
+            x: pathNode.node.x + (pre.node.x - centerPoint.x),
+            y: pathNode.node.y + (pre.node.y - centerPoint.y)
+          };
+          var nextCurvePoint = {
+            x: pathNode.node.x + (next.node.x - centerPoint.x),
+            y: pathNode.node.y + (next.node.y - centerPoint.y)
+          };
+          vizpath.replace(pathNode, [InstructionType.QUADRATIC_CURCE, preCurvePoint.x, preCurvePoint.y, pathNode.node.x, pathNode.node.y]);
+          vizpath.replace(next, [InstructionType.QUADRATIC_CURCE, nextCurvePoint.x, nextCurvePoint.y, next.node.x, next.node.y]);
+          // const points = [pre, pathNode, next].map((item) => item.node!);
+          // // 这里使用quadraticFromPoints，是使三个点组合成曲线路径（点都在曲线上）
+          // const splitCurves = this._splitInstruction(
+          //   (Bezier.quadraticFromPoints as any)(...points, 0.5).points,
+          //   points[1],
+          // );
+          // const neighboringInstructions = vizpath.getNeighboringInstructions(pathNode);
+          // vizpath.replace(
+          //   pathNode.instruction[0] === InstructionType.START
+          //     ? neighboringInstructions.pre!
+          //     : pathNode,
+          //   splitCurves.pre,
+          // );
+          // vizpath.replace(neighboringInstructions.next!, splitCurves.next);
+        } else if (pre) {
+          var _vizpath$getNeighbori2 = vizpath.getNeighboringNodes(pre),
+            ppre = _vizpath$getNeighbori2.pre;
+          if (ppre) {
+            var point = this.curveFromLine(((_b = pre.curveDots) === null || _b === void 0 ? void 0 : _b.pre) ? [pre.curveDots.pre, pre.node] : [ppre.node, pre.node], pathNode.node);
+            vizpath.replace(pathNode, [InstructionType.QUADRATIC_CURCE, point.x, point.y, pathNode.node.x, pathNode.node.y]);
+          } else {
+            var midPoint = this.curveFromPoint(pre.node, pathNode.node);
+            vizpath.replace(pathNode, [InstructionType.QUADRATIC_CURCE, midPoint.x, midPoint.y, pathNode.node.x, pathNode.node.y]);
+          }
+        } else if (next) {
+          var _vizpath$getNeighbori3 = vizpath.getNeighboringNodes(next),
+            nnext = _vizpath$getNeighbori3.next;
+          if (nnext) {
+            var _point = this.curveFromLine(((_c = next.curveDots) === null || _c === void 0 ? void 0 : _c.next) ? [next.curveDots.next, next.node] : [nnext.node, next.node], pathNode.node);
+            vizpath.replace(next, [InstructionType.QUADRATIC_CURCE, _point.x, _point.y, next.node.x, next.node.y]);
+          } else {
+            var _midPoint = this.curveFromPoint(next.node, pathNode.node);
+            vizpath.replace(next, [InstructionType.QUADRATIC_CURCE, _midPoint.x, _midPoint.y, next.node.x, next.node.y]);
+          }
+        }
+      }
+      // 创建拆分点
+    }, {
+      key: "_initSpiltDot",
+      value: function _initSpiltDot(vizpath) {
+        var _a, _b, _c, _d;
+        var ui = vizpath.context.find(EditorUI);
+        var splitDotTheme = (_d = (_b = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) === null || _a === void 0 ? void 0 : _a[this.options.splitDotKey]) !== null && _b !== void 0 ? _b : (_c = ui === null || ui === void 0 ? void 0 : ui.theme) === null || _c === void 0 ? void 0 : _c.node) !== null && _d !== void 0 ? _d : DEFAULT_THEME.node;
+        var decorated = false;
+        var decorator = function decorator(customObject, callback) {
+          customObject.set({
+            name: v4(),
+            // 选中时不出现选中框
+            hasBorders: false,
+            hasControls: false,
+            // 不给选中
+            evented: false,
+            selectable: false,
+            // 保持居中
+            originX: 'center',
+            originY: 'center'
+          });
+          // 不做另外的画布缓存
+          deepIterateGroup(customObject, function (object) {
+            object.set({
+              objectCaching: false
+            });
+          });
+          if (ui && callback) {
+            ui.objectPreRenderCallbackMap.set(customObject, callback);
+          }
+          decorated = true;
+          return customObject;
+        };
+        var object = splitDotTheme(decorator);
+        if (!decorated) object = decorator(object);
+        return object;
+      }
+      // 清除拆分点
+    }, {
+      key: "_destorySplitDot",
+      value: function _destorySplitDot(vizpath) {
+        var _a;
+        if (!this.splitDot) return;
+        var ui = vizpath.context.find(EditorUI);
+        ui === null || ui === void 0 ? void 0 : ui.objectPreRenderCallbackMap["delete"](this.splitDot);
+        (_a = this.splitDot.canvas) === null || _a === void 0 ? void 0 : _a.remove(this.splitDot);
+        this.splitDot = null;
+      }
+      // 注册双击节点变换事件
+    }, {
+      key: "_initDbclickChangeEvent",
+      value: function _initDbclickChangeEvent(vizpath) {
+        var _this15 = this;
+        var _a;
+        var editor = vizpath.context.find(Editor$1);
+        if (!editor) return;
+        (_a = editor.canvas) === null || _a === void 0 ? void 0 : _a.on('mouse:dblclick', function (event) {
+          var target = event.target;
+          if (!target || !editor.nodes.includes(target)) return;
+          var curveDots = editor.curveDots.filter(function (i) {
+            return i.node === target;
+          });
+          if (curveDots.length) _this15.degrade(target);else _this15.upgrade(target);
+        });
+      }
+      // 注册指令拆分事件
+    }, {
+      key: "_initSplitEvent",
+      value: function _initSplitEvent(vizpath) {
+        var _this16 = this;
+        var editor = vizpath.context.find(Editor$1);
+        if (!editor) return;
+        var canvas = editor.canvas;
+        if (!canvas) return;
+        var pathNode;
+        var splitCrood;
+        var disableAddToken;
+        var clean = function clean() {
+          if (pathNode) {
+            if (_this16.splitDot) canvas.remove(_this16.splitDot);
+            pathNode = undefined;
+            splitCrood = undefined;
+          }
+          if (disableAddToken) {
+            editor.requestEnableFunction(disableAddToken);
+            disableAddToken = undefined;
+          }
+        };
+        editor.addCanvasEvent('mouse:move', function (e) {
+          var _a;
+          clean();
+          if (editor.setting.mode !== Mode.ADD) return;
+          if (e.target && e.target[Editor$1.symbol]) return;
+          if (e.target && e.target.type === 'activeSelection') return;
+          var pointer = calcCanvasCrood(canvas, e.pointer);
+          // 只有进入路径范围内才开始判定是否触线拆分
+          var touchPath = editor.paths.find(function (i) {
+            return i.pathObject.containsPoint(e.pointer);
+          });
+          if (!touchPath) return;
+          var segment = touchPath.segment,
+            pathObject = touchPath.pathObject;
+          var _editor$calcRelativeC = editor.calcRelativeCrood({
+              left: pointer.x,
+              top: pointer.y
+            }, pathObject),
+            x = _editor$calcRelativeC.x,
+            y = _editor$calcRelativeC.y;
+          var d = Math.max(((_a = pathObject.strokeWidth) !== null && _a !== void 0 ? _a : 0) / 2 || 1, 1);
+          var _iterator3 = _createForOfIteratorHelper(segment),
+            _step3;
+          try {
+            for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
+              var item = _step3.value;
+              var points = [];
+              if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0])) continue;
+              if (item.instruction[0] === InstructionType.LINE) {
+                var _vizpath$getNeighbori4 = vizpath.getNeighboringNodes(item, true),
+                  pre = _vizpath$getNeighbori4.pre;
+                points = [pre.node, {
+                  x: item.instruction[1],
+                  y: item.instruction[2]
+                }, {
+                  x: item.instruction[1],
+                  y: item.instruction[2]
+                }];
+              } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
+                var _vizpath$getNeighbori5 = vizpath.getNeighboringNodes(item, true),
+                  _pre = _vizpath$getNeighbori5.pre;
+                points = [_pre.node, {
+                  x: item.instruction[1],
+                  y: item.instruction[2]
+                }, {
+                  x: item.instruction[3],
+                  y: item.instruction[4]
+                }];
+              } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
+                var _vizpath$getNeighbori6 = vizpath.getNeighboringNodes(item, true),
+                  _pre2 = _vizpath$getNeighbori6.pre;
+                points = [_pre2.node, {
+                  x: item.instruction[1],
+                  y: item.instruction[2]
+                }, {
+                  x: item.instruction[3],
+                  y: item.instruction[4]
+                }, {
+                  x: item.instruction[5],
+                  y: item.instruction[6]
+                }];
+              }
+              var bezier = new Bezier(points);
+              var p = bezier.project({
+                x: x,
+                y: y
+              });
+              if (p.d && p.d < d) {
+                d = p.d;
+                pathNode = item;
+                splitCrood = p;
+              }
+            }
+          } catch (err) {
+            _iterator3.e(err);
+          } finally {
+            _iterator3.f();
+          }
+          if (pathNode && splitCrood) {
+            var _splitCrood = splitCrood,
+              _x6 = _splitCrood.x,
+              _y3 = _splitCrood.y;
+            var _editor$calcAbsoluteP = editor.calcAbsolutePosition({
+                x: _x6,
+                y: _y3
+              }, pathObject),
+              left = _editor$calcAbsoluteP.left,
+              top = _editor$calcAbsoluteP.top;
+            if (!_this16.splitDot && !_this16.options.disabledSplitDot) {
+              _this16.splitDot = _this16._initSpiltDot(vizpath);
+            }
+            var splitDot = _this16.splitDot;
+            if (splitDot) {
+              splitDot.set({
+                left: left,
+                top: top
+              });
+              canvas.add(splitDot);
+              canvas.requestRenderAll();
+            }
+            disableAddToken = editor.requestDisableFunction('add');
+          }
+        });
+        editor.addCanvasEvent('mouse:down:before', function (e) {
+          if (!pathNode || !splitCrood) return;
+          var _vizpath$getNeighbori7 = vizpath.getNeighboringInstructions(pathNode, true),
+            pre = _vizpath$getNeighbori7.pre;
+          if (!pre || !pre.node) return;
+          var splitCurves = _this16._splitInstruction([pre.node].concat(_toConsumableArray(pathNode.instruction.slice(1).reduce(function (list, _, i, arr) {
+            if (i % 2 === 0) {
+              list.push({
+                x: arr[i],
+                y: arr[i + 1]
+              });
+            }
+            return list;
+          }, []))), splitCrood);
+          var node = vizpath.replace(pathNode, splitCurves.pre);
+          if (node) {
+            var object = editor.nodeObjectMap.get(node);
+            if (object) editor.focus(object);
+            vizpath.insertAfterNode(node, splitCurves.next);
+            var insertObject = editor.nodeObjectMap.get(node);
+            editor.currentConvertNodeObject = insertObject !== null && insertObject !== void 0 ? insertObject : null;
+          }
+          clean();
+        });
+      }
+    }, {
+      key: "unload",
+      value: function unload(vizpath) {
+        this._destorySplitDot(vizpath);
+      }
+    }, {
+      key: "load",
+      value: function load(vizpath) {
+        var _this$options = this.options,
+          disabledSplit = _this$options.disabledSplit,
+          disabledSplitDot = _this$options.disabledSplitDot;
+        if (!disabledSplit) this._initSplitEvent(vizpath);
+        if (!disabledSplitDot) this._initDbclickChangeEvent(vizpath);
+      }
+    }]);
+  }(EditorModule);
+  EditorBezier.ID = 'editor-bezier';
+  var EditorSymbolType;
+  (function (EditorSymbolType) {
+    EditorSymbolType["PATH"] = "path";
+    EditorSymbolType["NODE"] = "node";
+    EditorSymbolType["CURVE_DOT"] = "curve-dot";
+    EditorSymbolType["LINE"] = "line";
+    EditorSymbolType["OTHER"] = "other";
+  })(EditorSymbolType || (EditorSymbolType = {}));
+  var Mode;
+  (function (Mode) {
+    Mode["MOVE"] = "move";
+    Mode["ADD"] = "add";
+    Mode["DELETE"] = "delete";
+    Mode["CONVERT"] = "convert";
+  })(Mode || (Mode = {}));
+  var Editor = /*#__PURE__*/function (_EditorModule3) {
+    /**
+     * 构造函数
+     * @param options 更多配置
+     */
+    function Editor(mountCanvas) {
+      var _this17;
+      var isolation = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+      _classCallCheck(this, Editor);
+      _this17 = _callSuper(this, Editor);
+      /* ---------------------------- 画布相关配置 ---------------------------- */
+      /** 挂载的画布 */
+      _this17.mountCanvas = null;
+      /** 交互所在fabric画布 */
+      _this17.canvas = null;
+      /** 当前编辑器是否使用隔离画布（模拟克隆的新画布对象） */
+      _this17.isolation = false;
+      /** 监听事件 */
+      _this17.listeners = [];
+      /** 功能禁用请求凭证 */
+      _this17.disabledFunctionTokens = {};
+      /* ---------------------------- 路径相关配置 ---------------------------- */
+      /** 路径汇总 */
+      _this17.paths = [];
+      /** 节点路径映射 */
+      _this17.nodePathMap = new Map([]);
+      /* ---------------------------- 节点相关配置 ---------------------------- */
+      /**
+       * 内置配置，配置的更改会影响编辑器的交互效果
+       */
+      _this17.setting = {
+        mode: Mode.MOVE,
+        forcePointSymmetric: 'angle'
+      };
+      /** 路径节点对象 */
+      _this17.nodes = [];
+      /** 路径曲线变换点列表 */
+      _this17.curveDots = [];
+      /** 元素画布对象 与 路径节点对象 映射 */
+      _this17.objectNodeMap = new Map([]);
+      /** 路径节点对象 与 元素画布对象 映射 */
+      _this17.nodeObjectMap = new Map([]);
+      /** 当前活跃的路径节点画布对象列表 */
+      _this17.activeNodes = [];
+      /** 当前活跃的曲线变换点画布对象 */
+      _this17.activePoint = null;
+      /** 当前转换的路径节点 */
+      _this17.currentConvertNodeObject = null;
+      /**  临时停用选择监听处理 */
+      _this17._deactivateSelectListeners = false;
+      /** 废弃的画布对象池，可用于复用减少创建消耗 */
+      _this17._abandonedPool = {
+        nodes: [],
+        points: [],
+        lines: []
+      };
+      _this17.mountCanvas = mountCanvas;
+      _this17.isolation = isolation;
+      return _this17;
+    }
+    /**
+     * 将画布坐标转化为特定路径的相对指令坐标位置
+     */
+    _inherits(Editor, _EditorModule3);
+    return _createClass(Editor, [{
+      key: "calcAbsolutePosition",
+      value: function calcAbsolutePosition(crood, object) {
+        var matrix = _toConsumableArray(object.calcOwnMatrix());
+        // 路径如果带有偏移则需要移除偏移带来的影响
+        if (object.type === 'path') {
+          var offset = fabric.fabric.util.transformPoint(object.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
+          matrix[4] -= offset.x;
+          matrix[5] -= offset.y;
+        }
+        var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(crood.x, crood.y), matrix);
+        return {
+          left: point.x,
+          top: point.y
+        };
+      }
+      /**
+       * 将路径内的相对指令坐标位置转为所在画布的坐标位置
+       */
+    }, {
+      key: "calcRelativeCrood",
+      value: function calcRelativeCrood(position, object) {
+        var matrix = _toConsumableArray(object.calcOwnMatrix());
+        if (object.type === 'path') {
+          var offset = fabric.fabric.util.transformPoint(object.pathOffset, [].concat(_toConsumableArray(matrix.slice(0, 4)), [0, 0]));
+          matrix[4] -= offset.x;
+          matrix[5] -= offset.y;
+        }
+        var point = fabric.fabric.util.transformPoint(new fabric.fabric.Point(position.left, position.top), fabric.fabric.util.invertTransform(matrix));
+        return point;
+      }
+      /**
+       * 重新修正路径的尺寸和位置
+       *
+       * @param path 路径对象
+       *
+       * @note
+       *
+       * fabric.Path对象直接改内部路径指令，只能更新其路径渲染师正确的，但对象本身的尺寸和偏移信息都是错误的，
+       * 需要使用initialize重新初始化路径，获取正确的尺寸，但是偏移是错的，该方法同时修正偏移。
+       */
+    }, {
+      key: "updatePathStatus",
+      value: function updatePathStatus(path) {
+        var _a;
+        repairPath(path);
+        (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      }
+      /**
+       * 基于挂载画布构建编辑器画布
+       */
+    }, {
+      key: "_createEditorCanvas",
+      value: function _createEditorCanvas(canvas) {
+        var _a;
+        var container = canvas.getElement().parentNode;
+        if (!container) {
+          throw new TypeError('Please use fabric.Canvas which is mounted into the document.');
+        }
+        // 如果使用隔离画布则会参考配置构造新画布使与原画布隔离
+        if (this.isolation) {
+          var editorCanvas = document.createElement('canvas');
+          container.appendChild(editorCanvas);
+          var editorFabricCanvas = new fabric.fabric.Canvas(editorCanvas, {
+            // 跟随尺寸
+            width: container.clientWidth,
+            height: container.clientHeight,
+            // 允许画布多选
+            selection: true,
+            // 画布渲染不跳过离屏元素
+            skipOffscreen: false,
+            // 保持选中元素的层级关系
+            preserveObjectStacking: true
+          });
+          // 保留画布变换
+          editorFabricCanvas.setViewportTransform((_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0]);
+          // 更多画布配置需要使用者外部配置
+          return editorFabricCanvas;
+        }
+        return canvas;
+      }
+      /**
+       * 添加元素事件监听
+       */
+    }, {
+      key: "addGlobalEvent",
+      value: function addGlobalEvent(eventName, handler) {
+        window.addEventListener(eventName, handler);
+        this.listeners.push({
+          type: 'global',
+          eventName: eventName,
+          handler: handler
+        });
+      }
+    }, {
+      key: "addCanvasEvent",
+      value: function addCanvasEvent(eventName, handler) {
+        if (!this.canvas) return;
+        this.canvas.on(eventName, handler);
+        this.listeners.push({
+          type: 'canvas',
+          eventName: eventName,
+          handler: handler
+        });
+      }
+      /**
+       * 移除事件监听
+       */
+    }, {
+      key: "removeGlobalEvent",
+      value: function removeGlobalEvent(eventName, handler) {
+        this.listeners = this.listeners.filter(function (listener) {
+          if (handler && handler !== listener.handler) return true;
+          if (eventName === listener.eventName) {
+            window.removeEventListener(listener.eventName, listener.handler);
+            return false;
+          }
+          return true;
+        });
+      }
+    }, {
+      key: "removeCanvasEvent",
+      value: function removeCanvasEvent(eventName, handler) {
+        var canvas = this.canvas;
+        if (!canvas) return;
+        this.listeners = this.listeners.filter(function (listener) {
+          if (handler && handler !== listener.handler) return true;
+          if (eventName === listener.eventName) {
+            canvas.off(listener.eventName, listener.handler);
+            return false;
+          }
+          return true;
+        });
+      }
+      /**
+       * 初始化路径绘制监听
+       */
+    }, {
+      key: "_initDrawPathListener",
+      value: function _initDrawPathListener(vizpath) {
+        var _this18 = this;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        var handler = function handler(paths) {
+          var _this18$paths;
+          var _a;
+          var ui = vizpath.context.find(EditorUI);
+          var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
+          paths.forEach(function (item) {
+            var pathObject = item.pathObject;
+            // 如果已经带有标志则是已经添加进画布的路径
+            if (pathObject[Editor.symbol]) return;
+            var decorator = function decorator(customPath, callback) {
+              customPath.set({
+                name: v4(),
+                // 路径本身不可选中，后续通过操纵点和线条来更改路径
+                selectable: false,
+                // 不触发事件
+                evented: false,
+                // 防止因为缓存没有显示正确的路径
+                objectCaching: false
+              });
+              customPath[Editor.symbol] = EditorSymbolType.PATH;
+              if (ui && callback) {
+                ui.objectPreRenderCallbackMap.set(customPath, callback);
+              }
+              return customPath;
+            };
+            theme.path(decorator, pathObject);
+            if (!pathObject[Editor.symbol]) decorator(pathObject);
+          });
+          // 添加新的路径对象
+          canvas.renderOnAddRemove = true;
+          paths.forEach(function (_ref12) {
+            var pathObject = _ref12.pathObject;
+            if (!canvas.contains(pathObject)) canvas.add(pathObject);
+          });
+          canvas.renderOnAddRemove = false;
+          canvas.requestRenderAll();
+          (_this18$paths = _this18.paths).push.apply(_this18$paths, _toConsumableArray(paths));
+          // 建立映射关系，便于减少后续计算
+          _this18.paths.forEach(function (item) {
+            item.segment.forEach(function (_ref13) {
+              var node = _ref13.node;
+              if (node) _this18.nodePathMap.set(node, item);
+            });
+          });
+        };
+        vizpath.on('draw', handler);
+      }
+      /**
+       * 初始化路径清除监听
+       */
+    }, {
+      key: "_initClearPathListener",
+      value: function _initClearPathListener(vizpath) {
+        var _this19 = this;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        var handler = function handler(paths) {
+          canvas.remove.apply(canvas, _toConsumableArray(paths.map(function (i) {
+            return i.pathObject;
+          })));
+          _this19.paths = _this19.paths.filter(function (i) {
+            return paths.includes(i);
+          });
+          // 清除映射
+          paths.forEach(function (item) {
+            item.segment.forEach(function (_ref14) {
+              var node = _ref14.node;
+              if (node) _this19.nodePathMap["delete"](node);
+            });
+          });
+        };
+        vizpath.on('clear', handler);
+        vizpath.on('clearAll', function () {
+          canvas.remove.apply(canvas, _toConsumableArray(_this19.paths.map(function (i) {
+            return i.pathObject;
+          })));
+          _this19.paths.forEach(function (item) {
+            item.segment.forEach(function (_ref15) {
+              var node = _ref15.node;
+              if (node) _this19.nodePathMap["delete"](node);
+            });
+          });
+          _this19.paths = [];
+        });
+      }
+    }, {
+      key: "_initPathNodes",
+      value: function _initPathNodes() {
+        var _this20 = this;
+        var _a;
+        var objects = [];
+        var objectNodeMap = new Map();
+        var nodeObjectMap = new Map();
+        var vizpath = this.vizpath;
+        if (!vizpath) return {
+          objects: objects,
+          objectNodeMap: objectNodeMap,
+          nodeObjectMap: nodeObjectMap
+        };
+        var ui = vizpath.context.find(EditorUI);
+        var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
+        /**
+         * 创建路径节点对应的fabric对象
+         * @param node 路径节点
+         * @param originObject 来源对象
+         */
+        var createNodeObject = function createNodeObject(node, originObject) {
+          var decorator = function decorator(customObject, callback) {
+            customObject.set({
+              name: v4(),
+              // 选中时不出现选中框
+              hasBorders: false,
+              hasControls: false,
+              // 保持居中
+              originX: 'center',
+              originY: 'center'
+            });
+            // 不做另外的画布缓存
+            deepIterateGroup(customObject, function (object) {
+              object.set({
+                objectCaching: false
+              });
+            });
+            customObject[Editor.symbol] = EditorSymbolType.NODE;
+            if (ui && callback) {
+              ui.objectPreRenderCallbackMap.set(customObject, callback);
+            }
+            return customObject;
+          };
+          var object = originObject !== null && originObject !== void 0 ? originObject : theme.node(decorator);
+          if (!object[Editor.symbol]) object = decorator(object);
+          // 加入画布时添加自动响应
+          var onAddedNode = function onAddedNode() {
+            node.observe(function (x, y) {
+              var position = _this20.calcAbsolutePosition({
+                x: x,
+                y: y
+              }, _this20.nodePathMap.get(node).pathObject);
+              if (object.group) {
+                var relativePosition = _this20.calcRelativeCrood(position, object.group);
+                object.set({
+                  left: relativePosition.x,
+                  top: relativePosition.y
+                }).setCoords();
+                object.group.addWithUpdate();
+              } else {
+                object.set(position).setCoords();
+              }
+            }, {
+              id: object.name,
+              immediate: true
+            });
+          };
+          // 移除时结束自动响应
+          var onRemovedNode = function onRemovedNode() {
+            object.off('added', onAddedNode);
+            object.off('removed', onRemovedNode);
+            node.unobserve(object.name);
+            observe(object, ['left', 'top'], function () {});
+            _this20._abandonedPool.nodes.push(object);
+          };
+          object.on('added', onAddedNode);
+          object.on('removed', onRemovedNode);
+          return object;
+        };
+        // 第一轮遍历为了重用旧对象，避免每次更新fabric对象都变化还需要重新处理聚焦事件
+        vizpath.paths.forEach(function (_ref16) {
+          var segment = _ref16.segment;
+          segment.forEach(function (item) {
+            var node = item.node;
+            if (!node) return;
+            var reuseObject = _this20.nodeObjectMap.get(item);
+            if (reuseObject) {
+              var object = createNodeObject(node, reuseObject);
+              if (!object) return;
+              objects.push(object);
+              objectNodeMap.set(object, item);
+              nodeObjectMap.set(item, object);
+            }
+          });
+        });
+        // 第二轮遍历则是为了创建新对象
+        vizpath.paths.forEach(function (_ref17) {
+          var segment = _ref17.segment;
+          segment.forEach(function (item) {
+            var node = item.node;
+            if (!node) return;
+            if (nodeObjectMap.has(item)) return;
+            var recycleObject;
+            do {
+              recycleObject = _this20._abandonedPool.nodes.pop();
+            } while (recycleObject && objectNodeMap.has(recycleObject));
+            var object = createNodeObject(node, recycleObject);
+            if (!object) return;
+            objects.push(object);
+            objectNodeMap.set(object, item);
+            nodeObjectMap.set(item, object);
+          });
+        });
+        return {
+          objects: objects,
+          objectNodeMap: objectNodeMap,
+          nodeObjectMap: nodeObjectMap
+        };
+      }
+      /**
+       * 初始路径节点绘制事件
+       */
+    }, {
+      key: "_initDrawNodeEvents",
+      value: function _initDrawNodeEvents(vizpath) {
+        var _this21 = this;
+        var updateNodes = function updateNodes() {
+          var canvas = _this21.canvas;
+          if (!canvas) return;
+          var storeActiveObjects = _this21.activeNodes;
+          // 失去当前选中状态
+          if (storeActiveObjects.length) _this21.blur();
+          // 由于需要多次添加路径节点和曲线变换点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
+          canvas.renderOnAddRemove = false;
+          // 移除旧对象
+          canvas.remove.apply(canvas, _toConsumableArray(_this21.nodes));
+          // 初始路径路径节点
+          var _this21$_initPathNode = _this21._initPathNodes(),
+            objects = _this21$_initPathNode.objects,
+            objectNodeMap = _this21$_initPathNode.objectNodeMap,
+            nodeObjectMap = _this21$_initPathNode.nodeObjectMap;
+          // 添加新对象并重新建立映射关系
+          _this21.nodes = objects;
+          canvas.add.apply(canvas, _toConsumableArray(objects));
+          _this21.objectNodeMap.clear();
+          _this21.objectNodeMap = objectNodeMap;
+          _this21.nodeObjectMap.clear();
+          _this21.nodeObjectMap = nodeObjectMap;
+          canvas.renderOnAddRemove = true;
+          canvas.requestRenderAll();
+          // 保留原聚焦状态
+          if (storeActiveObjects.length) _this21.focus.apply(_this21, _toConsumableArray(storeActiveObjects));
+        };
+        vizpath.on('draw', updateNodes);
+      }
+      /**
+       * 初始路径节点清除事件
+       */
+    }, {
+      key: "_initClearNodeEvents",
+      value: function _initClearNodeEvents(vizpath) {
+        var _this22 = this;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        vizpath.on('clear', function (path) {
+          var removeObjects = [];
+          path.forEach(function (_ref18) {
+            var segment = _ref18.segment;
+            segment.forEach(function (node) {
+              var object = _this22.nodeObjectMap.get(node);
+              if (object) removeObjects.push(object);
+            });
+          });
+          _this22.blur();
+          canvas.remove.apply(canvas, removeObjects);
+          removeObjects.forEach(function (object) {
+            var node = _this22.objectNodeMap.get(object);
+            if (node) {
+              _this22.nodeObjectMap["delete"](node);
+              _this22.objectNodeMap["delete"](object);
+            }
+          });
+          _this22.nodes = _this22.nodes.filter(function (i) {
+            return !removeObjects.includes(i);
+          });
+        });
+        vizpath.on('clearAll', function () {
+          _this22.blur();
+          canvas.remove.apply(canvas, _toConsumableArray(_this22.nodes));
+          _this22.nodes = [];
+          _this22.objectNodeMap.clear();
+          _this22.nodeObjectMap.clear();
+        });
+        vizpath.on('destroy', function () {
+          _this22._abandonedPool = {
+            nodes: [],
+            points: [],
+            lines: []
+          };
+        });
+      }
+      /**
+       * 添加活跃组的响应式变化
+       */
+    }, {
+      key: "_addActiveSelectionObserve",
+      value: function _addActiveSelectionObserve(group) {
+        var _this23 = this;
+        var initialObjectCount = group._objects.length;
+        group._objects.forEach(function (object) {
+          return observe(object, ['left', 'top'], function () {});
+        });
+        observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], function (newValue, oldValue) {
+          var _a;
+          if (!group.canvas) return;
+          if (group._objects.length !== initialObjectCount) return;
+          (_a = _this23.vizpath) === null || _a === void 0 ? void 0 : _a.onceRerenderOriginPath(function () {
+            var _a, _b;
+            var hadFollowedCroods = new Set([]);
+            var _iterator4 = _createForOfIteratorHelper(group._objects),
+              _step4;
+            try {
+              var _loop = function _loop() {
+                var object = _step4.value;
+                var followCurveDots = [];
+                var pathNode = _this23.objectNodeMap.get(object);
+                var curveDots = (_b = (_a = _this23.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
+                curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref19) {
+                  var position = _ref19.position,
+                    direction = _ref19.direction,
+                    from = _ref19.from;
+                  var _a;
+                  var crood = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
+                  if (position !== 'cur' || !crood) return;
+                  // 避免重复的曲线变换点跟随更改
+                  if (hadFollowedCroods.has(crood)) return;
+                  followCurveDots.push(crood);
+                  hadFollowedCroods.add(crood);
+                });
+                object.set({
+                  scaleX: object.scaleX / (newValue.scaleX / oldValue.scaleX),
+                  scaleY: object.scaleY / (newValue.scaleY / oldValue.scaleY),
+                  angle: object.angle - (newValue.angle - oldValue.angle)
+                });
+                var decomposeMatrix = fabric.fabric.util.qrDecompose(object.calcTransformMatrix(false));
+                var left = decomposeMatrix.translateX;
+                var top = decomposeMatrix.translateY;
+                _this23._transform(object, {
+                  left: left,
+                  top: top,
+                  scaleX: newValue.scaleX / oldValue.scaleX,
+                  scaleY: newValue.scaleY / oldValue.scaleY,
+                  angle: newValue.angle - oldValue.angle
+                }, followCurveDots);
+              };
+              for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
+                _loop();
+              }
+            } catch (err) {
+              _iterator4.e(err);
+            } finally {
+              _iterator4.f();
+            }
+            hadFollowedCroods.clear();
+          });
+        });
+      }
+      /**
+       * 添加单个活跃对象的响应式变化
+       */
+    }, {
+      key: "_addActivePointObserve",
+      value: function _addActivePointObserve(object) {
+        var _this24 = this;
+        observe(object, ['left', 'top'], function (_ref20) {
+          var left = _ref20.left,
+            top = _ref20.top;
+          var _a, _b;
+          if (object.group) return;
+          var followCurveDots = [];
+          var pathNode = _this24.objectNodeMap.get(object);
+          var curveDots = (_b = (_a = _this24.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
+          curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref21) {
+            var position = _ref21.position,
+              direction = _ref21.direction,
+              from = _ref21.from;
+            var _a;
+            var crood = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
+            if (position !== 'cur' || !crood) return;
+            followCurveDots.push(crood);
+          });
+          _this24._transform(object, {
+            left: left,
+            top: top
+          }, followCurveDots);
+        });
+      }
+      /**
+       * 初始画布节点选中事件
+       */
+    }, {
+      key: "_initSelectNodeEvents",
+      value: function _initSelectNodeEvents() {
+        var _this25 = this;
+        this.addCanvasEvent('selection:created', function (e) {
+          if (_this25._deactivateSelectListeners) return;
+          _this25.focus.apply(_this25, _toConsumableArray(_this25.canvas.getActiveObjects()));
+        });
+        this.addCanvasEvent('selection:updated', function (e) {
+          if (_this25._deactivateSelectListeners) return;
+          _this25.focus.apply(_this25, _toConsumableArray(_this25.canvas.getActiveObjects()));
+        });
+        this.addCanvasEvent('selection:cleared', function () {
+          if (_this25._deactivateSelectListeners) return;
+          _this25.focus();
+        });
+        // 选中路径段时自动选中路线段内的所有指令路径节点
+        this.addCanvasEvent('mouse:dblclick', function (e) {
+          if (e.target && e.target[Editor.symbol]) return;
+          var focusPath;
+          for (var _i13 = _this25.paths.length - 1; _i13 >= 0; _i13--) {
+            var path = _this25.paths[_i13];
+            if (path.pathObject.containsPoint(e.pointer)) {
+              focusPath = path;
+              break;
+            }
+          }
+          if (focusPath) {
+            _this25.focus.apply(_this25, _toConsumableArray(_this25.nodes.filter(function (node) {
+              return _this25.nodePathMap.get(_this25.objectNodeMap.get(node).node) === focusPath;
+            })));
+          }
+        });
+      }
+      /**
+       * 初始路径点添加事件
+       */
+    }, {
+      key: "_initAddNodeEvents",
+      value: function _initAddNodeEvents() {
+        var _this26 = this;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        this.addCanvasEvent('mouse:down:before', function (event) {
+          var _a, _b;
+          if ((_a = _this26.disabledFunctionTokens.add) === null || _a === void 0 ? void 0 : _a.length) return;
+          if (_this26.setting.mode !== Mode.ADD) return;
+          var target;
+          if (event.target && event.target[Editor.symbol]) {
+            if (_this26.activeNodes.length === 1 && event.target[Editor.symbol] === EditorSymbolType.NODE) {
+              var joinNode = _this26.link(_this26.objectNodeMap.get(_this26.activeNodes[0]), _this26.objectNodeMap.get(event.target));
+              if (joinNode) target = _this26.nodeObjectMap.get(joinNode);
+            }
+          } else {
+            // 新增节点
+            var pointer = calcCanvasCrood(canvas, event.pointer);
+            target = _this26.add({
+              left: pointer.x,
+              top: pointer.y
+            });
+            if (target) {
+              var bezier = (_b = _this26.vizpath) === null || _b === void 0 ? void 0 : _b.context.find(EditorBezier);
+              if (bezier) bezier.upgrade(target);
+            }
+          }
+          if (target) _this26.currentConvertNodeObject = target;
+        });
+      }
+      /**
+       * 添加活跃节点的周围曲线变换点
+       */
+    }, {
+      key: "_addActivePointCurveDots",
+      value: function _addActivePointCurveDots(nodeObject) {
+        var _this27 = this;
+        var _a;
+        var vizpath = this.vizpath;
+        if (!vizpath) return;
+        var canvas = nodeObject.canvas;
+        if (!canvas) return;
+        var curPathNode = this.objectNodeMap.get(nodeObject);
+        if (!curPathNode) return;
+        var ui = vizpath.context.find(EditorUI);
+        var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
+        // 创建新的路径曲线变换点
+        var curveDots = [];
+        var curveDotSet = new WeakSet([]);
+        var neighboringCurveDots = vizpath.getNeighboringCurveDots(curPathNode);
+        neighboringCurveDots.forEach(function (_ref22) {
+          var position = _ref22.position,
+            direction = _ref22.direction,
+            from = _ref22.from;
+          var _a, _b, _c;
+          var node = from.node;
+          var curveDot = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
+          if (!node || !curveDot || curveDotSet.has(curveDot)) return false;
+          var nodeObject = _this27.nodeObjectMap.get(from);
+          /**
+           * 创建指令曲线变换点
+           */
+          var pointDecorator = function pointDecorator(customObject, callback) {
+            customObject.set({
+              name: v4(),
+              // 选中时不出现选中框
+              hasBorders: false,
+              hasControls: false,
+              // 保持居中
+              originX: 'center',
+              originY: 'center'
+            });
+            // 不做另外的画布缓存
+            deepIterateGroup(customObject, function (object) {
+              object.set({
+                objectCaching: false
+              });
+            });
+            customObject[Editor.symbol] = EditorSymbolType.CURVE_DOT;
+            if (ui && callback) {
+              ui.objectPreRenderCallbackMap.set(customObject, callback);
+            }
+            return customObject;
+          };
+          var point = (_b = _this27._abandonedPool.points.pop()) !== null && _b !== void 0 ? _b : theme.dot(pointDecorator);
+          if (!point[Editor.symbol]) point = pointDecorator(point);
+          // 建立相互响应，指令的数据和元素的位置更改会相互同步
+          var onAddedPoint = function onAddedPoint() {
+            curveDot.observe(function (x, y) {
+              var _a;
+              if (((_a = point.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === point) return;
+              var position = _this27.calcAbsolutePosition({
+                x: x,
+                y: y
+              }, _this27.nodePathMap.get(node).pathObject);
+              point.set(position).setCoords();
+            }, {
+              immediate: true,
+              id: point.name
+            });
+            observe(point, ['left', 'top'], function (_ref23) {
+              var left = _ref23.left,
+                top = _ref23.top;
+              var _a;
+              if (point.group) return;
+              // 与中心点相对角度固定
+              var nodeCenter = nodeObject.getCenterPoint();
+              var pointCenter = point.getCenterPoint();
+              point.set({
+                angle: 45 + Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180 / Math.PI
+              });
+              // 响应式更改指令信息
+              if (((_a = point.canvas) === null || _a === void 0 ? void 0 : _a.getActiveObject()) === point) {
+                var crood = _this27.calcRelativeCrood({
+                  left: left,
+                  top: top
+                }, _this27.nodePathMap.get(node).pathObject);
+                // 曲线变换点对称操作
+                if (_this27.setting.forcePointSymmetric !== 'none') {
+                  var symmetricCurveDot = _this27.curveDots.find(function (i) {
+                    var _a;
+                    var antiDirection = {
+                      pre: 'next',
+                      next: 'pre'
+                    }[direction];
+                    if (i.type !== antiDirection) return false;
+                    return i.pathNode === ((_a = neighboringCurveDots.find(function (i) {
+                      return i.position === position && i.direction === antiDirection;
+                    })) === null || _a === void 0 ? void 0 : _a.from);
+                  });
+                  if (symmetricCurveDot) {
+                    var _curveDot = symmetricCurveDot.curveDot;
+                    // 旧镜像曲线变换点到路径节点的距离
+                    var d = calcCroodsDistance(_curveDot, node);
+                    // 新镜像曲线变换点到路径节点的距离
+                    var new_d = calcCroodsDistance({
+                      x: node.x - (crood.x - node.x),
+                      y: node.y - (crood.y - node.y)
+                    }, node);
+                    var scale = _this27.setting.forcePointSymmetric === 'entire' ? 1 : d / new_d;
+                    _curveDot.setCrood({
+                      x: node.x - (crood.x - node.x) * scale,
+                      y: node.y - (crood.y - node.y) * scale
+                    });
+                  }
+                }
+                curveDot.setCrood(crood, [point.name]);
+              }
+            }, true);
+          };
+          var onRemovedPoint = function onRemovedPoint() {
+            point.off('added', onAddedPoint);
+            point.off('removed', onRemovedPoint);
+            curveDot.unobserve(point.name);
+            observe(point, ['left', 'top'], function () {});
+            _this27._abandonedPool.points.push(point);
+          };
+          point.on('added', onAddedPoint);
+          point.on('removed', onRemovedPoint);
+          /**
+           * 创建曲线变换点和节点的连线
+           */
+          var lineDecorator = function lineDecorator(customObject, callback) {
+            customObject.set({
+              name: v4(),
+              // 保持比例
+              strokeUniform: true,
+              // 不允许选中
+              selectable: false,
+              evented: false,
+              // 保持居中
+              originX: 'center',
+              originY: 'center',
+              // 不做另外的画布缓存
+              objectCaching: false
+            });
+            customObject[Editor.symbol] = EditorSymbolType.LINE;
+            if (ui && callback) {
+              ui.objectPreRenderCallbackMap.set(customObject, callback);
+            }
+            return customObject;
+          };
+          var line = (_c = _this27._abandonedPool.lines.pop()) !== null && _c !== void 0 ? _c : theme.line(lineDecorator);
+          if (!line[Editor.symbol]) line = lineDecorator(line);
+          // 建立响应式，让连线随时跟随指令的值进行变化
+          var onAddedLine = function onAddedLine() {
+            node.observe(function (x, y) {
+              var position = _this27.calcAbsolutePosition({
+                x: x,
+                y: y
+              }, _this27.nodePathMap.get(node).pathObject);
+              line.set({
+                x1: position.left,
+                y1: position.top
+              });
+            }, {
+              immediate: true,
+              id: line.name
+            });
+            curveDot.observe(function (x, y) {
+              var position = _this27.calcAbsolutePosition({
+                x: x,
+                y: y
+              }, _this27.nodePathMap.get(node).pathObject);
+              line.set({
+                x2: position.left,
+                y2: position.top
+              });
+            }, {
+              immediate: true,
+              id: line.name
+            });
+          };
+          var onRemovedLine = function onRemovedLine() {
+            line.off('added', onAddedLine);
+            line.off('removed', onRemovedLine);
+            node.unobserve(line.name);
+            curveDot.unobserve(line.name);
+            _this27._abandonedPool.lines.push(line);
+          };
+          line.on('added', onAddedLine);
+          line.on('removed', onRemovedLine);
+          curveDots.push({
+            type: direction,
+            pathNode: from,
+            curveDot: curveDot,
+            node: nodeObject,
+            point: point,
+            line: line
+          });
+          curveDotSet.add(curveDot);
+        });
+        // 移除旧对象并添加新对象
+        canvas.renderOnAddRemove = false;
+        canvas.remove.apply(canvas, _toConsumableArray(this.curveDots.map(function (i) {
+          return [i.point, i.line];
+        }).flat(1)));
+        var baseIndex = canvas._objects.indexOf(this.paths[0].pathObject) + this.paths.length;
+        curveDots.forEach(function (i, idx) {
+          canvas.insertAt(i.line, baseIndex + idx, false);
+          canvas.add(i.point);
+        });
+        this.curveDots = curveDots;
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
+      }
+      /**
+       * 移除当前曲线变换点
+       */
+    }, {
+      key: "_removeCurrentCurveDots",
+      value: function _removeCurrentCurveDots() {
+        var _a;
+        var editor = (_a = this.vizpath) === null || _a === void 0 ? void 0 : _a.context.find(Editor);
+        var canvas = editor === null || editor === void 0 ? void 0 : editor.canvas;
+        if (!canvas) return;
+        canvas.renderOnAddRemove = false;
+        this.curveDots.forEach(function (i) {
+          canvas.remove(i.point, i.line);
+        });
+        this.curveDots = [];
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
+      }
+      /**
+       * 获取路径节点进行转换的配置
+       */
+    }, {
+      key: "_getConvertibleNodes",
+      value: function _getConvertibleNodes(node) {
+        if (!this.vizpath) return [];
+        var instruction = node.instruction;
+        var _this$vizpath$getNeig = this.vizpath.getNeighboringInstructions(node),
+          pre = _this$vizpath$getNeig.pre,
+          next = _this$vizpath$getNeig.next;
+        var convertibleNodes = [];
+        switch (instruction[0]) {
+          case InstructionType.START:
+            if ((pre === null || pre === void 0 ? void 0 : pre.instruction[0]) === InstructionType.LINE || (pre === null || pre === void 0 ? void 0 : pre.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
+              convertibleNodes.push(['pre', pre]);
+            }
+            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
+              convertibleNodes.push(['next', next]);
+            }
+            break;
+          case InstructionType.LINE:
+            convertibleNodes.push(['pre', node]);
+            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
+              convertibleNodes.push(['next', next]);
+            }
+            break;
+          case InstructionType.QUADRATIC_CURCE:
+            convertibleNodes.push(['pre', node]);
+            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
+              convertibleNodes.push(['next', next]);
+            }
+            break;
+          case InstructionType.BEZIER_CURVE:
+            if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
+              convertibleNodes.push(['next', next]);
+            }
+            break;
+        }
+        return convertibleNodes;
+      }
+      /**
+       * 初始路径指令转换事件
+       */
+    }, {
+      key: "_initConvertNodeEvents",
+      value: function _initConvertNodeEvents() {
+        var _this28 = this;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        this.addCanvasEvent('mouse:down', function (event) {
+          var _a, _b;
+          if ((_a = _this28.disabledFunctionTokens.convert) === null || _a === void 0 ? void 0 : _a.length) return;
+          if (!_this28.currentConvertNodeObject) {
+            if (_this28.setting.mode !== Mode.CONVERT) return;
+            if (((_b = event.target) === null || _b === void 0 ? void 0 : _b[Editor.symbol]) !== EditorSymbolType.NODE) return;
+            _this28.currentConvertNodeObject = event.target;
+          }
+          if (_this28.currentConvertNodeObject) {
+            fireMouseUpAndSelect(_this28.currentConvertNodeObject);
+            _this28.currentConvertNodeObject.set({
+              lockMovementX: true,
+              lockMovementY: true
+            });
+            canvas.selection = false;
+          }
+        });
+        this.addCanvasEvent('mouse:move', function (event) {
+          var target = _this28.currentConvertNodeObject;
+          if (!target) return;
+          // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+          if (target.containsPoint(event.pointer)) return;
+          var pointer = calcCanvasCrood(canvas, event.pointer);
+          var targetNode = _this28.objectNodeMap.get(target);
+          var pathObject = _this28.nodePathMap.get(targetNode.node).pathObject;
+          var convertibleNodes = _this28._getConvertibleNodes(targetNode);
+          var neighboringNodes = _this28.vizpath.getNeighboringNodes(targetNode, true);
+          var position = _this28.calcRelativeCrood({
+            left: pointer.x,
+            top: pointer.y
+          }, pathObject);
+          var antiPosition = _this28.calcRelativeCrood({
+            left: target.left - (pointer.x - target.left),
+            top: target.top - (pointer.y - target.top)
+          }, pathObject);
+          // 根据夹角大小排序，夹角越小意味鼠标越接近
+          if (convertibleNodes.length > 1) {
+            convertibleNodes.sort(function (a, b) {
+              return calcCroodsAngle(position, targetNode.node, neighboringNodes[a[0]].node) - calcCroodsAngle(position, targetNode.node, neighboringNodes[b[0]].node);
+            });
+          }
+          convertibleNodes.forEach(function (item, index) {
+            var _a;
+            var newCrood = [position, antiPosition][index];
+            var newInstruction = _toConsumableArray(item[1].instruction);
+            newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[newInstruction[0]];
+            newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCrood.x, newCrood.y);
+            (_a = _this28.vizpath) === null || _a === void 0 ? void 0 : _a.replace(item[1], newInstruction);
+          });
+          var targetCurveDot = _this28.curveDots.find(function (i) {
+            var _a;
+            return i.pathNode === targetNode && i.type === ((_a = convertibleNodes[0]) === null || _a === void 0 ? void 0 : _a[0]);
+          });
+          if (targetCurveDot) {
+            _this28.focus(targetCurveDot.point);
+            fireMouseUpAndSelect(targetCurveDot.point);
+          }
+        });
+        this.addCanvasEvent('mouse:up', function () {
+          if (_this28.currentConvertNodeObject) {
+            _this28.currentConvertNodeObject.set({
+              lockMovementX: false,
+              lockMovementY: false
+            });
+            _this28.currentConvertNodeObject = null;
+            canvas.selection = true;
+          }
+        });
+      }
+      /**
+       * 初始路径节点删除事件
+       */
+    }, {
+      key: "_initDeleteNodeEvents",
+      value: function _initDeleteNodeEvents() {
+        var _this29 = this;
+        this.addCanvasEvent('mouse:down', function (event) {
+          var _a, _b, _c;
+          if ((_a = _this29.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
+          if (_this29.setting.mode !== Mode.DELETE) return;
+          if (((_b = event.target) === null || _b === void 0 ? void 0 : _b[Editor.symbol]) === EditorSymbolType.NODE || ((_c = event.target) === null || _c === void 0 ? void 0 : _c[Editor.symbol]) === EditorSymbolType.CURVE_DOT) {
+            _this29.remove(event.target);
+          }
+        });
+      }
+      /**
+       * 变换节点
+       * @param object 路径节点
+       * @param options 变换配置
+       * @param followCurveDots 跟随变换的曲线变换点
+       * @returns
+       */
+    }, {
+      key: "_transform",
+      value: function _transform(object, options) {
+        var followCurveDots = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
+        var _a;
+        var pathNode = this.objectNodeMap.get(object);
+        if (!pathNode) return;
+        var node = pathNode.node;
+        var left = options.left,
+          top = options.top,
+          _options$scaleX = options.scaleX,
+          scaleX = _options$scaleX === void 0 ? 1 : _options$scaleX,
+          _options$scaleY = options.scaleY,
+          scaleY = _options$scaleY === void 0 ? 1 : _options$scaleY,
+          _options$angle = options.angle,
+          angle = _options$angle === void 0 ? 0 : _options$angle;
+        var newCrood = this.calcRelativeCrood({
+          left: left,
+          top: top
+        }, this.nodePathMap.get(node).pathObject);
+        // 需要跟随变化的曲线曲线变换点
+        followCurveDots.forEach(function (curveDot) {
+          if (!curveDot) return;
+          var relativeDiff = transform({
+            x: curveDot.x - newCrood.x,
+            y: curveDot.y - newCrood.y
+          }, [{
+            translate: {
+              x: newCrood.x - node.x,
+              y: newCrood.y - node.y
+            }
+          }, {
+            scale: {
+              x: scaleX,
+              y: scaleY
+            }
+          }, {
+            rotate: angle
+          }]);
+          curveDot.x = newCrood.x + relativeDiff.x;
+          curveDot.y = newCrood.y + relativeDiff.y;
+        });
+        // 节点位置更新
+        node.setCrood(newCrood, [object.name]);
+        (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+      }
+      /**
+       * 请求对特定功能禁用
+       *
+       * @param functionName 禁用功能名称
+       *
+       * @example
+       *
+       * // 持有凭证用于重新启用功能
+       * const token = requestDisableFunction('add');
+       *
+       * // 重新启用功能
+       * requestEnableFunction(token);
+       */
+    }, {
+      key: "requestDisableFunction",
+      value: function requestDisableFunction(functionName) {
+        var _a;
+        var token = "".concat(functionName, "-").concat(v4());
+        var tokens = (_a = this.disabledFunctionTokens[functionName]) !== null && _a !== void 0 ? _a : [];
+        tokens.push(token);
+        this.disabledFunctionTokens[functionName] = tokens;
+        return token;
+      }
+      /**
+       * 请求启用特定功能
+       */
+    }, {
+      key: "requestEnableFunction",
+      value: function requestEnableFunction(token) {
+        var functionName = token.split('-')[0];
+        var tokens = this.disabledFunctionTokens[functionName];
+        if (!tokens) return false;
+        var index = tokens.indexOf(token);
+        if (index === -1) return false;
+        tokens.splice(index, 1);
+        return true;
+      }
+      /**
+       * 添加新的路径节点
+       *
+       * @note
+       *
+       * 1）在选中单一路径节点后，将在该点后添加新的路径节点
+       *
+       * 2）在未选中节点/选中多个节点时，将直接以该参数位置创建新的起始点以开启一段新的路径
+       *
+       * @param position 新节点的画布绝对位置
+       */
+    }, {
+      key: "add",
+      value: function add(position) {
+        var _a;
+        if ((_a = this.disabledFunctionTokens.add) === null || _a === void 0 ? void 0 : _a.length) return;
+        var vizpath = this.vizpath;
+        if (!vizpath) return;
+        if (this.activeNodes.length === 1) {
+          var node = this.activeNodes[0];
+          var pathNode = this.objectNodeMap.get(node);
+          if (!pathNode) return;
+          var segment = pathNode.segment;
+          // 如果当前节点已闭合或非端点，无法实现节点添加
+          if (vizpath.isClosePath(segment)) return;
+          var newCrood = this.calcRelativeCrood(position, this.nodePathMap.get(pathNode.node).pathObject);
+          // 如果是起始点
+          if (pathNode === segment[0]) {
+            // 添加新的起始
+            var addPathNode = vizpath.insertBeforeNode(pathNode, [InstructionType.START, newCrood.x, newCrood.y]);
+            if (!addPathNode) return;
+            return this.nodeObjectMap.get(addPathNode);
+          }
+          // 如果是末尾端点
+          else if (pathNode === segment[segment.length - 1]) {
+            var _addPathNode = vizpath.insertAfterNode(pathNode, [InstructionType.LINE, newCrood.x, newCrood.y]);
+            if (!_addPathNode) return;
+            return this.nodeObjectMap.get(_addPathNode);
+          }
+        } else {
+          var path = VizPathCreator.parseFabricPath(new fabric.fabric.Path('M 0 0', position));
+          var responsivePath = vizpath.draw(path);
+          return this.nodeObjectMap.get(responsivePath[0].segment[0]);
+        }
+      }
+      /**
+       * 删除节点或变换点
+       *
+       * @note
+       *
+       * 只有以下两种情况是有效删除操作：
+       *
+       * 1） 删除1~n个路径节点:
+       *
+       * ① 删除单一点时，删除节点，并将存在前后邻近节点的前提下连接前后节点。
+       *
+       * ② 删除多点时，删除点与点间的连线实现拆分路径效果。
+       *
+       * ③ 删除的点包含路径上所有点时，直接删除整个路径
+       *
+       * 2）删除1个变换点，实现曲线路径降级为直线路径
+       *
+       * @param objects 点对象(路径节点、变换点)列表
+       */
+    }, {
+      key: "remove",
+      value: function remove() {
+        var _this30 = this;
+        var _a;
+        if ((_a = this.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
+        if (!this.vizpath) return;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        for (var _len3 = arguments.length, objects = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+          objects[_key3] = arguments[_key3];
+        }
+        var nodeObjects = objects.filter(function (i) {
+          return i[Editor.symbol] === EditorSymbolType.NODE;
+        });
+        var pointObjects = objects.filter(function (i) {
+          return i[Editor.symbol] === EditorSymbolType.CURVE_DOT;
+        });
+        if (nodeObjects.length) {
+          var _this$vizpath;
+          var removeNodes = [];
+          nodeObjects.forEach(function (object) {
+            var _this30$objectNodeMap = _this30.objectNodeMap.get(object),
+              node = _this30$objectNodeMap.node;
+            if (!node) return;
+            removeNodes.push(node);
+          });
+          this.blur();
+          // 触发鼠标举起事件，避免后续拖动操作生效
+          this.canvas._onMouseUp(new MouseEvent('mouseup'));
+          (_this$vizpath = this.vizpath).remove.apply(_this$vizpath, removeNodes);
+        }
+        if (pointObjects.length) {
+          var _this$curveDots$find = this.curveDots.find(function (i) {
+              return i.point === pointObjects[0];
+            }),
+            type = _this$curveDots$find.type,
+            node = _this$curveDots$find.node;
+          this.degrade(node, type);
+        }
+      }
+      /**
+       * 路径升级
+       *
+       * @note
+       *
+       * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
+       */
+    }, {
+      key: "upgrade",
+      value: function upgrade(object) {
+        var _this31 = this;
+        var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
+        var _a;
+        if ((_a = this.disabledFunctionTokens.upgrade) === null || _a === void 0 ? void 0 : _a.length) return;
+        if (!this.vizpath) return;
+        var pathNode = this.objectNodeMap.get(object);
+        if (!pathNode) return;
+        var instruction = pathNode.instruction,
+          node = pathNode.node;
+        var _this$vizpath$getNeig2 = this.vizpath.getNeighboringInstructions(pathNode, true),
+          pre = _this$vizpath$getNeig2.pre,
+          next = _this$vizpath$getNeig2.next;
+        var directionNodeMap = {
+          pre: instruction[0] === InstructionType.START ? pre : pathNode,
+          next: next
+        };
+        var targets = [];
+        if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
+          targets.push(['pre', directionNodeMap.pre]);
+        }
+        if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
+          targets.push(['next', directionNodeMap.next]);
+        }
+        targets.forEach(function (_ref24) {
+          var _ref25 = _slicedToArray(_ref24, 2),
+            direction = _ref25[0],
+            pathNode = _ref25[1];
+          var oldInstruction = pathNode.instruction;
+          if (oldInstruction[0] === InstructionType.BEZIER_CURVE) return;
+          var newInstruction = _toConsumableArray(oldInstruction);
+          newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[newInstruction[0]];
+          newInstruction.splice({
+            pre: -2,
+            next: 1
+          }[direction], 0, node.x, node.y);
+          _this31.vizpath.replace(pathNode, newInstruction);
+        });
+      }
+      /**
+       * 路径降级
+       *
+       * @note
+       *
+       * 二阶贝塞尔曲线会降级为直线；三阶贝塞尔曲线会先降级为二阶贝塞尔曲线，再降级才会转化为直线。
+       *
+       * @param object 节点
+       * @param [direction='both'] 降级范围
+       * @param [lowest=false] 是否直接降到直线级别
+       */
+    }, {
+      key: "degrade",
+      value: function degrade(object) {
+        var _this32 = this;
+        var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
+        var lowest = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+        var _a;
+        if ((_a = this.disabledFunctionTokens.degrade) === null || _a === void 0 ? void 0 : _a.length) return;
+        if (!this.vizpath) return;
+        var pathNode = this.objectNodeMap.get(object);
+        if (!pathNode) return;
+        var _this$vizpath$getNeig3 = this.vizpath.getNeighboringInstructions(pathNode, true),
+          pre = _this$vizpath$getNeig3.pre,
+          next = _this$vizpath$getNeig3.next;
+        var directionNodeMap = {
+          pre: pathNode.instruction[0] === InstructionType.START ? pre : pathNode,
+          next: next
+        };
+        var targets = [];
+        if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
+          targets.push(['pre', directionNodeMap.pre]);
+        }
+        if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
+          targets.push(['next', directionNodeMap.next]);
+        }
+        targets.forEach(function (_ref26) {
+          var _ref27 = _slicedToArray(_ref26, 2),
+            direction = _ref27[0],
+            pathNode = _ref27[1];
+          var oldInstruction = pathNode.instruction;
+          if ([InstructionType.START, InstructionType.LINE].includes(oldInstruction[0])) return;
+          var newInstruction = _toConsumableArray(oldInstruction);
+          if (lowest) {
+            newInstruction[0] = InstructionType.LINE;
+            newInstruction.splice(1, newInstruction.length - 3);
+          } else {
+            newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.QUADRATIC_CURCE, InstructionType.LINE), InstructionType.BEZIER_CURVE, InstructionType.QUADRATIC_CURCE)[newInstruction[0]];
+            newInstruction.splice({
+              pre: -4,
+              next: 1
+            }[direction], 2);
+          }
+          _this32.vizpath.replace(pathNode, newInstruction);
+        });
+      }
+      /**
+       * 连接两个节点，可以实现路径闭合和路径拼接，仅在两点都是路径端点（即首尾点）时生效。
+       *
+       * @param source 当前点
+       * @param target 目标点
+       */
+    }, {
+      key: "link",
+      value: function link(source, target) {
+        var _this33 = this;
+        var _a;
+        if ((_a = this.disabledFunctionTokens.link) === null || _a === void 0 ? void 0 : _a.length) return;
+        var vizpath = this.vizpath;
+        if (!vizpath) return;
+        if (source === target) return;
+        if (!vizpath.isTerminalNode(source) || !vizpath.isTerminalNode(target)) return;
+        // 自身合并，直接加'z'闭合指令即可
+        if (source.segment === target.segment) {
+          vizpath.close(source);
+          return target;
+        }
+        // 不同路径需要进行合并
+        var sourcePath = source.segment.map(function (i) {
+          return i.instruction;
+        });
+        var targetPath = target.segment.map(function (i) {
+          return i.instruction;
+        });
+        if (source.instruction === sourcePath[0]) {
+          sourcePath = reversePath(sourcePath);
+        }
+        if (target.instruction === targetPath[targetPath.length - 1]) {
+          targetPath = reversePath(targetPath);
+        }
+        targetPath.splice(0, 1, [InstructionType.LINE, targetPath[0][1], targetPath[0][2]]);
+        targetPath.map(function (item) {
+          var instruction = item;
+          for (var _i14 = 0; _i14 < instruction.length - 1; _i14 += 2) {
+            var position = _this33.calcAbsolutePosition(new fabric.fabric.Point(instruction[_i14 + 1], instruction[_i14 + 2]), vizpath.getPath(target.segment).pathObject);
+            var crood = _this33.calcRelativeCrood(position, vizpath.getPath(source.segment).pathObject);
+            instruction[_i14 + 1] = crood.x;
+            instruction[_i14 + 2] = crood.y;
+          }
+        });
+        var joinIndex = sourcePath.length;
+        var mergePath = sourcePath.concat(targetPath);
+        // 合并后添加回路径段集合
+        var newPath = vizpath.onceRerenderOriginPath(function () {
+          vizpath.clear(target.segment);
+          return vizpath.replacePathSegments(vizpath.getPath(source.segment), [mergePath]);
+        });
+        return newPath[0].segment[joinIndex];
+      }
+    }, {
+      key: "focus",
+      value: function focus() {
+        var _this34 = this;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        // 提取有效活跃元素
+        var focusNodes = [];
+        var focusCurveDotPoints = [];
+        for (var _len4 = arguments.length, selectedObjects = new Array(_len4), _key4 = 0; _key4 < _len4; _key4++) {
+          selectedObjects[_key4] = arguments[_key4];
+        }
+        selectedObjects.forEach(function (object) {
+          switch (object[Editor.symbol]) {
+            case EditorSymbolType.NODE:
+              focusNodes.push(object);
+              break;
+            case EditorSymbolType.CURVE_DOT:
+              focusCurveDotPoints.push(object);
+              break;
+          }
+        });
+        // 触发内置失焦事件
+        if (this.activePoint || this.activeNodes.length) {
+          this.fire('deselected', this.activeNodes, this.activePoint);
+        }
+        // 只要包含路径节点则只处理聚焦路径节点逻辑
+        if (focusNodes.length) {
+          this._deactivateSelectListeners = true;
+          // 取消画布选中重新构造只包含路径节点的选中框对象
+          canvas.discardActiveObject();
+          this.activeNodes = focusNodes;
+          this.activePoint = null;
+          // 是否只选中单一路径节点
+          if (focusNodes.length === 1) {
+            var focusNode = focusNodes[0];
+            this._addActivePointObserve(focusNode);
+            this._addActivePointCurveDots(focusNode);
+            canvas.setActiveObject(focusNode);
+          }
+          // 多选则成组选择
+          else if (focusNodes.length > 1) {
+            var activeSelection = new fabric.fabric.ActiveSelection(focusNodes, {
+              canvas: canvas,
+              lockScalingFlip: true,
+              // TODO: 暂不允许旋转，后续计算会出现精度问题导致多次变换后无法正确呈现位置
+              lockRotation: true,
+              originX: 'center',
+              originY: 'center'
+            });
+            if (activeSelection.lockRotation) {
+              activeSelection.setControlVisible('mtr', false);
+            }
+            this._addActiveSelectionObserve(activeSelection);
+            this._removeCurrentCurveDots();
+            canvas.setActiveObject(activeSelection);
+          }
+          this._deactivateSelectListeners = false;
+          this.fire('selected', focusNodes, null);
+        }
+        // 考虑是否只有一个曲线变换点聚焦情况，不允许多曲线变换点同时聚焦
+        else if (focusCurveDotPoints.length === 1) {
+          this.activePoint = focusCurveDotPoints[0];
+          this.activeNodes = [this.curveDots.find(function (i) {
+            return i.point === _this34.activePoint;
+          }).node];
+          canvas.setActiveObject(focusCurveDotPoints[0]);
+          this.fire('selected', this.activeNodes, this.activePoint);
+        }
+        // 如都不符合上面情况则是所有节点都失去焦点
+        else {
+          this.activeNodes = [];
+          this.activePoint = null;
+          this._removeCurrentCurveDots();
+          canvas.discardActiveObject();
+        }
+      }
+    }, {
+      key: "blur",
+      value: function blur() {
+        this.focus();
+      }
+    }, {
+      key: "unload",
+      value: function unload() {
+        var _this35 = this;
+        var canvas = this.canvas;
+        if (!canvas) return;
+        canvas.remove.apply(canvas, _toConsumableArray(this.paths.map(function (i) {
+          return i.pathObject;
+        })).concat(_toConsumableArray(this.nodes), _toConsumableArray(this.curveDots.map(function (i) {
+          return i.point;
+        })), _toConsumableArray(this.curveDots.map(function (i) {
+          return i.line;
+        }))));
+        // 节点相关配置
+        this.nodes.length = 0;
+        this.curveDots.length = 0;
+        this.activeNodes.length = 0;
+        this.activePoint = null;
+        this.currentConvertNodeObject = null;
+        this.objectNodeMap.clear();
+        this.nodeObjectMap.clear();
+        this._deactivateSelectListeners = false;
+        this._abandonedPool.nodes.length = 0;
+        this._abandonedPool.points.length = 0;
+        this._abandonedPool.lines.length = 0;
+        // 路径相关配置
+        this.paths.length = 0;
+        this.nodePathMap.clear();
+        // 画布相关配置
+        this.listeners.forEach(function (_ref28) {
+          var type = _ref28.type,
+            eventName = _ref28.eventName,
+            handler = _ref28.handler;
+          if (type === 'global') _this35.removeGlobalEvent(eventName, handler);
+          if (type === 'canvas') _this35.removeCanvasEvent(eventName, handler);
+        });
+        this.mountCanvas = null;
+        this.canvas = null;
+        this.isolation = false;
+        this.listeners.length = 0;
+        this.disabledFunctionTokens = {};
+        // 如果是隔离画布要销毁克隆画布
+        if (this.isolation) canvas.dispose();else canvas.requestRenderAll();
+      }
+    }, {
+      key: "load",
+      value: function () {
+        var _load2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7(vizpath) {
+          return _regeneratorRuntime().wrap(function _callee7$(_context7) {
+            while (1) switch (_context7.prev = _context7.next) {
+              case 0:
+                if (this.mountCanvas) {
+                  _context7.next = 2;
+                  break;
+                }
+                throw new TypeError('Please use valid canvas object.');
+              case 2:
+                if (this.mountCanvas instanceof fabric.fabric.Canvas) {
+                  _context7.next = 4;
+                  break;
+                }
+                throw new TypeError('Please use fabric.Canvas instead of fabric.StaticCanvas.');
+              case 4:
+                this.canvas = this._createEditorCanvas(this.mountCanvas);
+                this._initDrawPathListener(vizpath);
+                this._initClearPathListener(vizpath);
+                this._initDrawNodeEvents(vizpath);
+                this._initClearNodeEvents(vizpath);
+                this._initSelectNodeEvents();
+                this._initAddNodeEvents();
+                this._initConvertNodeEvents();
+                this._initDeleteNodeEvents();
+              case 13:
+              case "end":
+                return _context7.stop();
+            }
+          }, _callee7, this);
+        }));
+        function load(_x7) {
+          return _load2.apply(this, arguments);
+        }
+        return load;
+      }()
+    }]);
+  }(EditorModule);
+  Editor.ID = 'editor';
+  Editor.symbol = Symbol('editor');
+  var Editor$1 = Editor;
+  var EditorBackground = /*#__PURE__*/function (_EditorModule4) {
     function EditorBackground() {
-      var _this31;
+      var _this36;
       var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
       _classCallCheck(this, EditorBackground);
-      _this31 = _callSuper(this, EditorBackground);
-      _this31.options = {
+      _this36 = _callSuper(this, EditorBackground);
+      _this36.options = {
         grid: true,
         gridSize: 50,
         gridStyle: {
@@ -7352,8 +9615,8 @@
           strokeDashArray: [4, 2]
         }
       };
-      _this31.options = defaultsDeep(options, _this31.options);
-      return _this31;
+      _this36.options = defaultsDeep(options, _this36.options);
+      return _this36;
     }
     // private _initAlignEvents(editor: Editor) {
     //   const canvas = editor.canvas;
@@ -7379,7 +9642,7 @@
     //     }
     //   });
     // }
-    _inherits(EditorBackground, _EditorModule3);
+    _inherits(EditorBackground, _EditorModule4);
     return _createClass(EditorBackground, [{
       key: "unload",
       value: function unload(vizpath) {
@@ -7394,7 +9657,7 @@
       key: "load",
       value: function () {
         var _load3 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee8(vizpath) {
-          var editor, canvas, _this$options, grid, gridSize, gridStyle, pattern;
+          var editor, canvas, _this$options2, grid, gridSize, gridStyle, pattern;
           return _regeneratorRuntime().wrap(function _callee8$(_context8) {
             while (1) switch (_context8.prev = _context8.next) {
               case 0:
@@ -7412,7 +9675,7 @@
                 }
                 return _context8.abrupt("return");
               case 6:
-                _this$options = this.options, grid = _this$options.grid, gridSize = _this$options.gridSize, gridStyle = _this$options.gridStyle;
+                _this$options2 = this.options, grid = _this$options2.grid, gridSize = _this$options2.gridSize, gridStyle = _this$options2.gridStyle;
                 if (!(grid && gridSize > 0)) {
                   _context8.next = 11;
                   break;
@@ -7440,7 +9703,7 @@
             }
           }, _callee8, this);
         }));
-        function load(_x7) {
+        function load(_x8) {
           return _load3.apply(this, arguments);
         }
         return load;
@@ -7926,19 +10189,19 @@
   function isEqual(value, other) {
     return baseIsEqual(value, other);
   }
-  var EditorShortcut = /*#__PURE__*/function (_EditorModule4) {
+  var EditorShortcut = /*#__PURE__*/function (_EditorModule5) {
     function EditorShortcut(options) {
-      var _this32;
+      var _this37;
       _classCallCheck(this, EditorShortcut);
-      _this32 = _callSuper(this, EditorShortcut);
-      _this32.shortcuts = [];
-      _this32.shortcutOptions = options;
-      return _this32;
+      _this37 = _callSuper(this, EditorShortcut);
+      _this37.shortcuts = [];
+      _this37.shortcutOptions = options;
+      return _this37;
     }
     /**
      * 初始默认快捷键配置
      */
-    _inherits(EditorShortcut, _EditorModule4);
+    _inherits(EditorShortcut, _EditorModule5);
     return _createClass(EditorShortcut, [{
       key: "_getDefaultShortcutOptions",
       value: function _getDefaultShortcutOptions(vizpath) {
@@ -7995,7 +10258,7 @@
             var editor = vizpath.context.find(Editor$1);
             if (!editor) return;
             editor.setting.mode = 'move';
-            editor.setting.forcePointSymmetric = 'none';
+            editor.setting.forcePointSymmetric = 'angle';
           }
         }, {
           combinationKeys: ['alt', 'ctrl'],
@@ -8004,14 +10267,14 @@
             if (!editor) return;
             if (editor.setting.mode === 'move') {
               editor.setting.mode = 'convert';
-              editor.setting.forcePointSymmetric = 'angle';
+              editor.setting.forcePointSymmetric = 'none';
             }
           },
           onDeactivate: function onDeactivate() {
             var editor = vizpath.context.find(Editor$1);
             if (!editor) return;
             editor.setting.mode = 'move';
-            editor.setting.forcePointSymmetric = 'none';
+            editor.setting.forcePointSymmetric = 'angle';
           }
         },
         // 更改为添加模式
@@ -8029,7 +10292,7 @@
             var editor = vizpath.context.find(Editor$1);
             if (!editor) return;
             editor.setting.mode = 'move';
-            editor.setting.forcePointSymmetric = 'none';
+            editor.setting.forcePointSymmetric = 'angle';
           }
         }];
       }
@@ -8156,2320 +10419,6 @@
     }]);
   }(EditorModule);
   EditorShortcut.ID = 'editor-shortcut';
-
-  // math-inlining.
-  var abs$1 = Math.abs,
-    cos$1 = Math.cos,
-    sin$1 = Math.sin,
-    acos$1 = Math.acos,
-    atan2 = Math.atan2,
-    sqrt$1 = Math.sqrt,
-    pow = Math.pow;
-
-  // cube root function yielding real roots
-  function crt(v) {
-    return v < 0 ? -pow(-v, 1 / 3) : pow(v, 1 / 3);
-  }
-
-  // trig constants
-  var pi$1 = Math.PI,
-    tau = 2 * pi$1,
-    quart = pi$1 / 2,
-    // float precision significant decimal
-    epsilon = 0.000001,
-    // extremas used in bbox calculation and similar algorithms
-    nMax = Number.MAX_SAFE_INTEGER || 9007199254740991,
-    nMin = Number.MIN_SAFE_INTEGER || -9007199254740991,
-    // a zero coordinate, which is surprisingly useful
-    ZERO = {
-      x: 0,
-      y: 0,
-      z: 0
-    };
-
-  // Bezier utility functions
-  var utils = {
-    // Legendre-Gauss abscissae with n=24 (x_i values, defined at i=n as the roots of the nth order Legendre polynomial Pn(x))
-    Tvalues: [-0.0640568928626056260850430826247450385909, 0.0640568928626056260850430826247450385909, -0.1911188674736163091586398207570696318404, 0.1911188674736163091586398207570696318404, -0.3150426796961633743867932913198102407864, 0.3150426796961633743867932913198102407864, -0.4337935076260451384870842319133497124524, 0.4337935076260451384870842319133497124524, -0.5454214713888395356583756172183723700107, 0.5454214713888395356583756172183723700107, -0.6480936519369755692524957869107476266696, 0.6480936519369755692524957869107476266696, -0.7401241915785543642438281030999784255232, 0.7401241915785543642438281030999784255232, -0.8200019859739029219539498726697452080761, 0.8200019859739029219539498726697452080761, -0.8864155270044010342131543419821967550873, 0.8864155270044010342131543419821967550873, -0.9382745520027327585236490017087214496548, 0.9382745520027327585236490017087214496548, -0.9747285559713094981983919930081690617411, 0.9747285559713094981983919930081690617411, -0.9951872199970213601799974097007368118745, 0.9951872199970213601799974097007368118745],
-    // Legendre-Gauss weights with n=24 (w_i values, defined by a function linked to in the Bezier primer article)
-    Cvalues: [0.1279381953467521569740561652246953718517, 0.1279381953467521569740561652246953718517, 0.1258374563468282961213753825111836887264, 0.1258374563468282961213753825111836887264, 0.121670472927803391204463153476262425607, 0.121670472927803391204463153476262425607, 0.1155056680537256013533444839067835598622, 0.1155056680537256013533444839067835598622, 0.1074442701159656347825773424466062227946, 0.1074442701159656347825773424466062227946, 0.0976186521041138882698806644642471544279, 0.0976186521041138882698806644642471544279, 0.086190161531953275917185202983742667185, 0.086190161531953275917185202983742667185, 0.0733464814110803057340336152531165181193, 0.0733464814110803057340336152531165181193, 0.0592985849154367807463677585001085845412, 0.0592985849154367807463677585001085845412, 0.0442774388174198061686027482113382288593, 0.0442774388174198061686027482113382288593, 0.0285313886289336631813078159518782864491, 0.0285313886289336631813078159518782864491, 0.0123412297999871995468056670700372915759, 0.0123412297999871995468056670700372915759],
-    arcfn: function arcfn(t, derivativeFn) {
-      var d = derivativeFn(t);
-      var l = d.x * d.x + d.y * d.y;
-      if (typeof d.z !== "undefined") {
-        l += d.z * d.z;
-      }
-      return sqrt$1(l);
-    },
-    compute: function compute(t, points, _3d) {
-      // shortcuts
-      if (t === 0) {
-        points[0].t = 0;
-        return points[0];
-      }
-      var order = points.length - 1;
-      if (t === 1) {
-        points[order].t = 1;
-        return points[order];
-      }
-      var mt = 1 - t;
-      var p = points;
-
-      // constant?
-      if (order === 0) {
-        points[0].t = t;
-        return points[0];
-      }
-
-      // linear?
-      if (order === 1) {
-        var ret = {
-          x: mt * p[0].x + t * p[1].x,
-          y: mt * p[0].y + t * p[1].y,
-          t: t
-        };
-        if (_3d) {
-          ret.z = mt * p[0].z + t * p[1].z;
-        }
-        return ret;
-      }
-
-      // quadratic/cubic curve?
-      if (order < 4) {
-        var mt2 = mt * mt,
-          t2 = t * t,
-          a,
-          b,
-          c,
-          d = 0;
-        if (order === 2) {
-          p = [p[0], p[1], p[2], ZERO];
-          a = mt2;
-          b = mt * t * 2;
-          c = t2;
-        } else if (order === 3) {
-          a = mt2 * mt;
-          b = mt2 * t * 3;
-          c = mt * t2 * 3;
-          d = t * t2;
-        }
-        var _ret = {
-          x: a * p[0].x + b * p[1].x + c * p[2].x + d * p[3].x,
-          y: a * p[0].y + b * p[1].y + c * p[2].y + d * p[3].y,
-          t: t
-        };
-        if (_3d) {
-          _ret.z = a * p[0].z + b * p[1].z + c * p[2].z + d * p[3].z;
-        }
-        return _ret;
-      }
-
-      // higher order curves: use de Casteljau's computation
-      var dCpts = JSON.parse(JSON.stringify(points));
-      while (dCpts.length > 1) {
-        for (var _i4 = 0; _i4 < dCpts.length - 1; _i4++) {
-          dCpts[_i4] = {
-            x: dCpts[_i4].x + (dCpts[_i4 + 1].x - dCpts[_i4].x) * t,
-            y: dCpts[_i4].y + (dCpts[_i4 + 1].y - dCpts[_i4].y) * t
-          };
-          if (typeof dCpts[_i4].z !== "undefined") {
-            dCpts[_i4].z = dCpts[_i4].z + (dCpts[_i4 + 1].z - dCpts[_i4].z) * t;
-          }
-        }
-        dCpts.splice(dCpts.length - 1, 1);
-      }
-      dCpts[0].t = t;
-      return dCpts[0];
-    },
-    computeWithRatios: function computeWithRatios(t, points, ratios, _3d) {
-      var mt = 1 - t,
-        r = ratios,
-        p = points;
-      var f1 = r[0],
-        f2 = r[1],
-        f3 = r[2],
-        f4 = r[3],
-        d;
-
-      // spec for linear
-      f1 *= mt;
-      f2 *= t;
-      if (p.length === 2) {
-        d = f1 + f2;
-        return {
-          x: (f1 * p[0].x + f2 * p[1].x) / d,
-          y: (f1 * p[0].y + f2 * p[1].y) / d,
-          z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z) / d,
-          t: t
-        };
-      }
-
-      // upgrade to quadratic
-      f1 *= mt;
-      f2 *= 2 * mt;
-      f3 *= t * t;
-      if (p.length === 3) {
-        d = f1 + f2 + f3;
-        return {
-          x: (f1 * p[0].x + f2 * p[1].x + f3 * p[2].x) / d,
-          y: (f1 * p[0].y + f2 * p[1].y + f3 * p[2].y) / d,
-          z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z + f3 * p[2].z) / d,
-          t: t
-        };
-      }
-
-      // upgrade to cubic
-      f1 *= mt;
-      f2 *= 1.5 * mt;
-      f3 *= 3 * mt;
-      f4 *= t * t * t;
-      if (p.length === 4) {
-        d = f1 + f2 + f3 + f4;
-        return {
-          x: (f1 * p[0].x + f2 * p[1].x + f3 * p[2].x + f4 * p[3].x) / d,
-          y: (f1 * p[0].y + f2 * p[1].y + f3 * p[2].y + f4 * p[3].y) / d,
-          z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z + f3 * p[2].z + f4 * p[3].z) / d,
-          t: t
-        };
-      }
-    },
-    derive: function derive(points, _3d) {
-      var dpoints = [];
-      for (var p = points, d = p.length, c = d - 1; d > 1; d--, c--) {
-        var list = [];
-        for (var j = 0, dpt; j < c; j++) {
-          dpt = {
-            x: c * (p[j + 1].x - p[j].x),
-            y: c * (p[j + 1].y - p[j].y)
-          };
-          if (_3d) {
-            dpt.z = c * (p[j + 1].z - p[j].z);
-          }
-          list.push(dpt);
-        }
-        dpoints.push(list);
-        p = list;
-      }
-      return dpoints;
-    },
-    between: function between(v, m, M) {
-      return m <= v && v <= M || utils.approximately(v, m) || utils.approximately(v, M);
-    },
-    approximately: function approximately(a, b, precision) {
-      return abs$1(a - b) <= (precision || epsilon);
-    },
-    length: function length(derivativeFn) {
-      var z = 0.5,
-        len = utils.Tvalues.length;
-      var sum = 0;
-      for (var _i5 = 0, _t; _i5 < len; _i5++) {
-        _t = z * utils.Tvalues[_i5] + z;
-        sum += utils.Cvalues[_i5] * utils.arcfn(_t, derivativeFn);
-      }
-      return z * sum;
-    },
-    map: function map(v, ds, de, ts, te) {
-      var d1 = de - ds,
-        d2 = te - ts,
-        v2 = v - ds,
-        r = v2 / d1;
-      return ts + d2 * r;
-    },
-    lerp: function lerp(r, v1, v2) {
-      var ret = {
-        x: v1.x + r * (v2.x - v1.x),
-        y: v1.y + r * (v2.y - v1.y)
-      };
-      if (v1.z !== undefined && v2.z !== undefined) {
-        ret.z = v1.z + r * (v2.z - v1.z);
-      }
-      return ret;
-    },
-    pointToString: function pointToString(p) {
-      var s = p.x + "/" + p.y;
-      if (typeof p.z !== "undefined") {
-        s += "/" + p.z;
-      }
-      return s;
-    },
-    pointsToString: function pointsToString(points) {
-      return "[" + points.map(utils.pointToString).join(", ") + "]";
-    },
-    copy: function copy(obj) {
-      return JSON.parse(JSON.stringify(obj));
-    },
-    angle: function angle(o, v1, v2) {
-      var dx1 = v1.x - o.x,
-        dy1 = v1.y - o.y,
-        dx2 = v2.x - o.x,
-        dy2 = v2.y - o.y,
-        cross = dx1 * dy2 - dy1 * dx2,
-        dot = dx1 * dx2 + dy1 * dy2;
-      return atan2(cross, dot);
-    },
-    // round as string, to avoid rounding errors
-    round: function round(v, d) {
-      var s = "" + v;
-      var pos = s.indexOf(".");
-      return parseFloat(s.substring(0, pos + 1 + d));
-    },
-    dist: function dist(p1, p2) {
-      var dx = p1.x - p2.x,
-        dy = p1.y - p2.y;
-      return sqrt$1(dx * dx + dy * dy);
-    },
-    closest: function closest(LUT, point) {
-      var mdist = pow(2, 63),
-        mpos,
-        d;
-      LUT.forEach(function (p, idx) {
-        d = utils.dist(point, p);
-        if (d < mdist) {
-          mdist = d;
-          mpos = idx;
-        }
-      });
-      return {
-        mdist: mdist,
-        mpos: mpos
-      };
-    },
-    abcratio: function abcratio(t, n) {
-      // see ratio(t) note on http://pomax.github.io/bezierinfo/#abc
-      if (n !== 2 && n !== 3) {
-        return false;
-      }
-      if (typeof t === "undefined") {
-        t = 0.5;
-      } else if (t === 0 || t === 1) {
-        return t;
-      }
-      var bottom = pow(t, n) + pow(1 - t, n),
-        top = bottom - 1;
-      return abs$1(top / bottom);
-    },
-    projectionratio: function projectionratio(t, n) {
-      // see u(t) note on http://pomax.github.io/bezierinfo/#abc
-      if (n !== 2 && n !== 3) {
-        return false;
-      }
-      if (typeof t === "undefined") {
-        t = 0.5;
-      } else if (t === 0 || t === 1) {
-        return t;
-      }
-      var top = pow(1 - t, n),
-        bottom = pow(t, n) + top;
-      return top / bottom;
-    },
-    lli8: function lli8(x1, y1, x2, y2, x3, y3, x4, y4) {
-      var nx = (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4),
-        ny = (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4),
-        d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-      if (d == 0) {
-        return false;
-      }
-      return {
-        x: nx / d,
-        y: ny / d
-      };
-    },
-    lli4: function lli4(p1, p2, p3, p4) {
-      var x1 = p1.x,
-        y1 = p1.y,
-        x2 = p2.x,
-        y2 = p2.y,
-        x3 = p3.x,
-        y3 = p3.y,
-        x4 = p4.x,
-        y4 = p4.y;
-      return utils.lli8(x1, y1, x2, y2, x3, y3, x4, y4);
-    },
-    lli: function lli(v1, v2) {
-      return utils.lli4(v1, v1.c, v2, v2.c);
-    },
-    makeline: function makeline(p1, p2) {
-      return new Bezier(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2, p2.x, p2.y);
-    },
-    findbbox: function findbbox(sections) {
-      var mx = nMax,
-        my = nMax,
-        MX = nMin,
-        MY = nMin;
-      sections.forEach(function (s) {
-        var bbox = s.bbox();
-        if (mx > bbox.x.min) mx = bbox.x.min;
-        if (my > bbox.y.min) my = bbox.y.min;
-        if (MX < bbox.x.max) MX = bbox.x.max;
-        if (MY < bbox.y.max) MY = bbox.y.max;
-      });
-      return {
-        x: {
-          min: mx,
-          mid: (mx + MX) / 2,
-          max: MX,
-          size: MX - mx
-        },
-        y: {
-          min: my,
-          mid: (my + MY) / 2,
-          max: MY,
-          size: MY - my
-        }
-      };
-    },
-    shapeintersections: function shapeintersections(s1, bbox1, s2, bbox2, curveIntersectionThreshold) {
-      if (!utils.bboxoverlap(bbox1, bbox2)) return [];
-      var intersections = [];
-      var a1 = [s1.startcap, s1.forward, s1.back, s1.endcap];
-      var a2 = [s2.startcap, s2.forward, s2.back, s2.endcap];
-      a1.forEach(function (l1) {
-        if (l1.virtual) return;
-        a2.forEach(function (l2) {
-          if (l2.virtual) return;
-          var iss = l1.intersects(l2, curveIntersectionThreshold);
-          if (iss.length > 0) {
-            iss.c1 = l1;
-            iss.c2 = l2;
-            iss.s1 = s1;
-            iss.s2 = s2;
-            intersections.push(iss);
-          }
-        });
-      });
-      return intersections;
-    },
-    makeshape: function makeshape(forward, back, curveIntersectionThreshold) {
-      var bpl = back.points.length;
-      var fpl = forward.points.length;
-      var start = utils.makeline(back.points[bpl - 1], forward.points[0]);
-      var end = utils.makeline(forward.points[fpl - 1], back.points[0]);
-      var shape = {
-        startcap: start,
-        forward: forward,
-        back: back,
-        endcap: end,
-        bbox: utils.findbbox([start, forward, back, end])
-      };
-      shape.intersections = function (s2) {
-        return utils.shapeintersections(shape, shape.bbox, s2, s2.bbox, curveIntersectionThreshold);
-      };
-      return shape;
-    },
-    getminmax: function getminmax(curve, d, list) {
-      if (!list) return {
-        min: 0,
-        max: 0
-      };
-      var min = nMax,
-        max = nMin,
-        t,
-        c;
-      if (list.indexOf(0) === -1) {
-        list = [0].concat(list);
-      }
-      if (list.indexOf(1) === -1) {
-        list.push(1);
-      }
-      for (var _i6 = 0, len = list.length; _i6 < len; _i6++) {
-        t = list[_i6];
-        c = curve.get(t);
-        if (c[d] < min) {
-          min = c[d];
-        }
-        if (c[d] > max) {
-          max = c[d];
-        }
-      }
-      return {
-        min: min,
-        mid: (min + max) / 2,
-        max: max,
-        size: max - min
-      };
-    },
-    align: function align(points, line) {
-      var tx = line.p1.x,
-        ty = line.p1.y,
-        a = -atan2(line.p2.y - ty, line.p2.x - tx),
-        d = function d(v) {
-          return {
-            x: (v.x - tx) * cos$1(a) - (v.y - ty) * sin$1(a),
-            y: (v.x - tx) * sin$1(a) + (v.y - ty) * cos$1(a)
-          };
-        };
-      return points.map(d);
-    },
-    roots: function roots(points, line) {
-      line = line || {
-        p1: {
-          x: 0,
-          y: 0
-        },
-        p2: {
-          x: 1,
-          y: 0
-        }
-      };
-      var order = points.length - 1;
-      var aligned = utils.align(points, line);
-      var reduce = function reduce(t) {
-        return 0 <= t && t <= 1;
-      };
-      if (order === 2) {
-        var _a4 = aligned[0].y,
-          _b2 = aligned[1].y,
-          _c2 = aligned[2].y,
-          _d2 = _a4 - 2 * _b2 + _c2;
-        if (_d2 !== 0) {
-          var m1 = -sqrt$1(_b2 * _b2 - _a4 * _c2),
-            m2 = -_a4 + _b2,
-            _v = -(m1 + m2) / _d2,
-            v2 = -(-m1 + m2) / _d2;
-          return [_v, v2].filter(reduce);
-        } else if (_b2 !== _c2 && _d2 === 0) {
-          return [(2 * _b2 - _c2) / (2 * _b2 - 2 * _c2)].filter(reduce);
-        }
-        return [];
-      }
-
-      // see http://www.trans4mind.com/personal_development/mathematics/polynomials/cubicAlgebra.htm
-      var pa = aligned[0].y,
-        pb = aligned[1].y,
-        pc = aligned[2].y,
-        pd = aligned[3].y;
-      var d = -pa + 3 * pb - 3 * pc + pd,
-        a = 3 * pa - 6 * pb + 3 * pc,
-        b = -3 * pa + 3 * pb,
-        c = pa;
-      if (utils.approximately(d, 0)) {
-        // this is not a cubic curve.
-        if (utils.approximately(a, 0)) {
-          // in fact, this is not a quadratic curve either.
-          if (utils.approximately(b, 0)) {
-            // in fact in fact, there are no solutions.
-            return [];
-          }
-          // linear solution:
-          return [-c / b].filter(reduce);
-        }
-        // quadratic solution:
-        var _q = sqrt$1(b * b - 4 * a * c),
-          a2 = 2 * a;
-        return [(_q - b) / a2, (-b - _q) / a2].filter(reduce);
-      }
-
-      // at this point, we know we need a cubic solution:
-
-      a /= d;
-      b /= d;
-      c /= d;
-      var p = (3 * b - a * a) / 3,
-        p3 = p / 3,
-        q = (2 * a * a * a - 9 * a * b + 27 * c) / 27,
-        q2 = q / 2,
-        discriminant = q2 * q2 + p3 * p3 * p3;
-      var u1, v1, x1, x2, x3;
-      if (discriminant < 0) {
-        var mp3 = -p / 3,
-          mp33 = mp3 * mp3 * mp3,
-          r = sqrt$1(mp33),
-          _t2 = -q / (2 * r),
-          cosphi = _t2 < -1 ? -1 : _t2 > 1 ? 1 : _t2,
-          phi = acos$1(cosphi),
-          crtr = crt(r),
-          t1 = 2 * crtr;
-        x1 = t1 * cos$1(phi / 3) - a / 3;
-        x2 = t1 * cos$1((phi + tau) / 3) - a / 3;
-        x3 = t1 * cos$1((phi + 2 * tau) / 3) - a / 3;
-        return [x1, x2, x3].filter(reduce);
-      } else if (discriminant === 0) {
-        u1 = q2 < 0 ? crt(-q2) : -crt(q2);
-        x1 = 2 * u1 - a / 3;
-        x2 = -u1 - a / 3;
-        return [x1, x2].filter(reduce);
-      } else {
-        var sd = sqrt$1(discriminant);
-        u1 = crt(-q2 + sd);
-        v1 = crt(q2 + sd);
-        return [u1 - v1 - a / 3].filter(reduce);
-      }
-    },
-    droots: function droots(p) {
-      // quadratic roots are easy
-      if (p.length === 3) {
-        var a = p[0],
-          b = p[1],
-          c = p[2],
-          d = a - 2 * b + c;
-        if (d !== 0) {
-          var m1 = -sqrt$1(b * b - a * c),
-            m2 = -a + b,
-            v1 = -(m1 + m2) / d,
-            v2 = -(-m1 + m2) / d;
-          return [v1, v2];
-        } else if (b !== c && d === 0) {
-          return [(2 * b - c) / (2 * (b - c))];
-        }
-        return [];
-      }
-
-      // linear roots are even easier
-      if (p.length === 2) {
-        var _a5 = p[0],
-          _b3 = p[1];
-        if (_a5 !== _b3) {
-          return [_a5 / (_a5 - _b3)];
-        }
-        return [];
-      }
-      return [];
-    },
-    curvature: function curvature(t, d1, d2, _3d, kOnly) {
-      var num,
-        dnm,
-        adk,
-        dk,
-        k = 0,
-        r = 0;
-
-      //
-      // We're using the following formula for curvature:
-      //
-      //              x'y" - y'x"
-      //   k(t) = ------------------
-      //           (x'² + y'²)^(3/2)
-      //
-      // from https://en.wikipedia.org/wiki/Radius_of_curvature#Definition
-      //
-      // With it corresponding 3D counterpart:
-      //
-      //          sqrt( (y'z" - y"z')² + (z'x" - z"x')² + (x'y" - x"y')²)
-      //   k(t) = -------------------------------------------------------
-      //                     (x'² + y'² + z'²)^(3/2)
-      //
-
-      var d = utils.compute(t, d1);
-      var dd = utils.compute(t, d2);
-      var qdsum = d.x * d.x + d.y * d.y;
-      if (_3d) {
-        num = sqrt$1(pow(d.y * dd.z - dd.y * d.z, 2) + pow(d.z * dd.x - dd.z * d.x, 2) + pow(d.x * dd.y - dd.x * d.y, 2));
-        dnm = pow(qdsum + d.z * d.z, 3 / 2);
-      } else {
-        num = d.x * dd.y - d.y * dd.x;
-        dnm = pow(qdsum, 3 / 2);
-      }
-      if (num === 0 || dnm === 0) {
-        return {
-          k: 0,
-          r: 0
-        };
-      }
-      k = num / dnm;
-      r = dnm / num;
-
-      // We're also computing the derivative of kappa, because
-      // there is value in knowing the rate of change for the
-      // curvature along the curve. And we're just going to
-      // ballpark it based on an epsilon.
-      if (!kOnly) {
-        // compute k'(t) based on the interval before, and after it,
-        // to at least try to not introduce forward/backward pass bias.
-        var pk = utils.curvature(t - 0.001, d1, d2, _3d, true).k;
-        var nk = utils.curvature(t + 0.001, d1, d2, _3d, true).k;
-        dk = (nk - k + (k - pk)) / 2;
-        adk = (abs$1(nk - k) + abs$1(k - pk)) / 2;
-      }
-      return {
-        k: k,
-        r: r,
-        dk: dk,
-        adk: adk
-      };
-    },
-    inflections: function inflections(points) {
-      if (points.length < 4) return [];
-
-      // FIXME: TODO: add in inflection abstraction for quartic+ curves?
-
-      var p = utils.align(points, {
-          p1: points[0],
-          p2: points.slice(-1)[0]
-        }),
-        a = p[2].x * p[1].y,
-        b = p[3].x * p[1].y,
-        c = p[1].x * p[2].y,
-        d = p[3].x * p[2].y,
-        v1 = 18 * (-3 * a + 2 * b + 3 * c - d),
-        v2 = 18 * (3 * a - b - 3 * c),
-        v3 = 18 * (c - a);
-      if (utils.approximately(v1, 0)) {
-        if (!utils.approximately(v2, 0)) {
-          var _t3 = -v3 / v2;
-          if (0 <= _t3 && _t3 <= 1) return [_t3];
-        }
-        return [];
-      }
-      var d2 = 2 * v1;
-      if (utils.approximately(d2, 0)) return [];
-      var trm = v2 * v2 - 4 * v1 * v3;
-      if (trm < 0) return [];
-      var sq = Math.sqrt(trm);
-      return [(sq - v2) / d2, -(v2 + sq) / d2].filter(function (r) {
-        return 0 <= r && r <= 1;
-      });
-    },
-    bboxoverlap: function bboxoverlap(b1, b2) {
-      var dims = ["x", "y"],
-        len = dims.length;
-      for (var _i7 = 0, dim, l, _t4, d; _i7 < len; _i7++) {
-        dim = dims[_i7];
-        l = b1[dim].mid;
-        _t4 = b2[dim].mid;
-        d = (b1[dim].size + b2[dim].size) / 2;
-        if (abs$1(l - _t4) >= d) return false;
-      }
-      return true;
-    },
-    expandbox: function expandbox(bbox, _bbox) {
-      if (_bbox.x.min < bbox.x.min) {
-        bbox.x.min = _bbox.x.min;
-      }
-      if (_bbox.y.min < bbox.y.min) {
-        bbox.y.min = _bbox.y.min;
-      }
-      if (_bbox.z && _bbox.z.min < bbox.z.min) {
-        bbox.z.min = _bbox.z.min;
-      }
-      if (_bbox.x.max > bbox.x.max) {
-        bbox.x.max = _bbox.x.max;
-      }
-      if (_bbox.y.max > bbox.y.max) {
-        bbox.y.max = _bbox.y.max;
-      }
-      if (_bbox.z && _bbox.z.max > bbox.z.max) {
-        bbox.z.max = _bbox.z.max;
-      }
-      bbox.x.mid = (bbox.x.min + bbox.x.max) / 2;
-      bbox.y.mid = (bbox.y.min + bbox.y.max) / 2;
-      if (bbox.z) {
-        bbox.z.mid = (bbox.z.min + bbox.z.max) / 2;
-      }
-      bbox.x.size = bbox.x.max - bbox.x.min;
-      bbox.y.size = bbox.y.max - bbox.y.min;
-      if (bbox.z) {
-        bbox.z.size = bbox.z.max - bbox.z.min;
-      }
-    },
-    pairiteration: function pairiteration(c1, c2, curveIntersectionThreshold) {
-      var c1b = c1.bbox(),
-        c2b = c2.bbox(),
-        r = 100000,
-        threshold = curveIntersectionThreshold || 0.5;
-      if (c1b.x.size + c1b.y.size < threshold && c2b.x.size + c2b.y.size < threshold) {
-        return [(r * (c1._t1 + c1._t2) / 2 | 0) / r + "/" + (r * (c2._t1 + c2._t2) / 2 | 0) / r];
-      }
-      var cc1 = c1.split(0.5),
-        cc2 = c2.split(0.5),
-        pairs = [{
-          left: cc1.left,
-          right: cc2.left
-        }, {
-          left: cc1.left,
-          right: cc2.right
-        }, {
-          left: cc1.right,
-          right: cc2.right
-        }, {
-          left: cc1.right,
-          right: cc2.left
-        }];
-      pairs = pairs.filter(function (pair) {
-        return utils.bboxoverlap(pair.left.bbox(), pair.right.bbox());
-      });
-      var results = [];
-      if (pairs.length === 0) return results;
-      pairs.forEach(function (pair) {
-        results = results.concat(utils.pairiteration(pair.left, pair.right, threshold));
-      });
-      results = results.filter(function (v, i) {
-        return results.indexOf(v) === i;
-      });
-      return results;
-    },
-    getccenter: function getccenter(p1, p2, p3) {
-      var dx1 = p2.x - p1.x,
-        dy1 = p2.y - p1.y,
-        dx2 = p3.x - p2.x,
-        dy2 = p3.y - p2.y,
-        dx1p = dx1 * cos$1(quart) - dy1 * sin$1(quart),
-        dy1p = dx1 * sin$1(quart) + dy1 * cos$1(quart),
-        dx2p = dx2 * cos$1(quart) - dy2 * sin$1(quart),
-        dy2p = dx2 * sin$1(quart) + dy2 * cos$1(quart),
-        // chord midpoints
-        mx1 = (p1.x + p2.x) / 2,
-        my1 = (p1.y + p2.y) / 2,
-        mx2 = (p2.x + p3.x) / 2,
-        my2 = (p2.y + p3.y) / 2,
-        // midpoint offsets
-        mx1n = mx1 + dx1p,
-        my1n = my1 + dy1p,
-        mx2n = mx2 + dx2p,
-        my2n = my2 + dy2p,
-        // intersection of these lines:
-        arc = utils.lli8(mx1, my1, mx1n, my1n, mx2, my2, mx2n, my2n),
-        r = utils.dist(arc, p1);
-
-      // arc start/end values, over mid point:
-      var s = atan2(p1.y - arc.y, p1.x - arc.x),
-        m = atan2(p2.y - arc.y, p2.x - arc.x),
-        e = atan2(p3.y - arc.y, p3.x - arc.x),
-        _;
-
-      // determine arc direction (cw/ccw correction)
-      if (s < e) {
-        // if s<m<e, arc(s, e)
-        // if m<s<e, arc(e, s + tau)
-        // if s<e<m, arc(e, s + tau)
-        if (s > m || m > e) {
-          s += tau;
-        }
-        if (s > e) {
-          _ = e;
-          e = s;
-          s = _;
-        }
-      } else {
-        // if e<m<s, arc(e, s)
-        // if m<e<s, arc(s, e + tau)
-        // if e<s<m, arc(s, e + tau)
-        if (e < m && m < s) {
-          _ = e;
-          e = s;
-          s = _;
-        } else {
-          e += tau;
-        }
-      }
-      // assign and done.
-      arc.s = s;
-      arc.e = e;
-      arc.r = r;
-      return arc;
-    },
-    numberSort: function numberSort(a, b) {
-      return a - b;
-    }
-  };
-
-  /**
-   * Poly Bezier
-   * @param {[type]} curves [description]
-   */
-  var PolyBezier = /*#__PURE__*/function () {
-    function PolyBezier(curves) {
-      _classCallCheck(this, PolyBezier);
-      this.curves = [];
-      this._3d = false;
-      if (!!curves) {
-        this.curves = curves;
-        this._3d = this.curves[0]._3d;
-      }
-    }
-    return _createClass(PolyBezier, [{
-      key: "valueOf",
-      value: function valueOf() {
-        return this.toString();
-      }
-    }, {
-      key: "toString",
-      value: function toString() {
-        return "[" + this.curves.map(function (curve) {
-          return utils.pointsToString(curve.points);
-        }).join(", ") + "]";
-      }
-    }, {
-      key: "addCurve",
-      value: function addCurve(curve) {
-        this.curves.push(curve);
-        this._3d = this._3d || curve._3d;
-      }
-    }, {
-      key: "length",
-      value: function length() {
-        return this.curves.map(function (v) {
-          return v.length();
-        }).reduce(function (a, b) {
-          return a + b;
-        });
-      }
-    }, {
-      key: "curve",
-      value: function curve(idx) {
-        return this.curves[idx];
-      }
-    }, {
-      key: "bbox",
-      value: function bbox() {
-        var c = this.curves;
-        var bbox = c[0].bbox();
-        for (var i = 1; i < c.length; i++) {
-          utils.expandbox(bbox, c[i].bbox());
-        }
-        return bbox;
-      }
-    }, {
-      key: "offset",
-      value: function offset(d) {
-        var offset = [];
-        this.curves.forEach(function (v) {
-          offset.push.apply(offset, _toConsumableArray(v.offset(d)));
-        });
-        return new PolyBezier(offset);
-      }
-    }]);
-  }();
-  /**
-    A javascript Bezier curve library by Pomax.
-
-    Based on http://pomax.github.io/bezierinfo
-
-    This code is MIT licensed.
-  **/
-  // math-inlining.
-  var abs = Math.abs,
-    min = Math.min,
-    max = Math.max,
-    cos = Math.cos,
-    sin = Math.sin,
-    acos = Math.acos,
-    sqrt = Math.sqrt;
-  var pi = Math.PI;
-
-  /**
-   * Bezier curve constructor.
-   *
-   * ...docs pending...
-   */
-  var Bezier = /*#__PURE__*/function () {
-    function Bezier(coords) {
-      _classCallCheck(this, Bezier);
-      var args = coords && coords.forEach ? coords : Array.from(arguments).slice();
-      var coordlen = false;
-      if (_typeof(args[0]) === "object") {
-        coordlen = args.length;
-        var newargs = [];
-        args.forEach(function (point) {
-          ["x", "y", "z"].forEach(function (d) {
-            if (typeof point[d] !== "undefined") {
-              newargs.push(point[d]);
-            }
-          });
-        });
-        args = newargs;
-      }
-      var higher = false;
-      var len = args.length;
-      if (coordlen) {
-        if (coordlen > 4) {
-          if (arguments.length !== 1) {
-            throw new Error("Only new Bezier(point[]) is accepted for 4th and higher order curves");
-          }
-          higher = true;
-        }
-      } else {
-        if (len !== 6 && len !== 8 && len !== 9 && len !== 12) {
-          if (arguments.length !== 1) {
-            throw new Error("Only new Bezier(point[]) is accepted for 4th and higher order curves");
-          }
-        }
-      }
-      var _3d = this._3d = !higher && (len === 9 || len === 12) || coords && coords[0] && typeof coords[0].z !== "undefined";
-      var points = this.points = [];
-      for (var idx = 0, step = _3d ? 3 : 2; idx < len; idx += step) {
-        var point = {
-          x: args[idx],
-          y: args[idx + 1]
-        };
-        if (_3d) {
-          point.z = args[idx + 2];
-        }
-        points.push(point);
-      }
-      var order = this.order = points.length - 1;
-      var dims = this.dims = ["x", "y"];
-      if (_3d) dims.push("z");
-      this.dimlen = dims.length;
-
-      // is this curve, practically speaking, a straight line?
-      var aligned = utils.align(points, {
-        p1: points[0],
-        p2: points[order]
-      });
-      var baselength = utils.dist(points[0], points[order]);
-      this._linear = aligned.reduce(function (t, p) {
-        return t + abs(p.y);
-      }, 0) < baselength / 50;
-      this._lut = [];
-      this._t1 = 0;
-      this._t2 = 1;
-      this.update();
-    }
-    return _createClass(Bezier, [{
-      key: "getUtils",
-      value: function getUtils() {
-        return Bezier.getUtils();
-      }
-    }, {
-      key: "valueOf",
-      value: function valueOf() {
-        return this.toString();
-      }
-    }, {
-      key: "toString",
-      value: function toString() {
-        return utils.pointsToString(this.points);
-      }
-    }, {
-      key: "toSVG",
-      value: function toSVG() {
-        if (this._3d) return false;
-        var p = this.points,
-          x = p[0].x,
-          y = p[0].y,
-          s = ["M", x, y, this.order === 2 ? "Q" : "C"];
-        for (var _i8 = 1, last = p.length; _i8 < last; _i8++) {
-          s.push(p[_i8].x);
-          s.push(p[_i8].y);
-        }
-        return s.join(" ");
-      }
-    }, {
-      key: "setRatios",
-      value: function setRatios(ratios) {
-        if (ratios.length !== this.points.length) {
-          throw new Error("incorrect number of ratio values");
-        }
-        this.ratios = ratios;
-        this._lut = []; //  invalidate any precomputed LUT
-      }
-    }, {
-      key: "verify",
-      value: function verify() {
-        var print = this.coordDigest();
-        if (print !== this._print) {
-          this._print = print;
-          this.update();
-        }
-      }
-    }, {
-      key: "coordDigest",
-      value: function coordDigest() {
-        return this.points.map(function (c, pos) {
-          return "" + pos + c.x + c.y + (c.z ? c.z : 0);
-        }).join("");
-      }
-    }, {
-      key: "update",
-      value: function update() {
-        // invalidate any precomputed LUT
-        this._lut = [];
-        this.dpoints = utils.derive(this.points, this._3d);
-        this.computedirection();
-      }
-    }, {
-      key: "computedirection",
-      value: function computedirection() {
-        var points = this.points;
-        var angle = utils.angle(points[0], points[this.order], points[1]);
-        this.clockwise = angle > 0;
-      }
-    }, {
-      key: "length",
-      value: function length() {
-        return utils.length(this.derivative.bind(this));
-      }
-    }, {
-      key: "getABC",
-      value: function getABC(t, B) {
-        B = B || this.get(t);
-        var S = this.points[0];
-        var E = this.points[this.order];
-        return Bezier.getABC(this.order, S, B, E, t);
-      }
-    }, {
-      key: "getLUT",
-      value: function getLUT(steps) {
-        this.verify();
-        steps = steps || 100;
-        if (this._lut.length === steps + 1) {
-          return this._lut;
-        }
-        this._lut = [];
-        // n steps means n+1 points
-        steps++;
-        this._lut = [];
-        for (var _i9 = 0, p, _t5; _i9 < steps; _i9++) {
-          _t5 = _i9 / (steps - 1);
-          p = this.compute(_t5);
-          p.t = _t5;
-          this._lut.push(p);
-        }
-        return this._lut;
-      }
-    }, {
-      key: "on",
-      value: function on(point, error) {
-        error = error || 5;
-        var lut = this.getLUT(),
-          hits = [];
-        for (var _i10 = 0, c, _t6 = 0; _i10 < lut.length; _i10++) {
-          c = lut[_i10];
-          if (utils.dist(c, point) < error) {
-            hits.push(c);
-            _t6 += _i10 / lut.length;
-          }
-        }
-        if (!hits.length) return false;
-        return t /= hits.length;
-      }
-    }, {
-      key: "project",
-      value: function project(point) {
-        // step 1: coarse check
-        var LUT = this.getLUT(),
-          l = LUT.length - 1,
-          closest = utils.closest(LUT, point),
-          mpos = closest.mpos,
-          t1 = (mpos - 1) / l,
-          t2 = (mpos + 1) / l,
-          step = 0.1 / l;
-
-        // step 2: fine check
-        var mdist = closest.mdist,
-          t = t1,
-          ft = t,
-          p;
-        mdist += 1;
-        for (var d; t < t2 + step; t += step) {
-          p = this.compute(t);
-          d = utils.dist(point, p);
-          if (d < mdist) {
-            mdist = d;
-            ft = t;
-          }
-        }
-        ft = ft < 0 ? 0 : ft > 1 ? 1 : ft;
-        p = this.compute(ft);
-        p.t = ft;
-        p.d = mdist;
-        return p;
-      }
-    }, {
-      key: "get",
-      value: function get(t) {
-        return this.compute(t);
-      }
-    }, {
-      key: "point",
-      value: function point(idx) {
-        return this.points[idx];
-      }
-    }, {
-      key: "compute",
-      value: function compute(t) {
-        if (this.ratios) {
-          return utils.computeWithRatios(t, this.points, this.ratios, this._3d);
-        }
-        return utils.compute(t, this.points, this._3d, this.ratios);
-      }
-    }, {
-      key: "raise",
-      value: function raise() {
-        var p = this.points,
-          np = [p[0]],
-          k = p.length;
-        for (var _i11 = 1, _pi, pim; _i11 < k; _i11++) {
-          _pi = p[_i11];
-          pim = p[_i11 - 1];
-          np[_i11] = {
-            x: (k - _i11) / k * _pi.x + _i11 / k * pim.x,
-            y: (k - _i11) / k * _pi.y + _i11 / k * pim.y
-          };
-        }
-        np[k] = p[k - 1];
-        return new Bezier(np);
-      }
-    }, {
-      key: "derivative",
-      value: function derivative(t) {
-        return utils.compute(t, this.dpoints[0], this._3d);
-      }
-    }, {
-      key: "dderivative",
-      value: function dderivative(t) {
-        return utils.compute(t, this.dpoints[1], this._3d);
-      }
-    }, {
-      key: "align",
-      value: function align() {
-        var p = this.points;
-        return new Bezier(utils.align(p, {
-          p1: p[0],
-          p2: p[p.length - 1]
-        }));
-      }
-    }, {
-      key: "curvature",
-      value: function curvature(t) {
-        return utils.curvature(t, this.dpoints[0], this.dpoints[1], this._3d);
-      }
-    }, {
-      key: "inflections",
-      value: function inflections() {
-        return utils.inflections(this.points);
-      }
-    }, {
-      key: "normal",
-      value: function normal(t) {
-        return this._3d ? this.__normal3(t) : this.__normal2(t);
-      }
-    }, {
-      key: "__normal2",
-      value: function __normal2(t) {
-        var d = this.derivative(t);
-        var q = sqrt(d.x * d.x + d.y * d.y);
-        return {
-          t: t,
-          x: -d.y / q,
-          y: d.x / q
-        };
-      }
-    }, {
-      key: "__normal3",
-      value: function __normal3(t) {
-        // see http://stackoverflow.com/questions/25453159
-        var r1 = this.derivative(t),
-          r2 = this.derivative(t + 0.01),
-          q1 = sqrt(r1.x * r1.x + r1.y * r1.y + r1.z * r1.z),
-          q2 = sqrt(r2.x * r2.x + r2.y * r2.y + r2.z * r2.z);
-        r1.x /= q1;
-        r1.y /= q1;
-        r1.z /= q1;
-        r2.x /= q2;
-        r2.y /= q2;
-        r2.z /= q2;
-        // cross product
-        var c = {
-          x: r2.y * r1.z - r2.z * r1.y,
-          y: r2.z * r1.x - r2.x * r1.z,
-          z: r2.x * r1.y - r2.y * r1.x
-        };
-        var m = sqrt(c.x * c.x + c.y * c.y + c.z * c.z);
-        c.x /= m;
-        c.y /= m;
-        c.z /= m;
-        // rotation matrix
-        var R = [c.x * c.x, c.x * c.y - c.z, c.x * c.z + c.y, c.x * c.y + c.z, c.y * c.y, c.y * c.z - c.x, c.x * c.z - c.y, c.y * c.z + c.x, c.z * c.z];
-        // normal vector:
-        var n = {
-          t: t,
-          x: R[0] * r1.x + R[1] * r1.y + R[2] * r1.z,
-          y: R[3] * r1.x + R[4] * r1.y + R[5] * r1.z,
-          z: R[6] * r1.x + R[7] * r1.y + R[8] * r1.z
-        };
-        return n;
-      }
-    }, {
-      key: "hull",
-      value: function hull(t) {
-        var p = this.points,
-          _p = [],
-          q = [],
-          idx = 0;
-        q[idx++] = p[0];
-        q[idx++] = p[1];
-        q[idx++] = p[2];
-        if (this.order === 3) {
-          q[idx++] = p[3];
-        }
-        // we lerp between all points at each iteration, until we have 1 point left.
-        while (p.length > 1) {
-          _p = [];
-          for (var _i12 = 0, pt, l = p.length - 1; _i12 < l; _i12++) {
-            pt = utils.lerp(t, p[_i12], p[_i12 + 1]);
-            q[idx++] = pt;
-            _p.push(pt);
-          }
-          p = _p;
-        }
-        return q;
-      }
-    }, {
-      key: "split",
-      value: function split(t1, t2) {
-        // shortcuts
-        if (t1 === 0 && !!t2) {
-          return this.split(t2).left;
-        }
-        if (t2 === 1) {
-          return this.split(t1).right;
-        }
-
-        // no shortcut: use "de Casteljau" iteration.
-        var q = this.hull(t1);
-        var result = {
-          left: this.order === 2 ? new Bezier([q[0], q[3], q[5]]) : new Bezier([q[0], q[4], q[7], q[9]]),
-          right: this.order === 2 ? new Bezier([q[5], q[4], q[2]]) : new Bezier([q[9], q[8], q[6], q[3]]),
-          span: q
-        };
-
-        // make sure we bind _t1/_t2 information!
-        result.left._t1 = utils.map(0, 0, 1, this._t1, this._t2);
-        result.left._t2 = utils.map(t1, 0, 1, this._t1, this._t2);
-        result.right._t1 = utils.map(t1, 0, 1, this._t1, this._t2);
-        result.right._t2 = utils.map(1, 0, 1, this._t1, this._t2);
-
-        // if we have no t2, we're done
-        if (!t2) {
-          return result;
-        }
-
-        // if we have a t2, split again:
-        t2 = utils.map(t2, t1, 1, 0, 1);
-        return result.right.split(t2).left;
-      }
-    }, {
-      key: "extrema",
-      value: function extrema() {
-        var result = {};
-        var roots = [];
-        this.dims.forEach(function (dim) {
-          var mfn = function mfn(v) {
-            return v[dim];
-          };
-          var p = this.dpoints[0].map(mfn);
-          result[dim] = utils.droots(p);
-          if (this.order === 3) {
-            p = this.dpoints[1].map(mfn);
-            result[dim] = result[dim].concat(utils.droots(p));
-          }
-          result[dim] = result[dim].filter(function (t) {
-            return t >= 0 && t <= 1;
-          });
-          roots = roots.concat(result[dim].sort(utils.numberSort));
-        }.bind(this));
-        result.values = roots.sort(utils.numberSort).filter(function (v, idx) {
-          return roots.indexOf(v) === idx;
-        });
-        return result;
-      }
-    }, {
-      key: "bbox",
-      value: function bbox() {
-        var extrema = this.extrema(),
-          result = {};
-        this.dims.forEach(function (d) {
-          result[d] = utils.getminmax(this, d, extrema[d]);
-        }.bind(this));
-        return result;
-      }
-    }, {
-      key: "overlaps",
-      value: function overlaps(curve) {
-        var lbbox = this.bbox(),
-          tbbox = curve.bbox();
-        return utils.bboxoverlap(lbbox, tbbox);
-      }
-    }, {
-      key: "offset",
-      value: function offset(t, d) {
-        if (typeof d !== "undefined") {
-          var c = this.get(t),
-            n = this.normal(t);
-          var ret = {
-            c: c,
-            n: n,
-            x: c.x + n.x * d,
-            y: c.y + n.y * d
-          };
-          if (this._3d) {
-            ret.z = c.z + n.z * d;
-          }
-          return ret;
-        }
-        if (this._linear) {
-          var nv = this.normal(0),
-            coords = this.points.map(function (p) {
-              var ret = {
-                x: p.x + t * nv.x,
-                y: p.y + t * nv.y
-              };
-              if (p.z && nv.z) {
-                ret.z = p.z + t * nv.z;
-              }
-              return ret;
-            });
-          return [new Bezier(coords)];
-        }
-        return this.reduce().map(function (s) {
-          if (s._linear) {
-            return s.offset(t)[0];
-          }
-          return s.scale(t);
-        });
-      }
-    }, {
-      key: "simple",
-      value: function simple() {
-        if (this.order === 3) {
-          var a1 = utils.angle(this.points[0], this.points[3], this.points[1]);
-          var a2 = utils.angle(this.points[0], this.points[3], this.points[2]);
-          if (a1 > 0 && a2 < 0 || a1 < 0 && a2 > 0) return false;
-        }
-        var n1 = this.normal(0);
-        var n2 = this.normal(1);
-        var s = n1.x * n2.x + n1.y * n2.y;
-        if (this._3d) {
-          s += n1.z * n2.z;
-        }
-        return abs(acos(s)) < pi / 3;
-      }
-    }, {
-      key: "reduce",
-      value: function reduce() {
-        // TODO: examine these var types in more detail...
-        var i,
-          t1 = 0,
-          t2 = 0,
-          step = 0.01,
-          segment,
-          pass1 = [],
-          pass2 = [];
-        // first pass: split on extrema
-        var extrema = this.extrema().values;
-        if (extrema.indexOf(0) === -1) {
-          extrema = [0].concat(extrema);
-        }
-        if (extrema.indexOf(1) === -1) {
-          extrema.push(1);
-        }
-        for (t1 = extrema[0], i = 1; i < extrema.length; i++) {
-          t2 = extrema[i];
-          segment = this.split(t1, t2);
-          segment._t1 = t1;
-          segment._t2 = t2;
-          pass1.push(segment);
-          t1 = t2;
-        }
-
-        // second pass: further reduce these segments to simple segments
-        pass1.forEach(function (p1) {
-          t1 = 0;
-          t2 = 0;
-          while (t2 <= 1) {
-            for (t2 = t1 + step; t2 <= 1 + step; t2 += step) {
-              segment = p1.split(t1, t2);
-              if (!segment.simple()) {
-                t2 -= step;
-                if (abs(t1 - t2) < step) {
-                  // we can never form a reduction
-                  return [];
-                }
-                segment = p1.split(t1, t2);
-                segment._t1 = utils.map(t1, 0, 1, p1._t1, p1._t2);
-                segment._t2 = utils.map(t2, 0, 1, p1._t1, p1._t2);
-                pass2.push(segment);
-                t1 = t2;
-                break;
-              }
-            }
-          }
-          if (t1 < 1) {
-            segment = p1.split(t1, 1);
-            segment._t1 = utils.map(t1, 0, 1, p1._t1, p1._t2);
-            segment._t2 = p1._t2;
-            pass2.push(segment);
-          }
-        });
-        return pass2;
-      }
-    }, {
-      key: "translate",
-      value: function translate(v, d1, d2) {
-        d2 = typeof d2 === "number" ? d2 : d1;
-
-        // TODO: make this take curves with control points outside
-        //       of the start-end interval into account
-
-        var o = this.order;
-        var d = this.points.map(function (_, i) {
-          return (1 - i / o) * d1 + i / o * d2;
-        });
-        return new Bezier(this.points.map(function (p, i) {
-          return {
-            x: p.x + v.x * d[i],
-            y: p.y + v.y * d[i]
-          };
-        }));
-      }
-    }, {
-      key: "scale",
-      value: function scale(d) {
-        var _this33 = this;
-        var order = this.order;
-        var distanceFn = false;
-        if (typeof d === "function") {
-          distanceFn = d;
-        }
-        if (distanceFn && order === 2) {
-          return this.raise().scale(distanceFn);
-        }
-
-        // TODO: add special handling for non-linear degenerate curves.
-
-        var clockwise = this.clockwise;
-        var points = this.points;
-        if (this._linear) {
-          return this.translate(this.normal(0), distanceFn ? distanceFn(0) : d, distanceFn ? distanceFn(1) : d);
-        }
-        var r1 = distanceFn ? distanceFn(0) : d;
-        var r2 = distanceFn ? distanceFn(1) : d;
-        var v = [this.offset(0, 10), this.offset(1, 10)];
-        var np = [];
-        var o = utils.lli4(v[0], v[0].c, v[1], v[1].c);
-        if (!o) {
-          throw new Error("cannot scale this curve. Try reducing it first.");
-        }
-
-        // move all points by distance 'd' wrt the origin 'o',
-        // and move end points by fixed distance along normal.
-        [0, 1].forEach(function (t) {
-          var p = np[t * order] = utils.copy(points[t * order]);
-          p.x += (t ? r2 : r1) * v[t].n.x;
-          p.y += (t ? r2 : r1) * v[t].n.y;
-        });
-        if (!distanceFn) {
-          // move control points to lie on the intersection of the offset
-          // derivative vector, and the origin-through-control vector
-          [0, 1].forEach(function (t) {
-            if (order === 2 && !!t) return;
-            var p = np[t * order];
-            var d = _this33.derivative(t);
-            var p2 = {
-              x: p.x + d.x,
-              y: p.y + d.y
-            };
-            np[t + 1] = utils.lli4(p, p2, o, points[t + 1]);
-          });
-          return new Bezier(np);
-        }
-
-        // move control points by "however much necessary to
-        // ensure the correct tangent to endpoint".
-        [0, 1].forEach(function (t) {
-          if (order === 2 && !!t) return;
-          var p = points[t + 1];
-          var ov = {
-            x: p.x - o.x,
-            y: p.y - o.y
-          };
-          var rc = distanceFn ? distanceFn((t + 1) / order) : d;
-          if (distanceFn && !clockwise) rc = -rc;
-          var m = sqrt(ov.x * ov.x + ov.y * ov.y);
-          ov.x /= m;
-          ov.y /= m;
-          np[t + 1] = {
-            x: p.x + rc * ov.x,
-            y: p.y + rc * ov.y
-          };
-        });
-        return new Bezier(np);
-      }
-    }, {
-      key: "outline",
-      value: function outline(d1, d2, d3, d4) {
-        d2 = d2 === undefined ? d1 : d2;
-        if (this._linear) {
-          // TODO: find the actual extrema, because they might
-          //       be before the start, or past the end.
-
-          var n = this.normal(0);
-          var start = this.points[0];
-          var end = this.points[this.points.length - 1];
-          var s, mid, e;
-          if (d3 === undefined) {
-            d3 = d1;
-            d4 = d2;
-          }
-          s = {
-            x: start.x + n.x * d1,
-            y: start.y + n.y * d1
-          };
-          e = {
-            x: end.x + n.x * d3,
-            y: end.y + n.y * d3
-          };
-          mid = {
-            x: (s.x + e.x) / 2,
-            y: (s.y + e.y) / 2
-          };
-          var fline = [s, mid, e];
-          s = {
-            x: start.x - n.x * d2,
-            y: start.y - n.y * d2
-          };
-          e = {
-            x: end.x - n.x * d4,
-            y: end.y - n.y * d4
-          };
-          mid = {
-            x: (s.x + e.x) / 2,
-            y: (s.y + e.y) / 2
-          };
-          var bline = [e, mid, s];
-          var _ls = utils.makeline(bline[2], fline[0]);
-          var _le = utils.makeline(fline[2], bline[0]);
-          var _segments2 = [_ls, new Bezier(fline), _le, new Bezier(bline)];
-          return new PolyBezier(_segments2);
-        }
-        var reduced = this.reduce(),
-          len = reduced.length,
-          fcurves = [];
-        var bcurves = [],
-          p,
-          alen = 0,
-          tlen = this.length();
-        var graduated = typeof d3 !== "undefined" && typeof d4 !== "undefined";
-        function linearDistanceFunction(s, e, tlen, alen, slen) {
-          return function (v) {
-            var f1 = alen / tlen,
-              f2 = (alen + slen) / tlen,
-              d = e - s;
-            return utils.map(v, 0, 1, s + f1 * d, s + f2 * d);
-          };
-        }
-
-        // form curve oulines
-        reduced.forEach(function (segment) {
-          var slen = segment.length();
-          if (graduated) {
-            fcurves.push(segment.scale(linearDistanceFunction(d1, d3, tlen, alen, slen)));
-            bcurves.push(segment.scale(linearDistanceFunction(-d2, -d4, tlen, alen, slen)));
-          } else {
-            fcurves.push(segment.scale(d1));
-            bcurves.push(segment.scale(-d2));
-          }
-          alen += slen;
-        });
-
-        // reverse the "return" outline
-        bcurves = bcurves.map(function (s) {
-          p = s.points;
-          if (p[3]) {
-            s.points = [p[3], p[2], p[1], p[0]];
-          } else {
-            s.points = [p[2], p[1], p[0]];
-          }
-          return s;
-        }).reverse();
-
-        // form the endcaps as lines
-        var fs = fcurves[0].points[0],
-          fe = fcurves[len - 1].points[fcurves[len - 1].points.length - 1],
-          bs = bcurves[len - 1].points[bcurves[len - 1].points.length - 1],
-          be = bcurves[0].points[0],
-          ls = utils.makeline(bs, fs),
-          le = utils.makeline(fe, be),
-          segments = [ls].concat(fcurves).concat([le]).concat(bcurves);
-        return new PolyBezier(segments);
-      }
-    }, {
-      key: "outlineshapes",
-      value: function outlineshapes(d1, d2, curveIntersectionThreshold) {
-        d2 = d2 || d1;
-        var outline = this.outline(d1, d2).curves;
-        var shapes = [];
-        for (var _i13 = 1, len = outline.length; _i13 < len / 2; _i13++) {
-          var shape = utils.makeshape(outline[_i13], outline[len - _i13], curveIntersectionThreshold);
-          shape.startcap.virtual = _i13 > 1;
-          shape.endcap.virtual = _i13 < len / 2 - 1;
-          shapes.push(shape);
-        }
-        return shapes;
-      }
-    }, {
-      key: "intersects",
-      value: function intersects(curve, curveIntersectionThreshold) {
-        if (!curve) return this.selfintersects(curveIntersectionThreshold);
-        if (curve.p1 && curve.p2) {
-          return this.lineIntersects(curve);
-        }
-        if (curve instanceof Bezier) {
-          curve = curve.reduce();
-        }
-        return this.curveintersects(this.reduce(), curve, curveIntersectionThreshold);
-      }
-    }, {
-      key: "lineIntersects",
-      value: function lineIntersects(line) {
-        var _this34 = this;
-        var mx = min(line.p1.x, line.p2.x),
-          my = min(line.p1.y, line.p2.y),
-          MX = max(line.p1.x, line.p2.x),
-          MY = max(line.p1.y, line.p2.y);
-        return utils.roots(this.points, line).filter(function (t) {
-          var p = _this34.get(t);
-          return utils.between(p.x, mx, MX) && utils.between(p.y, my, MY);
-        });
-      }
-    }, {
-      key: "selfintersects",
-      value: function selfintersects(curveIntersectionThreshold) {
-        // "simple" curves cannot intersect with their direct
-        // neighbour, so for each segment X we check whether
-        // it intersects [0:x-2][x+2:last].
-
-        var reduced = this.reduce(),
-          len = reduced.length - 2,
-          results = [];
-        for (var _i14 = 0, result, left, right; _i14 < len; _i14++) {
-          left = reduced.slice(_i14, _i14 + 1);
-          right = reduced.slice(_i14 + 2);
-          result = this.curveintersects(left, right, curveIntersectionThreshold);
-          results.push.apply(results, _toConsumableArray(result));
-        }
-        return results;
-      }
-    }, {
-      key: "curveintersects",
-      value: function curveintersects(c1, c2, curveIntersectionThreshold) {
-        var pairs = [];
-        // step 1: pair off any overlapping segments
-        c1.forEach(function (l) {
-          c2.forEach(function (r) {
-            if (l.overlaps(r)) {
-              pairs.push({
-                left: l,
-                right: r
-              });
-            }
-          });
-        });
-        // step 2: for each pairing, run through the convergence algorithm.
-        var intersections = [];
-        pairs.forEach(function (pair) {
-          var result = utils.pairiteration(pair.left, pair.right, curveIntersectionThreshold);
-          if (result.length > 0) {
-            intersections = intersections.concat(result);
-          }
-        });
-        return intersections;
-      }
-    }, {
-      key: "arcs",
-      value: function arcs(errorThreshold) {
-        errorThreshold = errorThreshold || 0.5;
-        return this._iterate(errorThreshold, []);
-      }
-    }, {
-      key: "_error",
-      value: function _error(pc, np1, s, e) {
-        var q = (e - s) / 4,
-          c1 = this.get(s + q),
-          c2 = this.get(e - q),
-          ref = utils.dist(pc, np1),
-          d1 = utils.dist(pc, c1),
-          d2 = utils.dist(pc, c2);
-        return abs(d1 - ref) + abs(d2 - ref);
-      }
-    }, {
-      key: "_iterate",
-      value: function _iterate(errorThreshold, circles) {
-        var t_s = 0,
-          t_e = 1,
-          safety;
-        // we do a binary search to find the "good `t` closest to no-longer-good"
-        do {
-          safety = 0;
-
-          // step 1: start with the maximum possible arc
-          t_e = 1;
-
-          // points:
-          var np1 = this.get(t_s),
-            np2 = void 0,
-            np3 = void 0,
-            arc = void 0,
-            prev_arc = void 0;
-
-          // booleans:
-          var curr_good = false,
-            prev_good = false,
-            done = void 0;
-
-          // numbers:
-          var t_m = t_e,
-            prev_e = 1;
-
-          // step 2: find the best possible arc
-          do {
-            prev_good = curr_good;
-            prev_arc = arc;
-            t_m = (t_s + t_e) / 2;
-            np2 = this.get(t_m);
-            np3 = this.get(t_e);
-            arc = utils.getccenter(np1, np2, np3);
-
-            //also save the t values
-            arc.interval = {
-              start: t_s,
-              end: t_e
-            };
-            var error = this._error(arc, np1, t_s, t_e);
-            curr_good = error <= errorThreshold;
-            done = prev_good && !curr_good;
-            if (!done) prev_e = t_e;
-
-            // this arc is fine: we can move 'e' up to see if we can find a wider arc
-            if (curr_good) {
-              // if e is already at max, then we're done for this arc.
-              if (t_e >= 1) {
-                // make sure we cap at t=1
-                arc.interval.end = prev_e = 1;
-                prev_arc = arc;
-                // if we capped the arc segment to t=1 we also need to make sure that
-                // the arc's end angle is correct with respect to the bezier end point.
-                if (t_e > 1) {
-                  var d = {
-                    x: arc.x + arc.r * cos(arc.e),
-                    y: arc.y + arc.r * sin(arc.e)
-                  };
-                  arc.e += utils.angle({
-                    x: arc.x,
-                    y: arc.y
-                  }, d, this.get(1));
-                }
-                break;
-              }
-              // if not, move it up by half the iteration distance
-              t_e = t_e + (t_e - t_s) / 2;
-            } else {
-              // this is a bad arc: we need to move 'e' down to find a good arc
-              t_e = t_m;
-            }
-          } while (!done && safety++ < 100);
-          if (safety >= 100) {
-            break;
-          }
-
-          // console.log("L835: [F] arc found", t_s, prev_e, prev_arc.x, prev_arc.y, prev_arc.s, prev_arc.e);
-
-          prev_arc = prev_arc ? prev_arc : arc;
-          circles.push(prev_arc);
-          t_s = prev_e;
-        } while (t_e < 1);
-        return circles;
-      }
-    }], [{
-      key: "quadraticFromPoints",
-      value: function quadraticFromPoints(p1, p2, p3, t) {
-        if (typeof t === "undefined") {
-          t = 0.5;
-        }
-        // shortcuts, although they're really dumb
-        if (t === 0) {
-          return new Bezier(p2, p2, p3);
-        }
-        if (t === 1) {
-          return new Bezier(p1, p2, p2);
-        }
-        // real fitting.
-        var abc = Bezier.getABC(2, p1, p2, p3, t);
-        return new Bezier(p1, abc.A, p3);
-      }
-    }, {
-      key: "cubicFromPoints",
-      value: function cubicFromPoints(S, B, E, t, d1) {
-        if (typeof t === "undefined") {
-          t = 0.5;
-        }
-        var abc = Bezier.getABC(3, S, B, E, t);
-        if (typeof d1 === "undefined") {
-          d1 = utils.dist(B, abc.C);
-        }
-        var d2 = d1 * (1 - t) / t;
-        var selen = utils.dist(S, E),
-          lx = (E.x - S.x) / selen,
-          ly = (E.y - S.y) / selen,
-          bx1 = d1 * lx,
-          by1 = d1 * ly,
-          bx2 = d2 * lx,
-          by2 = d2 * ly;
-        // derivation of new hull coordinates
-        var e1 = {
-            x: B.x - bx1,
-            y: B.y - by1
-          },
-          e2 = {
-            x: B.x + bx2,
-            y: B.y + by2
-          },
-          A = abc.A,
-          v1 = {
-            x: A.x + (e1.x - A.x) / (1 - t),
-            y: A.y + (e1.y - A.y) / (1 - t)
-          },
-          v2 = {
-            x: A.x + (e2.x - A.x) / t,
-            y: A.y + (e2.y - A.y) / t
-          },
-          nc1 = {
-            x: S.x + (v1.x - S.x) / t,
-            y: S.y + (v1.y - S.y) / t
-          },
-          nc2 = {
-            x: E.x + (v2.x - E.x) / (1 - t),
-            y: E.y + (v2.y - E.y) / (1 - t)
-          };
-        // ...done
-        return new Bezier(S, nc1, nc2, E);
-      }
-    }, {
-      key: "getUtils",
-      value: function getUtils() {
-        return utils;
-      }
-    }, {
-      key: "PolyBezier",
-      get: function get() {
-        return PolyBezier;
-      }
-    }, {
-      key: "getABC",
-      value: function getABC() {
-        var order = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 2;
-        var S = arguments.length > 1 ? arguments[1] : undefined;
-        var B = arguments.length > 2 ? arguments[2] : undefined;
-        var E = arguments.length > 3 ? arguments[3] : undefined;
-        var t = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 0.5;
-        var u = utils.projectionratio(t, order),
-          um = 1 - u,
-          C = {
-            x: u * S.x + um * E.x,
-            y: u * S.y + um * E.y
-          },
-          s = utils.abcratio(t, order),
-          A = {
-            x: B.x + (B.x - C.x) / s,
-            y: B.y + (B.y - C.y) / s
-          };
-        return {
-          A: A,
-          B: B,
-          C: C,
-          S: S,
-          E: E
-        };
-      }
-    }]);
-  }();
-  var DEFAULT_OPTIONS = {
-    splitDotKey: 'splitDot',
-    disabledSplit: false,
-    disabledSplitDot: false,
-    disabledDbclickConvert: false
-  };
-  /**
-   * 编辑器曲线化操作模块：1.双击实现指令升降级 2.实现路径选点拆分
-   *
-   * @note 注意：拆分点的样式需要在UI模块中配置，没配置默认使用UI模块中路径节点的样式
-   *
-   * @example
-   *
-   * vizpath
-   * .use(new Editor(fabricCanvas))
-   * .use(new EditorBezier())
-   * .use(new EditorUI<EditorBezierThemeConfigurators>({
-   *
-   * }))
-   */
-  var EditorBezier = /*#__PURE__*/function (_EditorModule5) {
-    function EditorBezier() {
-      var _this35;
-      var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-      _classCallCheck(this, EditorBezier);
-      _this35 = _callSuper(this, EditorBezier);
-      _this35.splitDot = null;
-      _this35.options = defaultsDeep(options, DEFAULT_OPTIONS);
-      return _this35;
-    }
-    /**
-     * 根据路径指令上的一点拆分路径指令
-     */
-    _inherits(EditorBezier, _EditorModule5);
-    return _createClass(EditorBezier, [{
-      key: "_splitInstruction",
-      value: function _splitInstruction(points, point) {
-        if (points.length === 2) {
-          return {
-            pre: [InstructionType.LINE, point.x, point.y],
-            next: [InstructionType.LINE, points[1].x, points[1].y]
-          };
-        } else {
-          var curve = new Bezier(points);
-          var _curve$project = curve.project(point),
-            _t7 = _curve$project.t;
-          var splitCurves = curve.split(_t7);
-          var path = new fabric.fabric.Path(splitCurves.left.toSVG() + splitCurves.right.toSVG()).path;
-          return {
-            pre: path[1],
-            next: path[3]
-          };
-        }
-      }
-      /**
-       * 通过线与点实现曲线化
-       */
-    }, {
-      key: "curveFromLine",
-      value: function curveFromLine(line, point) {
-        var t = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0.71;
-        var _line = _slicedToArray(line, 2),
-          start = _line[0],
-          end = _line[1];
-        var curvePoint = {
-          x: end.x + (point.x - start.x) / 2,
-          y: end.y + (point.y - start.y) / 2
-        };
-        var curve = Bezier.quadraticFromPoints.apply(Bezier, _toConsumableArray([end, curvePoint, point].flat(1)).concat([t]));
-        return curve.points[0];
-      }
-      /**
-       * 通过点与点实现曲线化
-       */
-    }, {
-      key: "curveFromPoint",
-      value: function curveFromPoint(point0, point) {
-        var centerPoint = {
-          x: (point.x + point0.x) / 2,
-          y: (point.y + point0.y) / 2
-        };
-        var dx = point.x - centerPoint.x;
-        var dy = point.y - centerPoint.y;
-        var midPoint = {
-          x: centerPoint.x - dy,
-          y: centerPoint.y + dx
-        };
-        return midPoint;
-      }
-      /**
-       * 自动降级到直线
-       */
-    }, {
-      key: "degrade",
-      value: function degrade(object) {
-        var _a;
-        var editor = (_a = this.vizpath) === null || _a === void 0 ? void 0 : _a.context.find(Editor$1);
-        if (!editor) return;
-        editor.degrade(object, 'both', true);
-      }
-      /**
-       * 自动升级到曲线
-       */
-    }, {
-      key: "upgrade",
-      value: function upgrade(object) {
-        var _a, _b, _c;
-        var vizpath = this.vizpath;
-        if (!vizpath) return;
-        var editor = (_a = this.vizpath) === null || _a === void 0 ? void 0 : _a.context.find(Editor$1);
-        if (!editor) return;
-        var pathNode = editor.objectNodeMap.get(object);
-        var _vizpath$getNeighbori = vizpath.getNeighboringNodes(pathNode),
-          pre = _vizpath$getNeighbori.pre,
-          next = _vizpath$getNeighbori.next;
-        if (pre && next) {
-          var centerPoint = {
-            x: (pre.node.x + next.node.x) / 2,
-            y: (pre.node.y + next.node.y) / 2
-          };
-          var preCurvePoint = {
-            x: pathNode.node.x + (pre.node.x - centerPoint.x),
-            y: pathNode.node.y + (pre.node.y - centerPoint.y)
-          };
-          var nextCurvePoint = {
-            x: pathNode.node.x + (next.node.x - centerPoint.x),
-            y: pathNode.node.y + (next.node.y - centerPoint.y)
-          };
-          vizpath.replace(pathNode, [InstructionType.QUADRATIC_CURCE, preCurvePoint.x, preCurvePoint.y, pathNode.node.x, pathNode.node.y]);
-          vizpath.replace(next, [InstructionType.QUADRATIC_CURCE, nextCurvePoint.x, nextCurvePoint.y, next.node.x, next.node.y]);
-          // const points = [pre, pathNode, next].map((item) => item.node!);
-          // // 这里使用quadraticFromPoints，是使三个点组合成曲线路径（点都在曲线上）
-          // const splitCurves = this._splitInstruction(
-          //   (Bezier.quadraticFromPoints as any)(...points, 0.5).points,
-          //   points[1],
-          // );
-          // const neighboringInstructions = vizpath.getNeighboringInstructions(pathNode);
-          // vizpath.replace(
-          //   pathNode.instruction[0] === InstructionType.START
-          //     ? neighboringInstructions.pre!
-          //     : pathNode,
-          //   splitCurves.pre,
-          // );
-          // vizpath.replace(neighboringInstructions.next!, splitCurves.next);
-        } else if (pre) {
-          var _vizpath$getNeighbori2 = vizpath.getNeighboringNodes(pre),
-            ppre = _vizpath$getNeighbori2.pre;
-          if (ppre) {
-            var point = this.curveFromLine(((_b = pre.curveDots) === null || _b === void 0 ? void 0 : _b.pre) ? [pre.curveDots.pre, pre.node] : [ppre.node, pre.node], pathNode.node);
-            vizpath.replace(pathNode, [InstructionType.QUADRATIC_CURCE, point.x, point.y, pathNode.node.x, pathNode.node.y]);
-          } else {
-            var midPoint = this.curveFromPoint(pre.node, pathNode.node);
-            vizpath.replace(pathNode, [InstructionType.QUADRATIC_CURCE, midPoint.x, midPoint.y, pathNode.node.x, pathNode.node.y]);
-          }
-        } else if (next) {
-          var _vizpath$getNeighbori3 = vizpath.getNeighboringNodes(next),
-            nnext = _vizpath$getNeighbori3.next;
-          if (nnext) {
-            var _point = this.curveFromLine(((_c = next.curveDots) === null || _c === void 0 ? void 0 : _c.next) ? [next.curveDots.next, next.node] : [nnext.node, next.node], pathNode.node);
-            vizpath.replace(next, [InstructionType.QUADRATIC_CURCE, _point.x, _point.y, next.node.x, next.node.y]);
-          } else {
-            var _midPoint = this.curveFromPoint(next.node, pathNode.node);
-            vizpath.replace(next, [InstructionType.QUADRATIC_CURCE, _midPoint.x, _midPoint.y, next.node.x, next.node.y]);
-          }
-        }
-      }
-      // 创建拆分点
-    }, {
-      key: "_initSpiltDot",
-      value: function _initSpiltDot(vizpath) {
-        var _a, _b, _c, _d;
-        var ui = vizpath.context.find(EditorUI);
-        var splitDotTheme = (_d = (_b = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) === null || _a === void 0 ? void 0 : _a[this.options.splitDotKey]) !== null && _b !== void 0 ? _b : (_c = ui === null || ui === void 0 ? void 0 : ui.theme) === null || _c === void 0 ? void 0 : _c.node) !== null && _d !== void 0 ? _d : DEFAULT_THEME.node;
-        var decorated = false;
-        var decorator = function decorator(customObject, callback) {
-          customObject.set({
-            name: v4(),
-            // 选中时不出现选中框
-            hasBorders: false,
-            hasControls: false,
-            // 不给选中
-            evented: false,
-            selectable: false,
-            // 保持居中
-            originX: 'center',
-            originY: 'center'
-          });
-          // 不做另外的画布缓存
-          deepIterateGroup(customObject, function (object) {
-            object.set({
-              objectCaching: false
-            });
-          });
-          if (ui && callback) {
-            ui.objectPreRenderCallbackMap.set(customObject, callback);
-          }
-          decorated = true;
-          return customObject;
-        };
-        var object = splitDotTheme(decorator);
-        if (!decorated) object = decorator(object);
-        return object;
-      }
-      // 清除拆分点
-    }, {
-      key: "_destorySplitDot",
-      value: function _destorySplitDot(vizpath) {
-        var _a;
-        if (!this.splitDot) return;
-        var ui = vizpath.context.find(EditorUI);
-        ui === null || ui === void 0 ? void 0 : ui.objectPreRenderCallbackMap["delete"](this.splitDot);
-        (_a = this.splitDot.canvas) === null || _a === void 0 ? void 0 : _a.remove(this.splitDot);
-        this.splitDot = null;
-      }
-      // 注册双击节点变换事件
-    }, {
-      key: "_initDbclickChangeEvent",
-      value: function _initDbclickChangeEvent(vizpath) {
-        var _this36 = this;
-        var _a;
-        var editor = vizpath.context.find(Editor$1);
-        if (!editor) return;
-        (_a = editor.canvas) === null || _a === void 0 ? void 0 : _a.on('mouse:dblclick', function (event) {
-          var target = event.target;
-          if (!target || !editor.nodes.includes(target)) return;
-          var curveDots = editor.curveDots.filter(function (i) {
-            return i.node === target;
-          });
-          if (curveDots.length) _this36.degrade(target);else _this36.upgrade(target);
-        });
-      }
-      // 注册指令拆分事件
-    }, {
-      key: "_initSplitEvent",
-      value: function _initSplitEvent(vizpath) {
-        var _this37 = this;
-        var editor = vizpath.context.find(Editor$1);
-        if (!editor) return;
-        var canvas = editor.canvas;
-        if (!canvas) return;
-        var pathNode;
-        var splitCrood;
-        var disableAddToken;
-        var clean = function clean() {
-          if (pathNode) {
-            if (_this37.splitDot) canvas.remove(_this37.splitDot);
-            pathNode = undefined;
-            splitCrood = undefined;
-          }
-          if (disableAddToken) {
-            editor.requestEnableFunction(disableAddToken);
-            disableAddToken = undefined;
-          }
-        };
-        editor.addCanvasEvent('mouse:move', function (e) {
-          var _a;
-          clean();
-          if (editor.setting.mode !== Mode.ADD) return;
-          if (e.target && e.target[Editor$1.symbol]) return;
-          var pointer = calcCanvasCrood(canvas, e.pointer);
-          // 只有进入路径范围内才开始判定是否触线拆分
-          var touchPath = editor.paths.find(function (i) {
-            return i.pathObject.containsPoint(e.pointer);
-          });
-          if (!touchPath) return;
-          var segment = touchPath.segment,
-            pathObject = touchPath.pathObject;
-          var _editor$calcRelativeC = editor.calcRelativeCrood({
-              left: pointer.x,
-              top: pointer.y
-            }, pathObject),
-            x = _editor$calcRelativeC.x,
-            y = _editor$calcRelativeC.y;
-          var d = Math.max(((_a = pathObject.strokeWidth) !== null && _a !== void 0 ? _a : 0) / 2 || 1, 1);
-          var _iterator4 = _createForOfIteratorHelper(segment),
-            _step4;
-          try {
-            for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
-              var item = _step4.value;
-              var points = [];
-              if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0])) continue;
-              if (item.instruction[0] === InstructionType.LINE) {
-                var _vizpath$getNeighbori4 = vizpath.getNeighboringNodes(item, true),
-                  pre = _vizpath$getNeighbori4.pre;
-                points = [pre.node, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }];
-              } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
-                var _vizpath$getNeighbori5 = vizpath.getNeighboringNodes(item, true),
-                  _pre = _vizpath$getNeighbori5.pre;
-                points = [_pre.node, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }, {
-                  x: item.instruction[3],
-                  y: item.instruction[4]
-                }];
-              } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
-                var _vizpath$getNeighbori6 = vizpath.getNeighboringNodes(item, true),
-                  _pre2 = _vizpath$getNeighbori6.pre;
-                points = [_pre2.node, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }, {
-                  x: item.instruction[3],
-                  y: item.instruction[4]
-                }, {
-                  x: item.instruction[5],
-                  y: item.instruction[6]
-                }];
-              }
-              var bezier = new Bezier(points);
-              var p = bezier.project({
-                x: x,
-                y: y
-              });
-              if (p.d && p.d < d) {
-                d = p.d;
-                pathNode = item;
-                splitCrood = p;
-              }
-            }
-          } catch (err) {
-            _iterator4.e(err);
-          } finally {
-            _iterator4.f();
-          }
-          if (pathNode && splitCrood) {
-            var _splitCrood = splitCrood,
-              _x8 = _splitCrood.x,
-              _y3 = _splitCrood.y;
-            var _editor$calcAbsoluteP = editor.calcAbsolutePosition({
-                x: _x8,
-                y: _y3
-              }, pathObject),
-              left = _editor$calcAbsoluteP.left,
-              top = _editor$calcAbsoluteP.top;
-            if (!_this37.splitDot && !_this37.options.disabledSplitDot) {
-              _this37.splitDot = _this37._initSpiltDot(vizpath);
-            }
-            var splitDot = _this37.splitDot;
-            if (splitDot) {
-              splitDot.set({
-                left: left,
-                top: top
-              });
-              canvas.add(splitDot);
-              canvas.requestRenderAll();
-            }
-            disableAddToken = editor.requestDisableFunction('add');
-          }
-        });
-        editor.addCanvasEvent('mouse:down', function (e) {
-          if (!pathNode || !splitCrood) return;
-          var _vizpath$getNeighbori7 = vizpath.getNeighboringInstructions(pathNode, true),
-            pre = _vizpath$getNeighbori7.pre;
-          if (!pre || !pre.node) return;
-          var splitCurves = _this37._splitInstruction([pre.node].concat(_toConsumableArray(pathNode.instruction.slice(1).reduce(function (list, _, i, arr) {
-            if (i % 2 === 0) {
-              list.push({
-                x: arr[i],
-                y: arr[i + 1]
-              });
-            }
-            return list;
-          }, []))), splitCrood);
-          var node = vizpath.replace(pathNode, splitCurves.pre);
-          if (node) {
-            var object = editor.nodeObjectMap.get(node);
-            if (object) editor.focus(object);
-            vizpath.insertAfterNode(node, splitCurves.next);
-          }
-          clean();
-        });
-      }
-    }, {
-      key: "unload",
-      value: function unload(vizpath) {
-        this._destorySplitDot(vizpath);
-      }
-    }, {
-      key: "load",
-      value: function load(vizpath) {
-        var _this$options2 = this.options,
-          disabledSplit = _this$options2.disabledSplit,
-          disabledSplitDot = _this$options2.disabledSplitDot;
-        if (!disabledSplit) this._initSplitEvent(vizpath);
-        if (!disabledSplitDot) this._initDbclickChangeEvent(vizpath);
-      }
-    }]);
-  }(EditorModule);
-  EditorBezier.ID = 'editor-bezier';
 
   var defaultTheme = function defaultTheme(editor, shareState) {
     editor.on('selected', function (nodes, point) {
