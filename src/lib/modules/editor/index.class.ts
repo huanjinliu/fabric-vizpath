@@ -1359,15 +1359,39 @@ class Editor extends EditorModule<{
       const pathNode = this.objectNodeMap.get(node);
       if (!pathNode) return;
 
+      const { segment } = pathNode;
+
+      // 如果当前节点已闭合或非端点，无法实现节点添加
+      if (vizpath.isClosePath(segment)) return;
+
       const newCrood = this.calcRelativeCrood(
         position,
         this.nodePathMap.get(pathNode.node!)!.pathObject,
       );
 
-      const addPathNode = vizpath.insert(pathNode, [InstructionType.LINE, newCrood.x, newCrood.y]);
-      if (!addPathNode) return;
+      // 如果是起始点
+      if (pathNode === segment[0]) {
+        // 添加新的起始
+        const addPathNode = vizpath.insertBeforeNode(pathNode, [
+          InstructionType.START,
+          newCrood.x,
+          newCrood.y,
+        ]);
+        if (!addPathNode) return;
 
-      return this.nodeObjectMap.get(addPathNode);
+        return this.nodeObjectMap.get(addPathNode);
+      }
+      // 如果是末尾端点
+      else if (pathNode === segment[segment.length - 1]) {
+        const addPathNode = vizpath.insertAfterNode(pathNode, [
+          InstructionType.LINE,
+          newCrood.x,
+          newCrood.y,
+        ]);
+        if (!addPathNode) return;
+
+        return this.nodeObjectMap.get(addPathNode);
+      }
     } else {
       const path = VizPathCreator.parseFabricPath(new fabric.Path('M 0 0', position));
       const responsivePath = vizpath.draw(path);

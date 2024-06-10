@@ -434,7 +434,7 @@ class EditorBezier extends EditorModule {
       if (node) {
         const object = editor.nodeObjectMap.get(node);
         if (object) editor.focus(object);
-        vizpath.insert(node, splitCurves.next);
+        vizpath.insertAfterNode(node, splitCurves.next);
       }
 
       clean();

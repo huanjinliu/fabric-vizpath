@@ -59,7 +59,7 @@ const EXAMPLE_PATH_D = {
 
   // fabricCanvas.setViewportTransform([0.5, 0, 0, 0.5, 100, 100]);
 
-  const path = new fabric.Path(EXAMPLE_PATH_D.bubble, {
+  const path = new fabric.Path(EXAMPLE_PATH_D.test, {
     objectCaching: false,
     noScaleCache: false,
     fill: '#e1e1e1',
@@ -257,6 +257,4 @@ const EXAMPLE_PATH_D = {
   // editorNode.remove();
 
   // operator.move(operator.paths[0][0].node, { x: 200, y: 200 })
-
-  // operator.insert(operator.paths[0].segment[0].node!, { x: 100, y: 100 }, true);
 })();

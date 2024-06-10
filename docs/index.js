@@ -4557,24 +4557,49 @@
         segmentIndexMap.clear();
       }
       /**
-       * 新增路径
+       * 新增路径指令
        * @param pathNode 指令对象
        * @param instruction 新指令
        */
     }, {
       key: "insert",
-      value: function insert(pathNode, instruction) {
-        var segment = pathNode.segment;
-        var index = segment.indexOf(pathNode);
-        if (index === -1) return;
-        var newPath = this._updatePathByCommands(this.paths.find(function (i) {
-          return i.segment === segment;
-        }), [{
+      value: function insert(path, index, instruction) {
+        var newPath = this._updatePathByCommands(path, [{
           type: 'add',
           index: index,
           instruction: instruction
         }]);
-        return newPath[0].segment[index + 1];
+        return newPath[0].segment[index];
+      }
+      /**
+       * 在节点前新增路径指令
+       * @param pathNode 指令对象
+       * @param instruction 新指令
+       */
+    }, {
+      key: "insertBeforeNode",
+      value: function insertBeforeNode(pathNode, instruction) {
+        var segment = pathNode.segment;
+        var path = this.getPath(segment);
+        if (!path) return;
+        var index = segment.indexOf(pathNode);
+        if (index === -1) return;
+        return this.insert(path, index, instruction);
+      }
+      /**
+       * 在节点后新增路径指令
+       * @param pathNode 指令对象
+       * @param instruction 新指令
+       */
+    }, {
+      key: "insertAfterNode",
+      value: function insertAfterNode(pathNode, instruction) {
+        var segment = pathNode.segment;
+        var path = this.getPath(segment);
+        if (!path) return;
+        var index = segment.indexOf(pathNode);
+        if (index === -1) return;
+        return this.insert(path, index + 1, instruction);
       }
       /**
        * 替换路径节点所在指令
@@ -4590,7 +4615,7 @@
         var segment = pathNode.segment;
         var index = segment.indexOf(pathNode);
         if (index === -1) return;
-        if (index === segment.length - 2 && this.isClosePath(segment)) index = 0;
+        if (this.isClosePath(segment) && index === segment.length - 2) index = 0;
         var updateCommands = [];
         if (index === 0) {
           var newStartInstruction = [InstructionType.START].concat(_toConsumableArray(instruction.slice(-2)));
@@ -4637,13 +4662,13 @@
         if (startNode.x !== endNode.x || startNode.y !== endNode.y) {
           updateCommands.push({
             type: 'add',
-            index: path.segment.length - 1,
+            index: path.segment.length,
             instruction: [InstructionType.LINE, startNode.x, startNode.y]
           });
         }
         updateCommands.push({
           type: 'add',
-          index: path.segment.length + updateCommands.length - 1,
+          index: path.segment.length + updateCommands.length,
           instruction: [InstructionType.CLOSE]
         });
         this._updatePathByCommands(path, updateCommands);
@@ -4667,7 +4692,14 @@
             instruction = _ref6.instruction;
           var _a, _b;
           if (type === 'add') {
-            segment.splice(index + 1, 0, {
+            // 改变原来的起始点指令类型
+            if (index === 0 && segment.length) {
+              segment.splice(0, 1, {
+                segment: segment,
+                instruction: [InstructionType.LINE, segment[0].node.x, segment[0].node.y]
+              });
+            }
+            segment.splice(index, 0, {
               segment: segment,
               instruction: instruction
             });
@@ -6508,10 +6540,23 @@
           var node = this.activeNodes[0];
           var pathNode = this.objectNodeMap.get(node);
           if (!pathNode) return;
+          var segment = pathNode.segment;
+          // 如果当前节点已闭合或非端点，无法实现节点添加
+          if (vizpath.isClosePath(segment)) return;
           var newCrood = this.calcRelativeCrood(position, this.nodePathMap.get(pathNode.node).pathObject);
-          var addPathNode = vizpath.insert(pathNode, [InstructionType.LINE, newCrood.x, newCrood.y]);
-          if (!addPathNode) return;
-          return this.nodeObjectMap.get(addPathNode);
+          // 如果是起始点
+          if (pathNode === segment[0]) {
+            // 添加新的起始
+            var addPathNode = vizpath.insertBeforeNode(pathNode, [InstructionType.START, newCrood.x, newCrood.y]);
+            if (!addPathNode) return;
+            return this.nodeObjectMap.get(addPathNode);
+          }
+          // 如果是末尾端点
+          else if (pathNode === segment[segment.length - 1]) {
+            var _addPathNode = vizpath.insertAfterNode(pathNode, [InstructionType.LINE, newCrood.x, newCrood.y]);
+            if (!_addPathNode) return;
+            return this.nodeObjectMap.get(_addPathNode);
+          }
         } else {
           var path = VizPathCreator.parseFabricPath(new fabric.fabric.Path('M 0 0', position));
           var responsivePath = vizpath.draw(path);
@@ -10403,7 +10448,7 @@
           if (node) {
             var object = editor.nodeObjectMap.get(node);
             if (object) editor.focus(object);
-            vizpath.insert(node, splitCurves.next);
+            vizpath.insertAfterNode(node, splitCurves.next);
           }
           clean();
         });
@@ -10553,7 +10598,7 @@
           // selection: false,
       });
       // fabricCanvas.setViewportTransform([0.5, 0, 0, 0.5, 100, 100]);
-      const path = new fabric.fabric.Path(EXAMPLE_PATH_D.bubble, {
+      const path = new fabric.fabric.Path(EXAMPLE_PATH_D.test, {
           objectCaching: false,
           noScaleCache: false,
           fill: '#e1e1e1',
@@ -10720,7 +10765,6 @@
       // editorNode.focus(object);
       // editorNode.remove();
       // operator.move(operator.paths[0][0].node, { x: 200, y: 200 })
-      // operator.insert(operator.paths[0].segment[0].node!, { x: 100, y: 100 }, true);
   })();
 
 })(fabric);

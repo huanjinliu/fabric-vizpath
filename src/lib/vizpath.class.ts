@@ -761,17 +761,12 @@ class VizPath extends BaseEvent<{
   }
 
   /**
-   * 新增路径
+   * 新增路径指令
    * @param pathNode 指令对象
    * @param instruction 新指令
    */
-  insert(pathNode: PathNode<ResponsiveCrood>, instruction: Instruction) {
-    const segment = pathNode.segment;
-
-    const index = segment.indexOf(pathNode);
-    if (index === -1) return;
-
-    const newPath = this._updatePathByCommands(this.paths.find((i) => i.segment === segment)!, [
+  insert(path: ResponsivePath, index: number, instruction: Instruction) {
+    const newPath = this._updatePathByCommands(path, [
       {
         type: 'add',
         index,
@@ -779,7 +774,41 @@ class VizPath extends BaseEvent<{
       },
     ]);
 
-    return newPath[0].segment[index + 1];
+    return newPath[0].segment[index];
+  }
+
+  /**
+   * 在节点前新增路径指令
+   * @param pathNode 指令对象
+   * @param instruction 新指令
+   */
+  insertBeforeNode(pathNode: PathNode<ResponsiveCrood>, instruction: Instruction) {
+    const segment = pathNode.segment;
+
+    const path = this.getPath(segment);
+    if (!path) return;
+
+    const index = segment.indexOf(pathNode);
+    if (index === -1) return;
+
+    return this.insert(path, index, instruction);
+  }
+
+  /**
+   * 在节点后新增路径指令
+   * @param pathNode 指令对象
+   * @param instruction 新指令
+   */
+  insertAfterNode(pathNode: PathNode<ResponsiveCrood>, instruction: Instruction) {
+    const segment = pathNode.segment;
+
+    const path = this.getPath(segment);
+    if (!path) return;
+
+    const index = segment.indexOf(pathNode);
+    if (index === -1) return;
+
+    return this.insert(path, index + 1, instruction);
   }
 
   /**
@@ -795,8 +824,7 @@ class VizPath extends BaseEvent<{
 
     let index = segment.indexOf(pathNode);
     if (index === -1) return;
-
-    if (index === segment.length - 2 && this.isClosePath(segment)) index = 0;
+    if (this.isClosePath(segment) && index === segment.length - 2) index = 0;
 
     const updateCommands: {
       type: 'add' | 'update';
@@ -865,14 +893,14 @@ class VizPath extends BaseEvent<{
     if (startNode.x !== endNode.x || startNode.y !== endNode.y) {
       updateCommands.push({
         type: 'add',
-        index: path.segment.length - 1,
+        index: path.segment.length,
         instruction: [InstructionType.LINE, startNode.x, startNode.y],
       });
     }
 
     updateCommands.push({
       type: 'add',
-      index: path.segment.length + updateCommands.length - 1,
+      index: path.segment.length + updateCommands.length,
       instruction: [InstructionType.CLOSE],
     });
 
@@ -898,7 +926,14 @@ class VizPath extends BaseEvent<{
 
     queue.forEach(({ type, index, instruction }) => {
       if (type === 'add') {
-        segment.splice(index + 1, 0, {
+        // 改变原来的起始点指令类型
+        if (index === 0 && segment.length) {
+          segment.splice(0, 1, {
+            segment,
+            instruction: [InstructionType.LINE, segment[0].node!.x, segment[0].node!.y],
+          });
+        }
+        segment.splice(index, 0, {
           segment,
           instruction,
         });
