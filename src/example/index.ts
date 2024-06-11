@@ -109,22 +109,7 @@ const EXAMPLE_PATH_D = {
     .use(editor)
     .use(new EditorBackground())
     .use(new EditorBezier())
-    .use(
-      new EditorUI<{}, { path: fabric.Object }>(
-        defaultTheme,
-        {
-          hoverNode: null,
-          hoverPoint: null,
-          hoverLine: null,
-          selectedNodes: [],
-          selectedPoint: null,
-          selectedLine: null,
-        },
-        (state) => {
-          // 监听状态变化
-        },
-      ),
-    )
+    .use(new EditorUI(defaultTheme))
     .use(new EditorShortcut())
     .initialize();
 
