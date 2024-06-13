@@ -90,7 +90,7 @@ class EditorBezier extends EditorModule {
   /**
    * 通过线与点实现曲线化
    */
-  curveFromLine(line: [start: Crood, end: Crood], point: Crood, t = 0.71) {
+  curveFromLine(line: [start: Crood, end: Crood], point: Crood, t = 0.5) {
     const [start, end] = line;
     const curvePoint = {
       x: end.x + (point.x - start.x) / 2,
@@ -187,6 +187,7 @@ class EditorBezier extends EditorModule {
         const point = this.curveFromLine(
           pre.curveDots?.pre ? [pre.curveDots.pre, pre.node!] : [ppre!.node!, pre.node!],
           pathNode.node!,
+          0.71
         );
         vizpath.replace(pathNode, [
           InstructionType.QUADRATIC_CURCE,
@@ -211,6 +212,7 @@ class EditorBezier extends EditorModule {
         const point = this.curveFromLine(
           next.curveDots?.next ? [next.curveDots.next, next.node!] : [nnext!.node!, next.node!],
           pathNode.node!,
+          0.71
         );
         vizpath.replace(next, [
           InstructionType.QUADRATIC_CURCE,
@@ -446,6 +448,32 @@ class EditorBezier extends EditorModule {
     });
   }
 
+  // 增强编辑器添加事件
+  private _strengthenAddEvent(vizpath: Vizpath) {
+    const editor = vizpath.context.find(Editor);
+    if (!editor) return;
+
+    // 如果前一个指令是曲线，则当前添加的点也会自动进阶为曲线
+    editor.on('added', (object: fabric.Object) => {
+      const node = editor.objectNodeMap.get(object);
+      if (!node) return;
+
+      let neighboringNode: PathNode<ResponsiveCrood> | undefined;
+      if (node.instruction[0] === InstructionType.START) {
+        neighboringNode = node.segment[2];
+      } else {
+        neighboringNode = node.segment[node.segment.length - 2];
+      }
+      if (!neighboringNode) return;
+
+      if ([InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE].includes(
+        neighboringNode.instruction[0],
+      )) {
+        this.upgrade(object);
+      }
+    });
+  }
+
   unload(vizpath: Vizpath) {
     this._destorySplitDot(vizpath);
   }
@@ -454,6 +482,7 @@ class EditorBezier extends EditorModule {
     const { disabledSplit, disabledSplitDot } = this.options;
     if (!disabledSplit) this._initSplitEvent(vizpath);
     if (!disabledSplitDot) this._initDbclickChangeEvent(vizpath);
+    this._strengthenAddEvent(vizpath);
   }
 }
 

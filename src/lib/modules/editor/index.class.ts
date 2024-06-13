@@ -16,7 +16,6 @@ import {
 import EditorUI, { DEFAULT_THEME, type ThemeDecorator } from '../editor-ui/index.class';
 import VizPath from '../../vizpath.class';
 import VizPathCreator, { InstructionType, type Instruction, type PathNode } from 'src/lib';
-import EditorBezier from '../editor-bezier/index.class';
 
 export enum EditorSymbolType {
   PATH = 'path',
@@ -43,6 +42,8 @@ type EditorCurveDot = {
 };
 
 class Editor extends EditorModule<{
+  added: (node: fabric.Object) => void;
+  removed: (nodes: fabric.Object[]) => void;
   selected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
   deselected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
 }> {
@@ -105,9 +106,9 @@ class Editor extends EditorModule<{
      */
     forcePointSymmetric: 'none' | 'angle' | 'entire';
   } = {
-    mode: Mode.MOVE,
-    forcePointSymmetric: 'angle',
-  };
+      mode: Mode.MOVE,
+      forcePointSymmetric: 'angle',
+    };
 
   /** 路径节点对象 */
   nodes: fabric.Object[] = [];
@@ -139,10 +140,10 @@ class Editor extends EditorModule<{
     points: fabric.Object[];
     lines: fabric.Line[];
   } = {
-    nodes: [],
-    points: [],
-    lines: [],
-  };
+      nodes: [],
+      points: [],
+      lines: [],
+    };
 
   /**
    * 构造函数
@@ -474,7 +475,7 @@ class Editor extends EditorModule<{
         object.off('added', onAddedNode);
         object.off('removed', onRemovedNode);
         node.unobserve(object.name);
-        observe(object, ['left', 'top'], () => {});
+        observe(object, ['left', 'top'], () => { });
         this._abandonedPool.nodes.push(object);
       };
 
@@ -625,7 +626,7 @@ class Editor extends EditorModule<{
    */
   private _addActiveSelectionObserve(group: fabric.ActiveSelection) {
     const initialObjectCount = group._objects.length;
-    group._objects.forEach((object) => observe(object, ['left', 'top'], () => {}));
+    group._objects.forEach((object) => observe(object, ['left', 'top'], () => { }));
     observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], (newValue, oldValue) => {
       if (!group.canvas) return;
       if (group._objects.length !== initialObjectCount) return;
@@ -740,6 +741,7 @@ class Editor extends EditorModule<{
       if (this.setting.mode !== Mode.ADD) return;
 
       let target: fabric.Object | undefined;
+      // 路径闭合
       if (event.target && event.target[Editor.symbol]) {
         if (
           this.activeNodes.length === 1 &&
@@ -751,18 +753,17 @@ class Editor extends EditorModule<{
           );
           if (joinNode) target = this.nodeObjectMap.get(joinNode);
         }
-      } else {
-        // 新增节点
+      }
+      // 新增节点
+      else {
         const pointer = calcCanvasCrood(canvas, event.pointer);
         target = this.add({ left: pointer.x, top: pointer.y });
-
-        if (target) {
-          const bezier = this.vizpath?.context.find(EditorBezier);
-          if (bezier) bezier.upgrade(target);
-        }
       }
 
-      if (target) this.currentConvertNodeObject = target;
+      if (target) {
+        this.currentConvertNodeObject = target;
+        this.fire('added', target);
+      }
     });
   }
 
@@ -856,7 +857,7 @@ class Editor extends EditorModule<{
               angle:
                 45 +
                 (Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180) /
-                  Math.PI,
+                Math.PI,
             });
 
             // 响应式更改指令信息
@@ -910,7 +911,7 @@ class Editor extends EditorModule<{
         point.off('removed', onRemovedPoint);
 
         curveDot.unobserve(point.name);
-        observe(point, ['left', 'top'], () => {});
+        observe(point, ['left', 'top'], () => { });
         this._abandonedPool.points.push(point);
       };
       point.on('added', onAddedPoint);
