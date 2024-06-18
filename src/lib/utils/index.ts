@@ -22,3 +22,10 @@ export { default as reinitializePath } from './reinitialize-path';
 export { default as reversePath } from './reverse-path';
 export { default as getCubicFromQuadratic } from './get-cubic-from-quadratic';
 export { default as convertQuadraticToCubic } from './convert-quadratic-to-cubic';
+
+/**
+ * 曲线处理
+ */
+export { default as curveFromLine } from './curve-from-line';
+export { default as curveFromPoint } from './curve-from-point';
+export { default as splitInstruction } from './split-instruction';

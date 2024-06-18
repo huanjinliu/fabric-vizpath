@@ -32,6 +32,37 @@ export enum Mode {
   CONVERT = 'convert',
 }
 
+type EditorSetting = {
+  /**
+   * 节点模式，不同模式下会影响节点的交互逻辑
+   *
+   * move 移动模式 - 节点鼠标选中为移动操作
+   *
+   * add 添加模式 - 鼠标点击外部区域会在区域位置上添加一个新的节点
+   *
+   * delete 删除模式 - 鼠标点击节点、变换点将直接删除
+   *
+   * convert 转换模式 - 鼠标点击节点无法移动，但可以通过拖拽实现节点转换
+   *
+   * @default 'move'
+   */
+  mode: `${Mode}`;
+  /**
+   * 是否开启强制曲线变换点对称
+   *
+   * none - 单杆变换，不对称变换
+   *
+   * auto - 自动变换，操作前若角度恰好对称则保持角度对称状态，如完全对称则完全对称，反之则不对称变换
+   *
+   * angle - 角度对称变换
+   *
+   * entire - 角度与位置保存完全对称变换
+   *
+   * @default 'auto'
+   */
+  dotSymmetricMode: 'none' | 'auto' | 'angle' | 'entire';
+};
+
 type EditorCurveDot = {
   type: 'pre' | 'next';
   pathNode: PathNode<ResponsiveCrood>;
@@ -42,7 +73,9 @@ type EditorCurveDot = {
 };
 
 class Editor extends EditorModule<{
+  set: (setting: Partial<EditorSetting>) => void;
   added: (node: fabric.Object) => void;
+  closed: (node: fabric.Object) => void;
   removed: (nodes: fabric.Object[]) => void;
   selected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
   deselected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
@@ -50,6 +83,18 @@ class Editor extends EditorModule<{
   static ID = 'editor';
 
   static symbol = Symbol('editor');
+
+  /**
+   * 内置配置，配置的更改会影响编辑器的交互效果，配置以栈的形式储存，每次拿配置会从后往前拿
+   *
+   * @note 通过 set 方法更改会触发 set 钩子，避免直接修改该字段以导致 set 钩子未执行
+   */
+  private _settings: Partial<EditorSetting>[] = [
+    {
+      mode: Mode.MOVE,
+      dotSymmetricMode: 'auto',
+    },
+  ];
 
   /* ---------------------------- 画布相关配置 ---------------------------- */
 
@@ -84,32 +129,6 @@ class Editor extends EditorModule<{
 
   /* ---------------------------- 节点相关配置 ---------------------------- */
 
-  /**
-   * 内置配置，配置的更改会影响编辑器的交互效果
-   */
-  setting: {
-    /**
-     * 节点模式，不同模式下会影响节点的交互逻辑
-     *
-     * move 移动 - 节点鼠标选中为移动操作
-     *
-     * add 添加 - 鼠标点击外部区域会在区域位置上添加一个新的节点
-     *
-     * convert 转换 - 鼠标点击节点无法移动，但可以通过拖拽实现节点转换
-     *
-     * @default 'move'
-     */
-    mode: `${Mode}`;
-    /**
-     * 是否开启强制曲线变换点对称，默认角度对称
-     * @default 'angle'
-     */
-    forcePointSymmetric: 'none' | 'angle' | 'entire';
-  } = {
-      mode: Mode.MOVE,
-      forcePointSymmetric: 'angle',
-    };
-
   /** 路径节点对象 */
   nodes: fabric.Object[] = [];
 
@@ -128,6 +147,9 @@ class Editor extends EditorModule<{
   /** 当前活跃的曲线变换点画布对象 */
   activePoint: fabric.Object | null = null;
 
+  /** dotSymmetricMode为auto的情况下，会采用以下变换模式 */
+  dotSymmetricAutoMode: 'none' | 'angle' | 'entire' = 'none';
+
   /** 当前转换的路径节点 */
   currentConvertNodeObject: fabric.Object | null = null;
 
@@ -140,10 +162,10 @@ class Editor extends EditorModule<{
     points: fabric.Object[];
     lines: fabric.Line[];
   } = {
-      nodes: [],
-      points: [],
-      lines: [],
-    };
+    nodes: [],
+    points: [],
+    lines: [],
+  };
 
   /**
    * 构造函数
@@ -153,6 +175,58 @@ class Editor extends EditorModule<{
     super();
     this.mountCanvas = mountCanvas;
     this.isolation = isolation;
+  }
+
+  /**
+   * 获取编辑器配置
+   * @param key
+   * @returns
+   */
+  get(key: keyof EditorSetting) {
+    for (let i = this._settings.length - 1; i >= 0; i--) {
+      if (key in this._settings[i]) return this._settings[i][key];
+    }
+    // 一定存在一个默认配置
+    return this._settings[0][key] as EditorSetting[typeof key];
+  }
+
+  /**
+   * 调整编辑器配置
+   */
+  set(key: Partial<EditorSetting>, value?: any): () => void;
+  set<K extends keyof EditorSetting>(key: K, value: EditorSetting[K]): () => void;
+  set(key: any, value: any) {
+    let setting: Partial<EditorSetting> = {};
+
+    if (typeof key === 'string') {
+      setting = { [key]: value };
+    }
+
+    if (typeof key === 'object') {
+      setting = key;
+    }
+
+    if (Object.keys(setting).length === 0) {
+      throw Error(`Please set valid editor's setting.`);
+    }
+
+    this._settings.push(setting);
+    this.fire('set', setting);
+    const reset = () => {
+      const index = this._settings.indexOf(setting);
+      if (index > 0) {
+        this._settings.splice(index, 1);
+        this.fire(
+          'set',
+          Object.keys(setting).reduce((result, key) => {
+            result[key] = this.get(key as keyof EditorSetting);
+            return result;
+          }, {}),
+        );
+      }
+    };
+
+    return reset;
   }
 
   /**
@@ -475,7 +549,7 @@ class Editor extends EditorModule<{
         object.off('added', onAddedNode);
         object.off('removed', onRemovedNode);
         node.unobserve(object.name);
-        observe(object, ['left', 'top'], () => { });
+        observe(object, ['left', 'top'], () => {});
         this._abandonedPool.nodes.push(object);
       };
 
@@ -626,7 +700,7 @@ class Editor extends EditorModule<{
    */
   private _addActiveSelectionObserve(group: fabric.ActiveSelection) {
     const initialObjectCount = group._objects.length;
-    group._objects.forEach((object) => observe(object, ['left', 'top'], () => { }));
+    group._objects.forEach((object) => observe(object, ['left', 'top'], () => {}));
     observe(group, ['left', 'top', 'angle', 'scaleX', 'scaleY'], (newValue, oldValue) => {
       if (!group.canvas) return;
       if (group._objects.length !== initialObjectCount) return;
@@ -738,7 +812,7 @@ class Editor extends EditorModule<{
 
     this.addCanvasEvent('mouse:down:before', (event) => {
       if (this.disabledFunctionTokens.add?.length) return;
-      if (this.setting.mode !== Mode.ADD) return;
+      if (this.get('mode') !== Mode.ADD) return;
 
       let target: fabric.Object | undefined;
       // 路径闭合
@@ -747,38 +821,64 @@ class Editor extends EditorModule<{
           this.activeNodes.length === 1 &&
           event.target[Editor.symbol] === EditorSymbolType.NODE
         ) {
-          const joinNode = this.link(
-            this.objectNodeMap.get(this.activeNodes[0]!)!,
-            this.objectNodeMap.get(event.target)!,
-          );
+          const joinNode = this.link(this.activeNodes[0]!, event.target);
           if (joinNode) target = this.nodeObjectMap.get(joinNode);
+          if (target) {
+            this.currentConvertNodeObject = target;
+            this.fire('closed', target);
+          }
         }
       }
       // 新增节点
       else {
         const pointer = calcCanvasCrood(canvas, event.pointer);
         target = this.add({ left: pointer.x, top: pointer.y });
+        if (target) {
+          this.currentConvertNodeObject = target;
+          this.fire('added', target);
+        }
       }
+    });
+  }
 
-      if (target) {
-        this.currentConvertNodeObject = target;
-        this.fire('added', target);
-      }
+  /**
+   * 获取相对变换点
+   */
+  getRelativeCurveDot(object: fabric.Object) {
+    const curveDot = this.curveDots.find((dot) => dot.point === object);
+    if (!curveDot) return;
+
+    return this.curveDots.find((dot) => {
+      const antiDirection = { pre: 'next', next: 'pre' }[curveDot.type];
+      if (dot.type !== antiDirection) return false;
+      if (dot.node !== curveDot.node) return false;
+      return dot;
     });
   }
 
   /**
    * 添加活跃节点的周围曲线变换点
    */
-  private _addActivePointCurveDots(nodeObject: fabric.Object) {
+  private _updateCurveDots() {
     const vizpath = this.vizpath;
     if (!vizpath) return;
 
-    const canvas = nodeObject.canvas;
+    const canvas = this.canvas;
     if (!canvas) return;
 
-    const curPathNode = this.objectNodeMap.get(nodeObject);
-    if (!curPathNode) return;
+    // 移除旧对象
+    canvas.renderOnAddRemove = false;
+    canvas.remove(...this.curveDots.map((i) => [i.point, i.line]).flat(1));
+
+    // 当前的活跃节点
+    const curPathNode =
+      this.activeNodes.length === 1 ? this.objectNodeMap.get(this.activeNodes[0]) : undefined;
+    if (!curPathNode) {
+      canvas.renderOnAddRemove = true;
+      canvas.requestRenderAll();
+      this.curveDots = [];
+      return;
+    }
 
     const ui = vizpath.context.find(EditorUI);
     const theme = ui?.theme ?? DEFAULT_THEME;
@@ -786,47 +886,71 @@ class Editor extends EditorModule<{
     // 创建新的路径曲线变换点
     const curveDots: EditorCurveDot[] = [];
     const curveDotSet = new WeakSet<ResponsiveCrood>([]);
-    const neighboringCurveDots = vizpath.getNeighboringCurveDots(curPathNode);
-    neighboringCurveDots.forEach(({ position, direction, from }) => {
-      const node = from.node;
-      const curveDot = from.curveDots?.[direction];
-      if (!node || !curveDot || curveDotSet.has(curveDot)) return false;
+    const neighboringCurveDots = vizpath
+      .getNeighboringCurveDots(curPathNode)
+      .filter(({ direction, from }) => {
+        const node = from.node;
+        const point = from.curveDots?.[direction];
+        if (!node || !point || curveDotSet.has(point)) return false;
+        curveDotSet.add(point);
 
-      const nodeObject = this.nodeObjectMap.get(from)!;
+        return true;
+      })
+      .map((curveDot) => {
+        const { direction, from } = curveDot;
+        const nodeObject = this.nodeObjectMap.get(from)!;
+        const reuseCurveDot = this.curveDots.find(
+          (i) => i.type === direction && i.pathNode === from && i.node === nodeObject,
+        );
+        return {
+          ...curveDot,
+          nodeObject,
+          reuseCurveDot,
+        };
+      });
+    // 有复用元素的必须优先处理，避免新的变换点在废弃池中提前使用了复用元素
+    neighboringCurveDots.sort((a, b) => (a.reuseCurveDot ? -1 : 1));
+    neighboringCurveDots.forEach(({ direction, from, nodeObject, reuseCurveDot }) => {
+      const node = from.node!;
+      const curveDot = from.curveDots![direction]!;
 
       /**
        * 创建指令曲线变换点
        */
-      const pointDecorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
-        customObject.set({
-          name: uuid(),
-          // 选中时不出现选中框
-          hasBorders: false,
-          hasControls: false,
-          // 保持居中
-          originX: 'center',
-          originY: 'center',
-        });
-
-        // 不做另外的画布缓存
-        deepIterateGroup(customObject, (object) => {
-          object.set({
-            objectCaching: false,
+      let point = reuseCurveDot?.point;
+      if (!point) {
+        const pointDecorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
+          customObject.set({
+            name: uuid(),
+            // 选中时不出现选中框
+            hasBorders: false,
+            hasControls: false,
+            // 保持居中
+            originX: 'center',
+            originY: 'center',
           });
-        });
 
-        customObject[Editor.symbol] = EditorSymbolType.CURVE_DOT;
+          // 不做另外的画布缓存
+          deepIterateGroup(customObject, (object) => {
+            object.set({
+              objectCaching: false,
+            });
+          });
 
-        if (ui && callback) {
-          ui.objectPreRenderCallbackMap.set(customObject, callback);
-        }
+          customObject[Editor.symbol] = EditorSymbolType.CURVE_DOT;
 
-        return customObject;
-      };
+          if (ui && callback) {
+            ui.objectPreRenderCallbackMap.set(customObject, callback);
+          }
 
-      let point = this._abandonedPool.points.pop() ?? theme.dot(pointDecorator);
-
-      if (!point[Editor.symbol]) point = pointDecorator(point);
+          return customObject;
+        };
+        point = this._abandonedPool.points.pop() ?? theme.dot(pointDecorator);
+        if (!point[Editor.symbol]) point = pointDecorator(point);
+      } else {
+        const index = this._abandonedPool.points.indexOf(point);
+        this._abandonedPool.points.splice(index, 1);
+      }
 
       // 建立相互响应，指令的数据和元素的位置更改会相互同步
       const onAddedPoint = () => {
@@ -857,7 +981,7 @@ class Editor extends EditorModule<{
               angle:
                 45 +
                 (Math.atan2(pointCenter.y - nodeCenter.y, pointCenter.x - nodeCenter.x) * 180) /
-                Math.PI,
+                  Math.PI,
             });
 
             // 响应式更改指令信息
@@ -870,17 +994,12 @@ class Editor extends EditorModule<{
                 this.nodePathMap.get(node)!.pathObject,
               );
               // 曲线变换点对称操作
-              if (this.setting.forcePointSymmetric !== 'none') {
-                const symmetricCurveDot = this.curveDots.find((i) => {
-                  const antiDirection = { pre: 'next', next: 'pre' }[direction];
-                  if (i.type !== antiDirection) return false;
-                  return (
-                    i.pathNode ===
-                    neighboringCurveDots.find(
-                      (i) => i.position === position && i.direction === antiDirection,
-                    )?.from
-                  );
-                });
+              const symmetricMode =
+                this.get('dotSymmetricMode') === 'auto'
+                  ? this.dotSymmetricAutoMode
+                  : this.get('dotSymmetricMode');
+              if (symmetricMode !== 'none') {
+                const symmetricCurveDot = this.getRelativeCurveDot(point);
                 if (symmetricCurveDot) {
                   const { curveDot: _curveDot } = symmetricCurveDot;
                   // 旧镜像曲线变换点到路径节点的距离
@@ -893,7 +1012,7 @@ class Editor extends EditorModule<{
                     },
                     node,
                   );
-                  const scale = this.setting.forcePointSymmetric === 'entire' ? 1 : d / new_d;
+                  const scale = symmetricMode === 'entire' ? 1 : d / new_d;
                   _curveDot.setCrood({
                     x: node.x - (crood.x - node.x) * scale,
                     y: node.y - (crood.y - node.y) * scale,
@@ -911,7 +1030,7 @@ class Editor extends EditorModule<{
         point.off('removed', onRemovedPoint);
 
         curveDot.unobserve(point.name);
-        observe(point, ['left', 'top'], () => { });
+        observe(point, ['left', 'top'], () => {});
         this._abandonedPool.points.push(point);
       };
       point.on('added', onAddedPoint);
@@ -920,33 +1039,38 @@ class Editor extends EditorModule<{
       /**
        * 创建曲线变换点和节点的连线
        */
-      const lineDecorator: ThemeDecorator<fabric.Line> = (customObject, callback) => {
-        customObject.set({
-          name: uuid(),
-          // 保持比例
-          strokeUniform: true,
-          // 不允许选中
-          selectable: false,
-          evented: false,
-          // 保持居中
-          originX: 'center',
-          originY: 'center',
-          // 不做另外的画布缓存
-          objectCaching: false,
-        });
 
-        customObject[Editor.symbol] = EditorSymbolType.LINE;
+      let line = reuseCurveDot?.line;
+      if (!line) {
+        const lineDecorator: ThemeDecorator<fabric.Line> = (customObject, callback) => {
+          customObject.set({
+            name: uuid(),
+            // 保持比例
+            strokeUniform: true,
+            // 不允许选中
+            selectable: false,
+            evented: false,
+            // 保持居中
+            originX: 'center',
+            originY: 'center',
+            // 不做另外的画布缓存
+            objectCaching: false,
+          });
 
-        if (ui && callback) {
-          ui.objectPreRenderCallbackMap.set(customObject, callback);
-        }
+          customObject[Editor.symbol] = EditorSymbolType.LINE;
 
-        return customObject;
-      };
+          if (ui && callback) {
+            ui.objectPreRenderCallbackMap.set(customObject, callback);
+          }
 
-      let line = this._abandonedPool.lines.pop() ?? theme.line(lineDecorator);
-
-      if (!line[Editor.symbol]) line = lineDecorator(line);
+          return customObject;
+        };
+        line = this._abandonedPool.lines.pop() ?? theme.line(lineDecorator);
+        if (!line[Editor.symbol]) line = lineDecorator(line);
+      } else {
+        const index = this._abandonedPool.lines.indexOf(line);
+        this._abandonedPool.lines.splice(index, 1);
+      }
 
       // 建立响应式，让连线随时跟随指令的值进行变化
       const onAddedLine = () => {
@@ -1000,32 +1124,13 @@ class Editor extends EditorModule<{
       curveDotSet.add(curveDot);
     });
 
-    // 移除旧对象并添加新对象
-    canvas.renderOnAddRemove = false;
-    canvas.remove(...this.curveDots.map((i) => [i.point, i.line]).flat(1));
+    // 添加新的画布元素
     const baseIndex = canvas._objects.indexOf(this.paths[0].pathObject) + this.paths.length;
     curveDots.forEach((i, idx) => {
       canvas.insertAt(i.line, baseIndex + idx, false);
       canvas.add(i.point);
     });
     this.curveDots = curveDots;
-    canvas.renderOnAddRemove = true;
-    canvas.requestRenderAll();
-  }
-
-  /**
-   * 移除当前曲线变换点
-   */
-  private _removeCurrentCurveDots() {
-    const editor = this.vizpath?.context.find(Editor);
-    const canvas = editor?.canvas;
-    if (!canvas) return;
-
-    canvas.renderOnAddRemove = false;
-    this.curveDots.forEach((i) => {
-      canvas.remove(i.point, i.line);
-    });
-    this.curveDots = [];
     canvas.renderOnAddRemove = true;
     canvas.requestRenderAll();
   }
@@ -1100,7 +1205,7 @@ class Editor extends EditorModule<{
       if (this.disabledFunctionTokens.convert?.length) return;
 
       if (!this.currentConvertNodeObject) {
-        if (this.setting.mode !== Mode.CONVERT) return;
+        if (this.get('mode') !== Mode.CONVERT) return;
         if (event.target?.[Editor.symbol] !== EditorSymbolType.NODE) return;
         this.currentConvertNodeObject = event.target as fabric.Object;
       }
@@ -1122,10 +1227,15 @@ class Editor extends EditorModule<{
       const pointer = calcCanvasCrood(canvas, event.pointer);
 
       const targetNode = this.objectNodeMap.get(target)!;
-
       const pathObject = this.nodePathMap.get(targetNode.node!)!.pathObject;
-      const convertibleNodes = this._getConvertibleNodes(targetNode);
       const neighboringNodes = this.vizpath!.getNeighboringNodes(targetNode, true);
+
+      // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
+      let convertibleNodes = this._getConvertibleNodes(targetNode);
+      if (convertibleNodes.length === 0) {
+        this.degrade(target, 'both', true);
+        convertibleNodes = this._getConvertibleNodes(targetNode);
+      }
 
       const position = this.calcRelativeCrood({ left: pointer.x, top: pointer.y }, pathObject);
       const antiPosition = this.calcRelativeCrood(
@@ -1182,7 +1292,7 @@ class Editor extends EditorModule<{
   private _initDeleteNodeEvents() {
     this.addCanvasEvent('mouse:down', (event) => {
       if (this.disabledFunctionTokens.remove?.length) return;
-      if (this.setting.mode !== Mode.DELETE) return;
+      if (this.get('mode') !== Mode.DELETE) return;
 
       if (
         event.target?.[Editor.symbol] === EditorSymbolType.NODE ||
@@ -1507,19 +1617,40 @@ class Editor extends EditorModule<{
   }
 
   /**
+   * 判断两点是否可以相连
+   */
+  checkLinkable(sourceObject: fabric.Object, targetObject: fabric.Object) {
+    const vizpath = this.vizpath;
+    if (!vizpath) return false;
+
+    if (sourceObject === targetObject) return false;
+
+    if (this.disabledFunctionTokens.link?.length) return false;
+
+    const sourceNode = this.objectNodeMap.get(sourceObject);
+    const targetNode = this.objectNodeMap.get(targetObject);
+
+    if (!sourceNode || !targetNode) return false;
+    if (!vizpath.isTerminalNode(sourceNode) || !vizpath.isTerminalNode(targetNode)) return false;
+
+    return true;
+  }
+
+  /**
    * 连接两个节点，可以实现路径闭合和路径拼接，仅在两点都是路径端点（即首尾点）时生效。
    *
    * @param source 当前点
    * @param target 目标点
+   * @returns 合并点
    */
-  link(source: PathNode<ResponsiveCrood>, target: PathNode<ResponsiveCrood>) {
-    if (this.disabledFunctionTokens.link?.length) return;
+  link(sourceObject: fabric.Object, targetObject: fabric.Object) {
+    if (!this.checkLinkable(sourceObject, targetObject)) return;
 
     const vizpath = this.vizpath;
     if (!vizpath) return;
 
-    if (source === target) return;
-    if (!vizpath.isTerminalNode(source) || !vizpath.isTerminalNode(target)) return;
+    const source = this.objectNodeMap.get(sourceObject)!;
+    const target = this.objectNodeMap.get(targetObject)!;
 
     // 自身合并，直接加'z'闭合指令即可
     if (source.segment === target.segment) {
@@ -1589,9 +1720,10 @@ class Editor extends EditorModule<{
       this.fire('deselected', this.activeNodes, this.activePoint);
     }
 
+    this._deactivateSelectListeners = true;
+
     // 只要包含路径节点则只处理聚焦路径节点逻辑
     if (focusNodes.length) {
-      this._deactivateSelectListeners = true;
       // 取消画布选中重新构造只包含路径节点的选中框对象
       canvas.discardActiveObject();
       this.activeNodes = focusNodes;
@@ -1600,7 +1732,7 @@ class Editor extends EditorModule<{
       if (focusNodes.length === 1) {
         const focusNode = focusNodes[0];
         this._addActivePointObserve(focusNode);
-        this._addActivePointCurveDots(focusNode);
+        this._updateCurveDots();
         canvas.setActiveObject(focusNode);
       }
       // 多选则成组选择
@@ -1617,25 +1749,55 @@ class Editor extends EditorModule<{
           activeSelection.setControlVisible('mtr', false);
         }
         this._addActiveSelectionObserve(activeSelection);
-        this._removeCurrentCurveDots();
+        this._updateCurveDots();
         canvas.setActiveObject(activeSelection);
       }
-      this._deactivateSelectListeners = false;
       this.fire('selected', focusNodes, null);
     }
     // 考虑是否只有一个曲线变换点聚焦情况，不允许多曲线变换点同时聚焦
     else if (focusCurveDotPoints.length === 1) {
-      this.activePoint = focusCurveDotPoints[0];
-      this.activeNodes = [this.curveDots.find((i) => i.point === this.activePoint)!.node];
-      canvas.setActiveObject(focusCurveDotPoints[0]);
+      const { node, type } = this.curveDots.find((i) => i.point === focusCurveDotPoints[0])!;
+      this.activeNodes = [node];
+      this._updateCurveDots();
+
+      const activePoint = this.curveDots.find((i) => i.node === node && i.type === type)!;
+      this.activePoint = activePoint.point;
+      canvas.setActiveObject(activePoint.point);
       this.fire('selected', this.activeNodes, this.activePoint);
     }
     // 如都不符合上面情况则是所有节点都失去焦点
     else {
       this.activeNodes = [];
       this.activePoint = null;
-      this._removeCurrentCurveDots();
+      this._updateCurveDots();
       canvas.discardActiveObject();
+    }
+
+    this._deactivateSelectListeners = false;
+
+    // 如果当前选中的是变换点需要确定其自动变换的模式
+    if (this.activePoint) {
+      const dot = this.curveDots.find((i) => i.point === this.activePoint)!;
+      const relativeDot = this.getRelativeCurveDot(this.activePoint)!;
+      if (
+        relativeDot &&
+        calcCroodsAngle(dot.curveDot, dot.pathNode.node!, relativeDot.curveDot) === 180
+      ) {
+        this.dotSymmetricAutoMode = 'angle';
+        if (
+          Math.abs(
+            calcCroodsDistance(dot.curveDot, dot.pathNode.node!) -
+              calcCroodsDistance(dot.pathNode.node!, relativeDot.curveDot),
+          ) <=
+          0.1 ** 4
+        ) {
+          this.dotSymmetricAutoMode = 'entire';
+        }
+      } else {
+        this.dotSymmetricAutoMode = 'none';
+      }
+    } else {
+      this.dotSymmetricAutoMode = 'none';
     }
   }
 

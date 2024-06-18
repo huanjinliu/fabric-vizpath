@@ -10,6 +10,11 @@ import {
 import defaultTheme from 'fabric-path-editor/dist/themes/default';
 
 const EXAMPLE_PATH_D = {
+  arch: 'M0.5 53.8667C0.5 24.3763 23.5738 0.5 52 0.5C80.4262 0.5 103.5 24.3763 103.5 53.8667V143.5H0.5V53.8667Z',
+  lines:
+    'M28 0.5H80M14 13.5H94M0 26.5H108M0 39.5H108M78 52.5H108M0 52.5H30M78 65.5H108M0 65.5H30M78 78.5H108M0 78.5H30M78 91.5H108M0 91.5H30M78 104.5H108M0 104.5H30M0 117.5H108M0 130.5H108M14 143.5H94M28 156.5H80',
+  spiral:
+    'M85.7639 135.505C85.7639 135.505 85.7496 135.509 85.7438 135.511C81.8568 136.497 77.6534 137.475 73.2314 137.944C67.5574 138.549 61.6383 138.342 55.6328 137.328C44.6718 135.481 34.7338 131.085 26.0907 124.27C15.2863 115.748 7.77844 104.811 3.78356 91.7677L3.71981 91.5592C-1.6158 73.6286 -0.194072 56.0381 7.9484 39.2738C12.0117 30.9068 17.7201 23.4838 24.9102 17.2098C29.8374 12.9103 35.4839 9.29955 41.6925 6.47953C52.3821 1.61793 64.1597 -0.517597 76.6933 0.126985C84.7958 0.543356 92.9129 2.38332 100.82 5.59858C110.005 9.33143 118.366 14.8208 125.674 21.9111C130.611 26.7023 134.948 32.3393 138.559 38.6666C141.123 43.1579 143.352 48.2517 145.374 54.248C145.454 54.4866 145.328 54.7435 145.091 54.8222C144.86 54.9058 144.599 54.7732 144.52 54.5346C142.516 48.5962 140.311 43.5519 137.776 39.1149C134.207 32.8635 129.926 27.2951 125.047 22.5619C117.823 15.5534 109.559 10.1298 100.483 6.43923C92.6707 3.26484 84.651 1.44574 76.6472 1.034C64.2628 0.394478 52.6255 2.50611 42.0675 7.3053C35.9395 10.0912 30.3663 13.6541 25.506 17.8952C18.4042 24.0883 12.774 31.4178 8.76162 39.6743C0.718869 56.2307 -0.686431 73.5977 4.58209 91.2987L4.64496 91.5043C8.58405 104.365 15.9889 115.15 26.6456 123.559C35.1663 130.282 44.9679 134.611 55.7773 136.436C61.6996 137.433 67.5398 137.639 73.1319 137.044C77.4892 136.579 81.6523 135.613 85.4983 134.636L85.62 134.593C95.4785 131.736 104.188 126.274 111.528 118.352C118.272 111.071 122.955 102.391 125.447 92.5603C127.078 86.1276 127.632 79.7237 127.091 73.5212C126.747 69.5733 126.117 65.9601 125.166 62.4827C123.463 56.2558 121.024 50.8366 117.713 45.9217C113.675 39.9273 108.646 34.9077 102.759 30.9987C96.2268 26.6603 89.1157 23.8287 81.625 22.5793C75.5671 21.5693 70.0219 21.5583 64.6691 22.5461L64.0153 22.6669C61.9489 23.0455 59.8138 23.4356 57.7696 24.0512C43.1548 28.6344 32.7493 38.3677 26.8413 52.9826C23.6236 60.9423 22.7312 69.4416 24.1864 78.2457C26.3941 91.5948 33.0422 101.958 43.9415 109.046C50.7525 113.473 58.4261 115.804 66.7529 115.968C71.1538 116.056 75.4058 115.453 79.385 114.173C79.3994 114.168 79.4166 114.163 79.431 114.159C89.0504 110.859 96.3017 104.95 100.99 96.5941C105.587 88.3997 107.006 79.6 105.213 70.44C103.377 61.0713 98.5646 53.7625 90.9103 48.7127C85.6079 45.2141 80.0918 43.44 74.0479 43.287C64.7248 43.0476 57.3688 45.9557 51.5687 52.175C45.9897 58.1526 43.5832 65.3354 44.4163 73.5223C45.5927 85.0905 53.1729 92.978 64.1995 94.1055C71.9883 94.9028 77.8729 92.2452 81.6966 86.2059C84.9508 81.0659 84.731 73.4165 81.21 69.1515C78.5375 65.9157 75.6196 64.7213 71.7498 65.2809C69.9512 65.5396 68.3157 66.4957 67.3751 67.8346C66.5081 69.0655 66.2353 70.5453 66.5653 72.2303C66.6121 72.4756 66.4527 72.7143 66.2102 72.7632C65.9668 72.8091 65.729 72.6475 65.6793 72.403C65.305 70.491 65.6364 68.7304 66.6369 67.3099C67.7179 65.7729 69.578 64.6785 71.6169 64.3843C75.8329 63.7758 79.0034 65.0671 81.9007 68.5761C85.6549 73.1213 85.9057 81.252 82.4565 86.6987C78.4356 93.0484 72.2637 95.8445 64.1117 95.0095C58.4168 94.4268 53.4785 92.0675 49.8321 88.1828C46.2858 84.41 44.1035 79.3682 43.5171 73.6105C42.6568 65.15 45.1447 57.7302 50.9068 51.551C56.8121 45.2235 64.6027 42.135 74.0655 42.3792C80.1957 42.5374 86.028 44.4112 91.4007 47.9548C99.2667 53.1425 104.21 60.652 106.097 70.271C107.934 79.6485 106.482 88.6578 101.775 97.0445C96.9693 105.613 89.5303 111.669 79.6716 115.038C79.6487 115.045 79.6286 115.051 79.6085 115.057C75.546 116.363 71.2189 116.968 66.7391 116.878C58.2442 116.708 50.4091 114.332 43.4558 109.809C32.3297 102.575 25.5493 92.0051 23.2982 78.3907C21.8135 69.4182 22.7239 60.7519 26.0069 52.6362C31.9793 37.8623 42.4735 27.9878 57.1947 23.2802C57.212 23.2749 57.2226 23.2685 57.2427 23.2624C57.3173 23.2396 57.392 23.2167 57.4666 23.1939L57.5241 23.1763C57.5241 23.1763 57.5355 23.1728 57.5442 23.1702C59.6208 22.5478 61.7645 22.1551 63.8433 21.7759L64.4943 21.656C69.9511 20.6491 75.5999 20.66 81.7601 21.6862C89.3758 22.9544 96.6056 25.8352 103.247 30.2416C109.231 34.2156 114.347 39.3199 118.452 45.4138C121.818 50.4134 124.296 55.9189 126.029 62.2442C126.996 65.7766 127.635 69.4379 127.985 73.4443C128.531 79.7494 127.971 86.2566 126.313 92.7861C123.783 102.768 119.029 111.577 112.182 118.972C104.732 127.016 95.8773 132.558 85.8905 135.457L85.7745 135.498C85.7745 135.498 85.7631 135.502 85.7573 135.504L85.7639 135.505Z',
   arc: 'M 88.827 199.088 Q 258.533 199.088 258.533 368.794',
   point: 'M 100 100 z',
   polyline: 'M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160',
@@ -59,7 +64,7 @@ const EXAMPLE_PATH_D = {
 
   // fabricCanvas.setViewportTransform([0.5, 0, 0, 0.5, 100, 100]);
 
-  const path = new fabric.Path(EXAMPLE_PATH_D.test, {
+  const path = new fabric.Path(EXAMPLE_PATH_D.arch, {
     objectCaching: false,
     noScaleCache: false,
     fill: '#e1e1e1',
@@ -74,13 +79,14 @@ const EXAMPLE_PATH_D = {
   });
   fabricCanvas.add(path);
 
-  // let pathText = new fabric.Text(
+  // let pathText = new fabric.IText(
   //   'The shortest way to do many things is to only one thing at a time.',
   //   {
-  //     fontSize: 20,
+  //     fontSize: 10,
   //     // @ts-ignore
   //     path: path as any,
-  //     pathAlign: 'center',
+  //     pathStartOffset: 100,
+  //     pathAlign: 'descender',
   //     pathSide: 'left',
   //     left: fabricCanvas.getWidth() / 2,
   //     top: fabricCanvas.getHeight() / 2,
@@ -90,13 +96,13 @@ const EXAMPLE_PATH_D = {
   //     noScaleCache: false,
   //     // backgroundColor: 'pink',
   //     // angle: 45,
-  //     // scaleX: 0.5,
-  //     // scaleY: 0.5,
+  //     scaleX: 2,
+  //     scaleY: 2,
   //   }
   // );
   // fabricCanvas.add(pathText);
 
-  fabricCanvas.renderAll();
+  // fabricCanvas.renderAll();
 
   const vizpath = new VizPathCreator({
     refreshPathTriggerTime: 'auto',
@@ -110,11 +116,115 @@ const EXAMPLE_PATH_D = {
     .use(new EditorBackground())
     .use(new EditorBezier())
     .use(new EditorUI(defaultTheme))
-    .use(new EditorShortcut())
+    .use(
+      new EditorShortcut([
+        // 删除节点快捷键
+        {
+          key: 'backspace',
+          onActivate: (e) => {
+            e.preventDefault();
+
+            const editor = vizpath.find(Editor);
+            if (!editor) return;
+
+            // 如果当前有选中曲线控制点
+            if (editor.activePoint) {
+              editor.remove(editor.activePoint);
+            } else if (editor.activeNodes.length) {
+              editor.remove(...editor.activeNodes);
+            }
+          },
+        },
+        // 全选节点快捷键
+        {
+          key: 'A',
+          combinationKeys: ['meta'],
+          onActivate: (e) => {
+            e.preventDefault();
+
+            const editor = vizpath.find(Editor);
+            if (!editor) return;
+
+            editor.focus(...editor.nodes);
+          },
+        },
+        // 取消节点选择
+        {
+          key: 'D',
+          combinationKeys: ['meta'],
+          onActivate: (e) => {
+            e.preventDefault();
+
+            const editor = vizpath.find(Editor);
+            if (!editor) return;
+
+            editor.focus();
+          },
+        },
+        // 更改路径节点交互模式
+        {
+          combinationKeys: ['alt'],
+          onActivate: () => {
+            const editor = vizpath.find(Editor);
+            if (!editor) return;
+
+            return editor.set({
+              dotSymmetricMode: editor.dotSymmetricAutoMode === 'none' ? 'angle' : 'none',
+            });
+          },
+          onDeactivate: (e, reset) => {
+            reset?.();
+          },
+        },
+        {
+          combinationKeys: ['alt', 'ctrl'],
+          onActivate: () => {
+            const editor = vizpath.find(Editor);
+            if (!editor) return;
+
+            return editor.set({
+              dotSymmetricMode: editor.dotSymmetricAutoMode === 'none' ? 'entire' : 'none',
+            });
+          },
+          onDeactivate: (e, reset) => {
+            reset?.();
+          },
+        },
+        // 更改为变换模式
+        {
+          key: 'V',
+          onActivate: () => {
+            const editor = vizpath.find(Editor);
+            if (!editor) return;
+
+            return editor.set({
+              mode: 'convert',
+              dotSymmetricMode: 'entire',
+            });
+          },
+          onDeactivate: (e, reset) => {
+            reset?.();
+          },
+        },
+        // 更改为添加模式
+        {
+          key: 'P',
+          onActivate: () => {
+            const editor = vizpath.find(Editor);
+            if (!editor) return;
+
+            return editor.set('mode', 'add');
+          },
+          onDeactivate: (e, reset) => {
+            reset?.();
+          },
+        },
+      ]),
+    )
     .initialize();
 
   // // ① 通过路径指令直接绘制
-  // const path1 = VizPath.parsePathData(EXAMPLE_PATH_D.test, {
+  // const path1 = VizPathCreator.parsePathData(EXAMPLE_PATH_D.arch, {
   //   left: pathText.left,
   //   top: pathText.top,
   //   originX: pathText.originX,
@@ -144,6 +254,9 @@ const EXAMPLE_PATH_D = {
   //     scaleX: 1,
   //     scaleY: 1,
   //     angle: 0,
+  //     pathStartOffset: pathText.pathStartOffset! * pathText.scaleX!,
+  //     fontSize: pathText.fontSize! * pathText.scaleX!,
+  //     strokeWidth: pathText.strokeWidth! * pathText.scaleX!,
   //   })
 
   //   fabricCanvas.requestRenderAll();

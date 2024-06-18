@@ -6,143 +6,31 @@ import type VizPath from '../../vizpath.class';
 
 type CombinationKey = 'alt' | 'ctrl' | 'shift' | 'meta';
 
-type Shortcut = {
+type Shortcut<ReturnValue = any> = {
   key?: string;
   combinationKeys: CombinationKey[];
-  onActivate: (e: KeyboardEvent) => void;
-  onDeactivate?: (e: KeyboardEvent) => void;
+  onActivate: (e: KeyboardEvent) => ReturnValue;
+  onDeactivate?: (e: KeyboardEvent, returnValue: ReturnValue) => void;
 };
 
-type ShortcutOptions = {
-  key?: string;
-  combinationKeys?: CombinationKey[];
-  onActivate?: (e: KeyboardEvent) => void;
-  onDeactivate?: (e: KeyboardEvent) => void;
-};
+type ShortcutOptions<ReturnValue = any> = Partial<Shortcut<ReturnValue>>;
 
 class EditorShortcut extends EditorModule {
   static ID = 'editor-shortcut';
 
   shortcuts: Shortcut[] = [];
 
-  shortcutOptions: ShortcutOptions[] | undefined;
+  shortcutOptions: ShortcutOptions[];
 
-  activeShortcut: Shortcut | undefined;
+  activeShortcut?: {
+    shortcut: Shortcut;
+    returnValue: any;
+  };
 
-  constructor(options?: ShortcutOptions[]) {
+  constructor(options: ShortcutOptions[] = []) {
     super();
 
     this.shortcutOptions = options;
-  }
-
-  /**
-   * 初始默认快捷键配置
-   */
-  private _getDefaultShortcutOptions(vizpath: VizPath) {
-    return [
-      // 删除节点快捷键
-      {
-        key: 'backspace',
-        onActivate: (e) => {
-          e.preventDefault();
-
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          // 如果当前有选中曲线控制点
-          if (editor.activePoint) {
-            editor.remove(editor.activePoint);
-          } else if (editor.activeNodes.length) {
-            editor.remove(...editor.activeNodes);
-          }
-        },
-      },
-      // 全选节点快捷键
-      {
-        key: 'A',
-        combinationKeys: ['meta'],
-        onActivate: (e) => {
-          e.preventDefault();
-
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          editor.focus(...editor.nodes);
-        },
-      },
-      // 取消节点选择
-      {
-        key: 'D',
-        combinationKeys: ['meta'],
-        onActivate: (e) => {
-          e.preventDefault();
-
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          editor.focus();
-        },
-      },
-      // 更改路径节点交互模式
-      {
-        combinationKeys: ['alt'],
-        onActivate: () => {
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          if (editor.setting.mode === 'move') {
-            editor.setting.mode = 'convert';
-            editor.setting.forcePointSymmetric = 'entire';
-          }
-        },
-        onDeactivate: () => {
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          editor.setting.mode = 'move';
-          editor.setting.forcePointSymmetric = 'angle';
-        },
-      },
-      {
-        combinationKeys: ['alt', 'ctrl'],
-        onActivate: () => {
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          if (editor.setting.mode === 'move') {
-            editor.setting.mode = 'convert';
-            editor.setting.forcePointSymmetric = 'none';
-          }
-        },
-        onDeactivate: () => {
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          editor.setting.mode = 'move';
-          editor.setting.forcePointSymmetric = 'angle';
-        },
-      },
-      // 更改为添加模式
-      {
-        combinationKeys: ['shift'],
-        onActivate: () => {
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          if (editor.setting.mode === 'move') {
-            editor.setting.mode = 'add';
-            editor.setting.forcePointSymmetric = 'entire';
-          }
-        },
-        onDeactivate: () => {
-          const editor = vizpath.context.find(Editor);
-          if (!editor) return;
-
-          editor.setting.mode = 'move';
-          editor.setting.forcePointSymmetric = 'angle';
-        },
-      },
-    ] as ShortcutOptions[];
   }
 
   private _tryGetValidShortcut(shortcut: ShortcutOptions) {
@@ -167,7 +55,7 @@ class EditorShortcut extends EditorModule {
 
   private _handlePageDeactivate(e: KeyboardEvent) {
     if (this.activeShortcut) {
-      this.activeShortcut.onDeactivate?.(e);
+      this.activeShortcut.shortcut.onDeactivate?.(e, this.activeShortcut.returnValue);
       this.activeShortcut = undefined;
     }
   }
@@ -213,16 +101,13 @@ class EditorShortcut extends EditorModule {
     });
 
     const shortcut = activateKeys[0];
-    if (this.activeShortcut === shortcut) {
-      this.activeShortcut?.onActivate(e);
-      return;
+    if (shortcut) {
+      if (this.activeShortcut?.shortcut === activateKeys[0]) return;
+      this.activeShortcut = { shortcut, returnValue: shortcut.onActivate(e) };
+    } else {
+      this.activeShortcut?.shortcut.onDeactivate?.(e, this.activeShortcut.returnValue);
+      this.activeShortcut = undefined;
     }
-
-    this.activeShortcut?.onDeactivate?.(e);
-
-    this.activeShortcut = shortcut;
-
-    this.activeShortcut?.onActivate(e);
   }
 
   add(shortcut: ShortcutOptions) {
@@ -265,7 +150,7 @@ class EditorShortcut extends EditorModule {
     const editor = vizpath.context.find(Editor);
     if (!editor) return;
 
-    this.shortcuts = (this.shortcutOptions ?? this._getDefaultShortcutOptions(vizpath))
+    this.shortcuts = (this.shortcutOptions ?? [])
       .map(this._tryGetValidShortcut.bind(this))
       .filter(Boolean) as typeof this.shortcuts;
 

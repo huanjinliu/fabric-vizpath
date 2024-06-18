@@ -16,15 +16,10 @@ export type DefaultThemeConfigurators = {
   line: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
 };
 
-export type ThemeConfigurators<
-  T extends Record<string, any> = Record<string, unknown>,
-  Q extends Record<string, any> = Record<string, unknown>,
-> = (
+export type ThemeConfigurators<ShareState extends Record<string, any> = Record<string, unknown>> = (
   editor: Editor,
-  shareState: Partial<T>,
-) => DefaultThemeConfigurators & {
-  [p in keyof Omit<Q, keyof DefaultThemeConfigurators>]?: (decorator: ThemeDecorator<Q[p]>) => Q[p];
-};
+  shareState: Partial<ShareState>,
+) => DefaultThemeConfigurators & Record<string, (decorator: ThemeDecorator<any>) => any>;
 
 export const DEFAULT_THEME = {
   path: (decorator, pathObject) => {
@@ -65,8 +60,7 @@ export const DEFAULT_THEME = {
 } as DefaultThemeConfigurators;
 
 class EditorUI<
-  T extends Record<string, any> = Record<string, unknown>,
-  Q extends Record<string, any> = Record<string, unknown>,
+  ShareState extends Record<string, any> = Record<string, unknown>,
 > extends EditorModule {
   static ID = 'editor-ui';
 
@@ -75,27 +69,23 @@ class EditorUI<
    */
   configurator: (
     editor: Editor,
-    shareState: Partial<T>,
-  ) => Partial<DefaultThemeConfigurators> & {
-    [p in keyof Omit<Q, keyof DefaultThemeConfigurators>]?: (
-      decorator: ThemeDecorator<Q[p]>,
-    ) => Q[p];
-  };
+    shareState: Partial<ShareState>,
+  ) => Partial<DefaultThemeConfigurators> & Record<string, (decorator: ThemeDecorator<any>) => any>;
 
   /**
    * 主题
    */
-  theme: ReturnType<ThemeConfigurators<T, Q>> | null = null;
+  theme: ReturnType<ThemeConfigurators<ShareState>> | null = null;
 
   /**
    * 共享状态
    */
-  shareState: Partial<T>;
+  shareState: Partial<ShareState>;
 
   /**
    * 监听共享状态变化
    */
-  private _onShareStateUpdate?: (editor: Editor, shareState: Partial<T>) => void;
+  private _onShareStateUpdate?: (editor: Editor, shareState: Partial<ShareState>) => void;
 
   /**
    * 元素渲染更新回调映射
@@ -103,9 +93,9 @@ class EditorUI<
   objectPreRenderCallbackMap = new Map<fabric.Object, () => void>([]);
 
   constructor(
-    configurator: EditorUI<T, Q>['configurator'] = () => ({}),
-    initialShareState: Partial<T> = {},
-    onShareStateUpdate?: (editor: Editor, shareState: Partial<T>) => void,
+    configurator: EditorUI<ShareState>['configurator'] = () => ({}),
+    initialShareState: Partial<ShareState> = {},
+    onShareStateUpdate?: (editor: Editor, shareState: Partial<ShareState>) => void,
   ) {
     super();
     this.configurator = configurator;
@@ -131,7 +121,7 @@ class EditorUI<
 
   unload() {
     this.theme = null;
-    this.shareState = {} as T;
+    this.shareState = {} as ShareState;
     this._onShareStateUpdate = undefined;
     this.objectPreRenderCallbackMap.clear();
   }
