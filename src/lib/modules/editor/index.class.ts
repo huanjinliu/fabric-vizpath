@@ -917,7 +917,7 @@ class Editor extends EditorModule<{
       /**
        * 创建指令曲线变换点
        */
-      let point = reuseCurveDot?.point;
+      let point = reuseCurveDot?.point as fabric.Object;
       if (!point) {
         const pointDecorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
           customObject.set({
@@ -1040,7 +1040,7 @@ class Editor extends EditorModule<{
        * 创建曲线变换点和节点的连线
        */
 
-      let line = reuseCurveDot?.line;
+      let line = reuseCurveDot?.line as fabric.Line;
       if (!line) {
         const lineDecorator: ThemeDecorator<fabric.Line> = (customObject, callback) => {
           customObject.set({
