@@ -6920,9 +6920,18 @@
           };
         });
         // 建立组并销毁组是为了保持子路径对象的正确尺寸和位置
-        new fabric.fabric.Group(segments.map(function (i) {
+        var group = new fabric.fabric.Group(segments.map(function (i) {
           return i.pathObject;
-        }), layout).destroy();
+        }), layout);
+        // 避免原点问题导致元素偏移
+        var centerPoint = pathObject.getCenterPoint();
+        group.set({
+          originX: 'center',
+          originY: 'center',
+          left: centerPoint.x,
+          top: centerPoint.y
+        });
+        group.destroy();
         /**
          * 第二步：组合path
          */
@@ -7546,6 +7555,7 @@
             var pathObject = item.pathObject;
             // 如果已经带有标志则是已经添加进画布的路径
             if (pathObject[Editor.symbol]) return;
+            var centerPoint = pathObject.getCenterPoint();
             var decorator = function decorator(customPath, callback) {
               customPath.set({
                 name: v4(),
@@ -7556,6 +7566,8 @@
                 // 防止因为缓存没有显示正确的路径
                 objectCaching: false
               });
+              // 避免路径轮廓宽度影响到路径偏移
+              customPath.setPositionByOrigin(centerPoint, 'center', 'center');
               customPath[Editor.symbol] = EditorSymbolType.PATH;
               if (ui && callback) {
                 ui.objectPreRenderCallbackMap.set(customPath, callback);
@@ -10761,7 +10773,8 @@
           objectCaching: false,
           noScaleCache: false,
           fill: '#e1e1e1',
-          strokeWidth: 2,
+          // stroke: '#333',
+          // strokeWidth: 20,
           originX: 'center',
           originY: 'center',
           left: fabricCanvas.getWidth() / 2,
@@ -10950,6 +10963,7 @@
               scaleX: 1,
               scaleY: 1,
               angle: 0,
+              strokeWidth: path.strokeWidth * path.scaleX,
           });
           path.initialize(d);
           (_a = path.canvas) === null || _a === void 0 ? void 0 : _a.renderAll();

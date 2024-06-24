@@ -68,7 +68,8 @@ const EXAMPLE_PATH_D = {
     objectCaching: false,
     noScaleCache: false,
     fill: '#e1e1e1',
-    strokeWidth: 2,
+    // stroke: '#333',
+    // strokeWidth: 20,
     originX: 'center',
     originY: 'center',
     left: fabricCanvas.getWidth() / 2,
@@ -273,6 +274,7 @@ const EXAMPLE_PATH_D = {
       scaleX: 1,
       scaleY: 1,
       angle: 0,
+      strokeWidth: path.strokeWidth! * path.scaleX!,
     });
     path.initialize(d as any);
 

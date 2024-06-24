@@ -89,10 +89,20 @@ class VizPathCreator {
     });
 
     // 建立组并销毁组是为了保持子路径对象的正确尺寸和位置
-    new fabric.Group(
+    const group = new fabric.Group(
       segments.map((i) => i.pathObject),
       layout,
-    ).destroy();
+    );
+
+    // 避免原点问题导致元素偏移
+    const centerPoint = pathObject.getCenterPoint();
+    group.set({
+      originX: 'center',
+      originY: 'center',
+      left: centerPoint.x,
+      top: centerPoint.y,
+    });
+    group.destroy();
 
     /**
      * 第二步：组合path

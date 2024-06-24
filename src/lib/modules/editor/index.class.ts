@@ -392,6 +392,8 @@ class Editor extends EditorModule<{
         // 如果已经带有标志则是已经添加进画布的路径
         if (pathObject[Editor.symbol]) return;
 
+        const centerPoint = pathObject.getCenterPoint();
+
         const decorator: ThemeDecorator<fabric.Path> = (customPath, callback) => {
           customPath.set({
             name: uuid(),
@@ -402,6 +404,9 @@ class Editor extends EditorModule<{
             // 防止因为缓存没有显示正确的路径
             objectCaching: false,
           });
+
+          // 避免路径轮廓宽度影响到路径偏移
+          customPath.setPositionByOrigin(centerPoint, 'center', 'center');
 
           customPath[Editor.symbol] = EditorSymbolType.PATH;
 
