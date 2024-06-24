@@ -281,6 +281,7 @@ class EditorBezier extends EditorModule {
     const canvas = editor.canvas;
     if (!canvas) return;
 
+    let touchPath: fabric.Path | undefined;
     let pathNode: PathNode<ResponsiveCrood> | undefined;
     let splitCrood: Crood | undefined;
     let disableAddToken: string | undefined;
@@ -309,62 +310,64 @@ class EditorBezier extends EditorModule {
 
       const pointer = calcCanvasCrood(canvas, e.pointer);
 
-      // 只有进入路径范围内才开始判定是否触线拆分
-      const touchPath = editor.paths.find((i) => i.pathObject.containsPoint(e.pointer));
-      if (!touchPath) return;
+      let minDistance = Infinity;
 
-      const { segment, pathObject } = touchPath;
+      editor.paths.forEach(({ segment, pathObject }) => {
+        if (!pathObject.containsPoint(e.pointer)) return;
 
-      const { x, y } = editor.calcRelativeCrood(
-        {
-          left: pointer.x,
-          top: pointer.y,
-        },
-        pathObject,
-      );
+        const { x, y } = editor.calcRelativeCrood(
+          {
+            left: pointer.x,
+            top: pointer.y,
+          },
+          pathObject,
+        );
 
-      let d = Math.max((pathObject.strokeWidth ?? 0) / 2 || 1, 1);
+        const validDistance = Math.max((pathObject.strokeWidth ?? 0) / 2 || 1, 1);
 
-      for (const item of segment) {
-        let points: Crood[] = [];
+        for (const item of segment) {
+          let points: Crood[] = [];
 
-        if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0])) continue;
-        if (item.instruction[0] === InstructionType.LINE) {
-          const { pre } = vizpath.getNeighboringNodes(item, true);
-          points = [
-            pre!.node!,
-            { x: item.instruction[1], y: item.instruction[2] },
-            { x: item.instruction[1], y: item.instruction[2] },
-          ];
-        } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
-          const { pre } = vizpath.getNeighboringNodes(item, true);
-          points = [
-            pre!.node!,
-            { x: item.instruction[1], y: item.instruction[2] },
-            { x: item.instruction[3], y: item.instruction[4] },
-          ];
-        } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
-          const { pre } = vizpath.getNeighboringNodes(item, true);
-          points = [
-            pre!.node!,
-            { x: item.instruction[1], y: item.instruction[2] },
-            { x: item.instruction[3], y: item.instruction[4] },
-            { x: item.instruction[5], y: item.instruction[6] },
-          ];
+          if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0]))
+            continue;
+          if (item.instruction[0] === InstructionType.LINE) {
+            const { pre } = vizpath.getNeighboringNodes(item, true);
+            points = [
+              pre!.node!,
+              { x: item.instruction[1], y: item.instruction[2] },
+              { x: item.instruction[1], y: item.instruction[2] },
+            ];
+          } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
+            const { pre } = vizpath.getNeighboringNodes(item, true);
+            points = [
+              pre!.node!,
+              { x: item.instruction[1], y: item.instruction[2] },
+              { x: item.instruction[3], y: item.instruction[4] },
+            ];
+          } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
+            const { pre } = vizpath.getNeighboringNodes(item, true);
+            points = [
+              pre!.node!,
+              { x: item.instruction[1], y: item.instruction[2] },
+              { x: item.instruction[3], y: item.instruction[4] },
+              { x: item.instruction[5], y: item.instruction[6] },
+            ];
+          }
+          const bezier = new Bezier(points);
+          const p = bezier.project({ x, y });
+
+          if (p.d && p.d < validDistance && p.d < minDistance) {
+            minDistance = p.d;
+            touchPath = pathObject;
+            pathNode = item;
+            splitCrood = p;
+          }
         }
-        const bezier = new Bezier(points);
-        const p = bezier.project({ x, y });
+      });
 
-        if (p.d && p.d < d) {
-          d = p.d;
-          pathNode = item;
-          splitCrood = p;
-        }
-      }
-
-      if (pathNode && splitCrood) {
+      if (touchPath && pathNode && splitCrood) {
         const { x, y } = splitCrood;
-        const { left, top } = editor.calcAbsolutePosition({ x, y }, pathObject);
+        const { left, top } = editor.calcAbsolutePosition({ x, y }, touchPath);
 
         if (!this.splitDot && !this.options.disabledSplitDot) {
           this.splitDot = this._initSpiltDot(vizpath);

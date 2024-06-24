@@ -96,6 +96,9 @@ class Editor extends EditorModule<{
     },
   ];
 
+  /** 内部用于比较值的误差值 */
+  deviation = 0.1 ** 8;
+
   /* ---------------------------- 画布相关配置 ---------------------------- */
 
   /** 挂载的画布 */
@@ -1786,15 +1789,15 @@ class Editor extends EditorModule<{
       const relativeDot = this.getRelativeCurveDot(this.activePoint)!;
       if (
         relativeDot &&
-        calcCroodsAngle(dot.curveDot, dot.pathNode.node!, relativeDot.curveDot) === 180
+        180 - calcCroodsAngle(dot.curveDot, dot.pathNode.node!, relativeDot.curveDot) <=
+          this.deviation
       ) {
         this.dotSymmetricAutoMode = 'angle';
         if (
           Math.abs(
             calcCroodsDistance(dot.curveDot, dot.pathNode.node!) -
               calcCroodsDistance(dot.pathNode.node!, relativeDot.curveDot),
-          ) <=
-          0.1 ** 4
+          ) <= this.deviation
         ) {
           this.dotSymmetricAutoMode = 'entire';
         }

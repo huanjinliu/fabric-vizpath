@@ -7312,6 +7312,8 @@
         mode: Mode.MOVE,
         dotSymmetricMode: 'auto'
       }];
+      /** 内部用于比较值的误差值 */
+      _this14.deviation = Math.pow(0.1, 8);
       /* ---------------------------- 画布相关配置 ---------------------------- */
       /** 挂载的画布 */
       _this14.mountCanvas = null;
@@ -8875,9 +8877,9 @@
             return i.point === _this32.activePoint;
           });
           var relativeDot = this.getRelativeCurveDot(this.activePoint);
-          if (relativeDot && calcCroodsAngle(dot.curveDot, dot.pathNode.node, relativeDot.curveDot) === 180) {
+          if (relativeDot && 180 - calcCroodsAngle(dot.curveDot, dot.pathNode.node, relativeDot.curveDot) <= this.deviation) {
             this.dotSymmetricAutoMode = 'angle';
-            if (Math.abs(calcCroodsDistance(dot.curveDot, dot.pathNode.node) - calcCroodsDistance(dot.pathNode.node, relativeDot.curveDot)) <= Math.pow(0.1, 4)) {
+            if (Math.abs(calcCroodsDistance(dot.curveDot, dot.pathNode.node) - calcCroodsDistance(dot.pathNode.node, relativeDot.curveDot)) <= this.deviation) {
               this.dotSymmetricAutoMode = 'entire';
             }
           } else {
@@ -10278,6 +10280,7 @@
         if (!editor) return;
         var canvas = editor.canvas;
         if (!canvas) return;
+        var touchPath;
         var pathNode;
         var splitCrood;
         var disableAddToken;
@@ -10293,91 +10296,91 @@
           }
         };
         editor.addCanvasEvent('mouse:move', function (e) {
-          var _a;
           clean();
           if (editor.get('mode') !== Mode.ADD) return;
           if (e.target && e.target[Editor$1.symbol]) return;
           if (e.target && e.target.type === 'activeSelection') return;
           var pointer = calcCanvasCrood(canvas, e.pointer);
-          // 只有进入路径范围内才开始判定是否触线拆分
-          var touchPath = editor.paths.find(function (i) {
-            return i.pathObject.containsPoint(e.pointer);
-          });
-          if (!touchPath) return;
-          var segment = touchPath.segment,
-            pathObject = touchPath.pathObject;
-          var _editor$calcRelativeC = editor.calcRelativeCrood({
-              left: pointer.x,
-              top: pointer.y
-            }, pathObject),
-            x = _editor$calcRelativeC.x,
-            y = _editor$calcRelativeC.y;
-          var d = Math.max(((_a = pathObject.strokeWidth) !== null && _a !== void 0 ? _a : 0) / 2 || 1, 1);
-          var _iterator4 = _createForOfIteratorHelper(segment),
-            _step4;
-          try {
-            for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
-              var item = _step4.value;
-              var points = [];
-              if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0])) continue;
-              if (item.instruction[0] === InstructionType.LINE) {
-                var _vizpath$getNeighbori4 = vizpath.getNeighboringNodes(item, true),
-                  pre = _vizpath$getNeighbori4.pre;
-                points = [pre.node, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }];
-              } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
-                var _vizpath$getNeighbori5 = vizpath.getNeighboringNodes(item, true),
-                  _pre = _vizpath$getNeighbori5.pre;
-                points = [_pre.node, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }, {
-                  x: item.instruction[3],
-                  y: item.instruction[4]
-                }];
-              } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
-                var _vizpath$getNeighbori6 = vizpath.getNeighboringNodes(item, true),
-                  _pre2 = _vizpath$getNeighbori6.pre;
-                points = [_pre2.node, {
-                  x: item.instruction[1],
-                  y: item.instruction[2]
-                }, {
-                  x: item.instruction[3],
-                  y: item.instruction[4]
-                }, {
-                  x: item.instruction[5],
-                  y: item.instruction[6]
-                }];
+          var minDistance = Infinity;
+          editor.paths.forEach(function (_ref30) {
+            var segment = _ref30.segment,
+              pathObject = _ref30.pathObject;
+            var _a;
+            if (!pathObject.containsPoint(e.pointer)) return;
+            var _editor$calcRelativeC = editor.calcRelativeCrood({
+                left: pointer.x,
+                top: pointer.y
+              }, pathObject),
+              x = _editor$calcRelativeC.x,
+              y = _editor$calcRelativeC.y;
+            var validDistance = Math.max(((_a = pathObject.strokeWidth) !== null && _a !== void 0 ? _a : 0) / 2 || 1, 1);
+            var _iterator4 = _createForOfIteratorHelper(segment),
+              _step4;
+            try {
+              for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
+                var item = _step4.value;
+                var points = [];
+                if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0])) continue;
+                if (item.instruction[0] === InstructionType.LINE) {
+                  var _vizpath$getNeighbori4 = vizpath.getNeighboringNodes(item, true),
+                    pre = _vizpath$getNeighbori4.pre;
+                  points = [pre.node, {
+                    x: item.instruction[1],
+                    y: item.instruction[2]
+                  }, {
+                    x: item.instruction[1],
+                    y: item.instruction[2]
+                  }];
+                } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
+                  var _vizpath$getNeighbori5 = vizpath.getNeighboringNodes(item, true),
+                    _pre = _vizpath$getNeighbori5.pre;
+                  points = [_pre.node, {
+                    x: item.instruction[1],
+                    y: item.instruction[2]
+                  }, {
+                    x: item.instruction[3],
+                    y: item.instruction[4]
+                  }];
+                } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
+                  var _vizpath$getNeighbori6 = vizpath.getNeighboringNodes(item, true),
+                    _pre2 = _vizpath$getNeighbori6.pre;
+                  points = [_pre2.node, {
+                    x: item.instruction[1],
+                    y: item.instruction[2]
+                  }, {
+                    x: item.instruction[3],
+                    y: item.instruction[4]
+                  }, {
+                    x: item.instruction[5],
+                    y: item.instruction[6]
+                  }];
+                }
+                var bezier = new Bezier(points);
+                var p = bezier.project({
+                  x: x,
+                  y: y
+                });
+                if (p.d && p.d < validDistance && p.d < minDistance) {
+                  minDistance = p.d;
+                  touchPath = pathObject;
+                  pathNode = item;
+                  splitCrood = p;
+                }
               }
-              var bezier = new Bezier(points);
-              var p = bezier.project({
+            } catch (err) {
+              _iterator4.e(err);
+            } finally {
+              _iterator4.f();
+            }
+          });
+          if (touchPath && pathNode && splitCrood) {
+            var _splitCrood = splitCrood,
+              x = _splitCrood.x,
+              y = _splitCrood.y;
+            var _editor$calcAbsoluteP = editor.calcAbsolutePosition({
                 x: x,
                 y: y
-              });
-              if (p.d && p.d < d) {
-                d = p.d;
-                pathNode = item;
-                splitCrood = p;
-              }
-            }
-          } catch (err) {
-            _iterator4.e(err);
-          } finally {
-            _iterator4.f();
-          }
-          if (pathNode && splitCrood) {
-            var _splitCrood = splitCrood,
-              _x8 = _splitCrood.x,
-              _y3 = _splitCrood.y;
-            var _editor$calcAbsoluteP = editor.calcAbsolutePosition({
-                x: _x8,
-                y: _y3
-              }, pathObject),
+              }, touchPath),
               left = _editor$calcAbsoluteP.left,
               top = _editor$calcAbsoluteP.top;
             if (!_this38.splitDot && !_this38.options.disabledSplitDot) {

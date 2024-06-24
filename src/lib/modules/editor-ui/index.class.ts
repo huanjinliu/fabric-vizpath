@@ -19,7 +19,8 @@ export type DefaultThemeConfigurators = {
 export type ThemeConfigurators<ShareState extends Record<string, any> = Record<string, unknown>> = (
   editor: Editor,
   shareState: Partial<ShareState>,
-) => DefaultThemeConfigurators & Record<string, (decorator: ThemeDecorator<any>) => any>;
+) => DefaultThemeConfigurators &
+  Record<string, (decorator: ThemeDecorator<any>, ...args: any[]) => any>;
 
 export const DEFAULT_THEME = {
   path: (decorator, pathObject) => {
@@ -70,7 +71,8 @@ class EditorUI<
   configurator: (
     editor: Editor,
     shareState: Partial<ShareState>,
-  ) => Partial<DefaultThemeConfigurators> & Record<string, (decorator: ThemeDecorator<any>) => any>;
+  ) => Partial<DefaultThemeConfigurators> &
+    Record<string, (decorator: ThemeDecorator<any>, ...args: any[]) => any>;
 
   /**
    * 主题
