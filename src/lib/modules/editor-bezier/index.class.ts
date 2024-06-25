@@ -548,6 +548,10 @@ class EditorBezier extends EditorModule {
     const canvas = editor.canvas;
     if (!canvas) return;
 
+    let activeNode: fabric.Object | undefined;
+    let movePointPosition: Position | undefined;
+    let hideNode: boolean;
+
     let virtualPath: fabric.Path | undefined;
     let virtualNode: fabric.Object | undefined;
     let curvePoint: Crood | undefined;
@@ -597,8 +601,8 @@ class EditorBezier extends EditorModule {
       }
 
       canvas.renderOnAddRemove = false;
-      if (!editor.canvas!.contains(virtualPath) && !hideNode) editor.canvas!.add(virtualPath);
-      if (!editor.canvas!.contains(virtualNode)) editor.canvas!.add(virtualNode);
+      if (!editor.canvas!.contains(virtualPath)) editor.canvas!.add(virtualPath);
+      if (!editor.canvas!.contains(virtualNode) && !hideNode) editor.canvas!.add(virtualNode);
       canvas.renderOnAddRemove = true;
       editor.canvas?.requestRenderAll();
       return true;
@@ -606,9 +610,10 @@ class EditorBezier extends EditorModule {
 
     editor.addCanvasEvent('mouse:move', (e) => {
       const render = () => {
-        if (editor.get('mode') !== 'add') return false;
+        activeNode = editor.activeNodes.length === 1 ? editor.activeNodes[0] : undefined;
+        movePointPosition = undefined;
+        hideNode = false;
 
-        const activeNode = editor.activeNodes.length === 1 ? editor.activeNodes[0] : undefined;
         if (!activeNode) return false;
 
         if (e.target) {
@@ -616,15 +621,19 @@ class EditorBezier extends EditorModule {
             e.target[Editor.symbol] === EditorSymbolType.NODE &&
             editor.checkLinkable(activeNode, e.target)
           ) {
-            return renderVirtualObjects(
-              activeNode,
-              { left: e.target.left, top: e.target.top },
-              false,
-            );
+            movePointPosition = { left: e.target.left, top: e.target.top };
+            hideNode = true;
           }
         } else {
           const pointer = calcCanvasCrood(editor.canvas!, e.pointer);
-          return renderVirtualObjects(activeNode, { left: pointer.x, top: pointer.y });
+          movePointPosition = { left: pointer.x, top: pointer.y };
+          hideNode = false;
+        }
+
+        if (editor.get('mode') !== 'add') return false;
+
+        if (movePointPosition) {
+          return renderVirtualObjects(activeNode, movePointPosition, hideNode);
         }
 
         return false;
@@ -678,6 +687,8 @@ class EditorBezier extends EditorModule {
     editor.on('set', () => {
       if (editor.get('mode') !== 'add') {
         cleanVirtualObjects();
+      } else if (activeNode && movePointPosition) {
+        renderVirtualObjects(activeNode, movePointPosition, hideNode);
       }
     });
   }

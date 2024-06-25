@@ -427,15 +427,21 @@ class Editor extends EditorModule<{
 
       // 添加新的路径对象
       canvas.renderOnAddRemove = true;
-      paths.forEach(({ pathObject }) => {
-        if (!canvas.contains(pathObject)) canvas.add(pathObject);
+      paths.forEach((path) => {
+        const { pathObject } = path;
+        const index = this.paths.findIndex((i) => i.pathObject === pathObject);
+        if (index !== -1) {
+          this.paths.splice(index, 1, path);
+        } else {
+          canvas.add(pathObject);
+          this.paths.push(path);
+        }
       });
       canvas.renderOnAddRemove = false;
       canvas.requestRenderAll();
 
-      this.paths.push(...paths);
-
       // 建立映射关系，便于减少后续计算
+      this.nodePathMap.clear();
       this.paths.forEach((item) => {
         item.segment.forEach(({ node }) => {
           if (node) this.nodePathMap.set(node, item);

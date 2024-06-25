@@ -7549,7 +7549,6 @@
         var canvas = this.canvas;
         if (!canvas) return;
         var handler = function handler(paths) {
-          var _this16$paths;
           var _a;
           var ui = vizpath.context.find(EditorUI);
           var theme = (_a = ui === null || ui === void 0 ? void 0 : ui.theme) !== null && _a !== void 0 ? _a : DEFAULT_THEME;
@@ -7581,17 +7580,25 @@
           });
           // 添加新的路径对象
           canvas.renderOnAddRemove = true;
-          paths.forEach(function (_ref12) {
-            var pathObject = _ref12.pathObject;
-            if (!canvas.contains(pathObject)) canvas.add(pathObject);
+          paths.forEach(function (path) {
+            var pathObject = path.pathObject;
+            var index = _this16.paths.findIndex(function (i) {
+              return i.pathObject === pathObject;
+            });
+            if (index !== -1) {
+              _this16.paths.splice(index, 1, path);
+            } else {
+              canvas.add(pathObject);
+              _this16.paths.push(path);
+            }
           });
           canvas.renderOnAddRemove = false;
           canvas.requestRenderAll();
-          (_this16$paths = _this16.paths).push.apply(_this16$paths, _toConsumableArray(paths));
           // 建立映射关系，便于减少后续计算
+          _this16.nodePathMap.clear();
           _this16.paths.forEach(function (item) {
-            item.segment.forEach(function (_ref13) {
-              var node = _ref13.node;
+            item.segment.forEach(function (_ref12) {
+              var node = _ref12.node;
               if (node) _this16.nodePathMap.set(node, item);
             });
           });
@@ -7616,8 +7623,8 @@
           });
           // 清除映射
           paths.forEach(function (item) {
-            item.segment.forEach(function (_ref14) {
-              var node = _ref14.node;
+            item.segment.forEach(function (_ref13) {
+              var node = _ref13.node;
               if (node) _this17.nodePathMap["delete"](node);
             });
           });
@@ -7628,8 +7635,8 @@
             return i.pathObject;
           })));
           _this17.paths.forEach(function (item) {
-            item.segment.forEach(function (_ref15) {
-              var node = _ref15.node;
+            item.segment.forEach(function (_ref14) {
+              var node = _ref14.node;
               if (node) _this17.nodePathMap["delete"](node);
             });
           });
@@ -7717,8 +7724,8 @@
           return object;
         };
         // 第一轮遍历为了重用旧对象，避免每次更新fabric对象都变化还需要重新处理聚焦事件
-        vizpath.paths.forEach(function (_ref16) {
-          var segment = _ref16.segment;
+        vizpath.paths.forEach(function (_ref15) {
+          var segment = _ref15.segment;
           segment.forEach(function (item) {
             var node = item.node;
             if (!node) return;
@@ -7733,8 +7740,8 @@
           });
         });
         // 第二轮遍历则是为了创建新对象
-        vizpath.paths.forEach(function (_ref17) {
-          var segment = _ref17.segment;
+        vizpath.paths.forEach(function (_ref16) {
+          var segment = _ref16.segment;
           segment.forEach(function (item) {
             var node = item.node;
             if (!node) return;
@@ -7803,8 +7810,8 @@
         if (!canvas) return;
         vizpath.on('clear', function (path) {
           var removeObjects = [];
-          path.forEach(function (_ref18) {
-            var segment = _ref18.segment;
+          path.forEach(function (_ref17) {
+            var segment = _ref17.segment;
             segment.forEach(function (node) {
               var object = _this20.nodeObjectMap.get(node);
               if (object) removeObjects.push(object);
@@ -7864,10 +7871,10 @@
                 var followCurveDots = [];
                 var pathNode = _this21.objectNodeMap.get(object);
                 var curveDots = (_b = (_a = _this21.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
-                curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref19) {
-                  var position = _ref19.position,
-                    direction = _ref19.direction,
-                    from = _ref19.from;
+                curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref18) {
+                  var position = _ref18.position,
+                    direction = _ref18.direction,
+                    from = _ref18.from;
                   var _a;
                   var crood = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
                   if (position !== 'cur' || !crood) return;
@@ -7911,18 +7918,18 @@
       key: "_addActivePointObserve",
       value: function _addActivePointObserve(object) {
         var _this22 = this;
-        observe(object, ['left', 'top'], function (_ref20) {
-          var left = _ref20.left,
-            top = _ref20.top;
+        observe(object, ['left', 'top'], function (_ref19) {
+          var left = _ref19.left,
+            top = _ref19.top;
           var _a, _b;
           if (object.group) return;
           var followCurveDots = [];
           var pathNode = _this22.objectNodeMap.get(object);
           var curveDots = (_b = (_a = _this22.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
-          curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref21) {
-            var position = _ref21.position,
-              direction = _ref21.direction,
-              from = _ref21.from;
+          curveDots === null || curveDots === void 0 ? void 0 : curveDots.forEach(function (_ref20) {
+            var position = _ref20.position,
+              direction = _ref20.direction,
+              from = _ref20.from;
             var _a;
             var crood = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
             if (position !== 'cur' || !crood) return;
@@ -8060,9 +8067,9 @@
         // 创建新的路径曲线变换点
         var curveDots = [];
         var curveDotSet = new WeakSet([]);
-        var neighboringCurveDots = vizpath.getNeighboringCurveDots(curPathNode).filter(function (_ref22) {
-          var direction = _ref22.direction,
-            from = _ref22.from;
+        var neighboringCurveDots = vizpath.getNeighboringCurveDots(curPathNode).filter(function (_ref21) {
+          var direction = _ref21.direction,
+            from = _ref21.from;
           var _a;
           var node = from.node;
           var point = (_a = from.curveDots) === null || _a === void 0 ? void 0 : _a[direction];
@@ -8085,11 +8092,11 @@
         neighboringCurveDots.sort(function (a, b) {
           return a.reuseCurveDot ? -1 : 1;
         });
-        neighboringCurveDots.forEach(function (_ref23) {
-          var direction = _ref23.direction,
-            from = _ref23.from,
-            nodeObject = _ref23.nodeObject,
-            reuseCurveDot = _ref23.reuseCurveDot;
+        neighboringCurveDots.forEach(function (_ref22) {
+          var direction = _ref22.direction,
+            from = _ref22.from,
+            nodeObject = _ref22.nodeObject,
+            reuseCurveDot = _ref22.reuseCurveDot;
           var _a, _b;
           var node = from.node;
           var curveDot = from.curveDots[direction];
@@ -8140,9 +8147,9 @@
               immediate: true,
               id: point.name
             });
-            observe(point, ['left', 'top'], function (_ref24) {
-              var left = _ref24.left,
-                top = _ref24.top;
+            observe(point, ['left', 'top'], function (_ref23) {
+              var left = _ref23.left,
+                top = _ref23.top;
               var _a;
               if (point.group) return;
               // 与中心点相对角度固定
@@ -8647,10 +8654,10 @@
         if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
           targets.push(['next', directionNodeMap.next]);
         }
-        targets.forEach(function (_ref25) {
-          var _ref26 = _slicedToArray(_ref25, 2),
-            direction = _ref26[0],
-            pathNode = _ref26[1];
+        targets.forEach(function (_ref24) {
+          var _ref25 = _slicedToArray(_ref24, 2),
+            direction = _ref25[0],
+            pathNode = _ref25[1];
           var oldInstruction = pathNode.instruction;
           if (oldInstruction[0] === InstructionType.BEZIER_CURVE) return;
           var newInstruction = _toConsumableArray(oldInstruction);
@@ -8698,10 +8705,10 @@
         if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
           targets.push(['next', directionNodeMap.next]);
         }
-        targets.forEach(function (_ref27) {
-          var _ref28 = _slicedToArray(_ref27, 2),
-            direction = _ref28[0],
-            pathNode = _ref28[1];
+        targets.forEach(function (_ref26) {
+          var _ref27 = _slicedToArray(_ref26, 2),
+            direction = _ref27[0],
+            pathNode = _ref27[1];
           var oldInstruction = pathNode.instruction;
           if ([InstructionType.START, InstructionType.LINE].includes(oldInstruction[0])) return;
           var newInstruction = _toConsumableArray(oldInstruction);
@@ -8923,10 +8930,10 @@
         this.paths.length = 0;
         this.nodePathMap.clear();
         // 画布相关配置
-        this.listeners.forEach(function (_ref29) {
-          var type = _ref29.type,
-            eventName = _ref29.eventName,
-            handler = _ref29.handler;
+        this.listeners.forEach(function (_ref28) {
+          var type = _ref28.type,
+            eventName = _ref28.eventName,
+            handler = _ref28.handler;
           if (type === 'global') _this33.removeGlobalEvent(eventName, handler);
           if (type === 'canvas') _this33.removeCanvasEvent(eventName, handler);
         });
@@ -10302,9 +10309,9 @@
           if (e.target && e.target.type === 'activeSelection') return;
           var pointer = calcCanvasCrood(canvas, e.pointer);
           var minDistance = Infinity;
-          editor.paths.forEach(function (_ref30) {
-            var segment = _ref30.segment,
-              pathObject = _ref30.pathObject;
+          editor.paths.forEach(function (_ref29) {
+            var segment = _ref29.segment,
+              pathObject = _ref29.pathObject;
             var _a;
             if (!pathObject.containsPoint(e.pointer)) return;
             var _editor$calcRelativeC = editor.calcRelativeCrood({
@@ -10532,6 +10539,9 @@
         if (!editor) return;
         var canvas = editor.canvas;
         if (!canvas) return;
+        var activeNode;
+        var movePointPosition;
+        var hideNode;
         var virtualPath;
         var virtualNode;
         var curvePoint;
@@ -10565,30 +10575,37 @@
             virtualPath.initialize([[InstructionType.START, activeNode.left, activeNode.top], [InstructionType.LINE, position.left, position.top]]);
           }
           canvas.renderOnAddRemove = false;
-          if (!editor.canvas.contains(virtualPath) && !hideNode) editor.canvas.add(virtualPath);
-          if (!editor.canvas.contains(virtualNode)) editor.canvas.add(virtualNode);
+          if (!editor.canvas.contains(virtualPath)) editor.canvas.add(virtualPath);
+          if (!editor.canvas.contains(virtualNode) && !hideNode) editor.canvas.add(virtualNode);
           canvas.renderOnAddRemove = true;
           (_a = editor.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
           return true;
         };
         editor.addCanvasEvent('mouse:move', function (e) {
           var render = function render() {
-            if (editor.get('mode') !== 'add') return false;
-            var activeNode = editor.activeNodes.length === 1 ? editor.activeNodes[0] : undefined;
+            activeNode = editor.activeNodes.length === 1 ? editor.activeNodes[0] : undefined;
+            movePointPosition = undefined;
+            hideNode = false;
             if (!activeNode) return false;
             if (e.target) {
               if (e.target[Editor$1.symbol] === EditorSymbolType.NODE && editor.checkLinkable(activeNode, e.target)) {
-                return renderVirtualObjects(activeNode, {
+                movePointPosition = {
                   left: e.target.left,
                   top: e.target.top
-                }, false);
+                };
+                hideNode = true;
               }
             } else {
               var pointer = calcCanvasCrood(editor.canvas, e.pointer);
-              return renderVirtualObjects(activeNode, {
+              movePointPosition = {
                 left: pointer.x,
                 top: pointer.y
-              });
+              };
+              hideNode = false;
+            }
+            if (editor.get('mode') !== 'add') return false;
+            if (movePointPosition) {
+              return renderVirtualObjects(activeNode, movePointPosition, hideNode);
             }
             return false;
           };
@@ -10620,6 +10637,8 @@
         editor.on('set', function () {
           if (editor.get('mode') !== 'add') {
             cleanVirtualObjects();
+          } else if (activeNode && movePointPosition) {
+            renderVirtualObjects(activeNode, movePointPosition, hideNode);
           }
         });
       }
