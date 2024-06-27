@@ -10261,21 +10261,35 @@
         (_a = this.splitDot.canvas) === null || _a === void 0 ? void 0 : _a.remove(this.splitDot);
         this.splitDot = null;
       }
-      // 注册双击节点变换事件
+      // 增强变换事件: 直接点击节点实现直线/曲线切换
     }, {
-      key: "_initDbclickChangeEvent",
-      value: function _initDbclickChangeEvent(vizpath) {
+      key: "_strengthenConvertEvent",
+      value: function _strengthenConvertEvent(vizpath) {
         var _this37 = this;
-        var _a;
+        var _a, _b;
         var editor = vizpath.context.find(Editor$1);
         if (!editor) return;
-        (_a = editor.canvas) === null || _a === void 0 ? void 0 : _a.on('mouse:dblclick', function (event) {
-          var target = event.target;
-          if (!target || !editor.nodes.includes(target)) return;
-          var curveDots = editor.curveDots.filter(function (i) {
-            return i.node === target;
-          });
-          if (curveDots.length) _this37.degrade(target);else _this37.upgrade(target);
+        var _target;
+        var _pointer;
+        (_a = editor.canvas) === null || _a === void 0 ? void 0 : _a.on('mouse:down', function (event) {
+          var target = event.target,
+            pointer = event.pointer;
+          if (editor.get('mode') !== 'convert') return;
+          if (!target || target[Editor$1.symbol] !== EditorSymbolType.NODE) return;
+          _target = target;
+          _pointer = pointer;
+        });
+        (_b = editor.canvas) === null || _b === void 0 ? void 0 : _b.on('mouse:up', function (event) {
+          var target = event.target,
+            pointer = event.pointer;
+          if (_target && _target === target && _pointer && pointer && _pointer.x === pointer.x && _pointer.y === pointer.y) {
+            var curveDots = editor.curveDots.filter(function (i) {
+              return i.node === target;
+            });
+            if (curveDots.length) _this37.degrade(_target);else _this37.upgrade(_target);
+          }
+          _target = undefined;
+          _pointer = undefined;
         });
       }
       // 注册指令拆分事件
@@ -10650,12 +10664,10 @@
     }, {
       key: "load",
       value: function load(vizpath) {
-        var _this$options2 = this.options,
-          disabledSplit = _this$options2.disabledSplit,
-          disabledSplitDot = _this$options2.disabledSplitDot;
+        var disabledSplit = this.options.disabledSplit;
         if (!disabledSplit) this._initSplitEvent(vizpath);
-        if (!disabledSplitDot) this._initDbclickChangeEvent(vizpath);
         this._strengthenAddEvent(vizpath);
+        this._strengthenConvertEvent(vizpath);
       }
     }]);
   }(EditorModule);

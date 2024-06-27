@@ -256,20 +256,41 @@ class EditorBezier extends EditorModule {
     this.splitDot = null;
   }
 
-  // 注册双击节点变换事件
-  private _initDbclickChangeEvent(vizpath: Vizpath) {
+  // 增强变换事件: 直接点击节点实现直线/曲线切换
+  private _strengthenConvertEvent(vizpath: Vizpath) {
     const editor = vizpath.context.find(Editor);
     if (!editor) return;
 
-    editor.canvas?.on('mouse:dblclick', (event) => {
-      const { target } = event;
+    let _target: fabric.Object | undefined;
+    let _pointer: fabric.Point | undefined;
 
-      if (!target || !editor.nodes.includes(target)) return;
+    editor.canvas?.on('mouse:down', (event) => {
+      const { target, pointer } = event;
 
-      const curveDots = editor.curveDots.filter((i) => i.node === target);
+      if (editor.get('mode') !== 'convert') return;
 
-      if (curveDots.length) this.degrade(target);
-      else this.upgrade(target);
+      if (!target || target[Editor.symbol] !== EditorSymbolType.NODE) return;
+
+      _target = target;
+      _pointer = pointer;
+    });
+    editor.canvas?.on('mouse:up', (event) => {
+      const { target, pointer } = event;
+      if (
+        _target &&
+        _target === target &&
+        _pointer &&
+        pointer &&
+        _pointer.x === pointer.x &&
+        _pointer.y === pointer.y
+      ) {
+        const curveDots = editor.curveDots.filter((i) => i.node === target);
+
+        if (curveDots.length) this.degrade(_target);
+        else this.upgrade(_target);
+      }
+      _target = undefined;
+      _pointer = undefined;
     });
   }
 
@@ -698,11 +719,10 @@ class EditorBezier extends EditorModule {
   }
 
   load(vizpath: Vizpath) {
-    const { disabledSplit, disabledSplitDot } = this.options;
+    const { disabledSplit } = this.options;
     if (!disabledSplit) this._initSplitEvent(vizpath);
-    if (!disabledSplitDot) this._initDbclickChangeEvent(vizpath);
-
     this._strengthenAddEvent(vizpath);
+    this._strengthenConvertEvent(vizpath);
   }
 }
 
