@@ -100,14 +100,12 @@ class EditorShortcut extends EditorModule {
       return (b.combinationKeys?.length ?? 0) - (a.combinationKeys?.length ?? 0);
     });
 
+    // 如果还是上一个激活按键则不做处理
     const shortcut = activateKeys[0];
-    if (shortcut) {
-      if (this.activeShortcut?.shortcut === activateKeys[0]) return;
-      this.activeShortcut = { shortcut, returnValue: shortcut.onActivate(e) };
-    } else {
-      this.activeShortcut?.shortcut.onDeactivate?.(e, this.activeShortcut.returnValue);
-      this.activeShortcut = undefined;
-    }
+    if (shortcut && shortcut === this.activeShortcut?.shortcut) return;
+
+    this.activeShortcut?.shortcut.onDeactivate?.(e, this.activeShortcut.returnValue);
+    this.activeShortcut = shortcut && { shortcut, returnValue: shortcut.onActivate(e) };
   }
 
   add(shortcut: ShortcutOptions) {

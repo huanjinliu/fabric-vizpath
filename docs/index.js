@@ -6828,10 +6828,11 @@
       value: function destroy() {
         if (!this.vizpath) return;
         var vizpath = this.vizpath;
-        this.modules.forEach(function (module) {
+        this.modules.reverse().forEach(function (module) {
           module.__unload(vizpath);
         });
         this.vizpath = null;
+        this.modules = [];
       }
       /**
        * 初始可视路径编辑器
@@ -7300,7 +7301,8 @@
      */
     function Editor(mountCanvas) {
       var _this14;
-      var isolation = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+      var initialSetting = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+      var isolation = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
       _classCallCheck(this, Editor);
       _this14 = _callSuper(this, Editor);
       /**
@@ -7308,10 +7310,7 @@
        *
        * @note 通过 set 方法更改会触发 set 钩子，避免直接修改该字段以导致 set 钩子未执行
        */
-      _this14._settings = [{
-        mode: Mode.MOVE,
-        dotSymmetricMode: 'auto'
-      }];
+      _this14._settings = [];
       /** 内部用于比较值的误差值 */
       _this14.deviation = Math.pow(0.1, 8);
       /* ---------------------------- 画布相关配置 ---------------------------- */
@@ -7357,6 +7356,10 @@
       };
       _this14.mountCanvas = mountCanvas;
       _this14.isolation = isolation;
+      _this14._settings.push(defaults(initialSetting, {
+        mode: Mode.MOVE,
+        dotSymmetricMode: 'auto'
+      }));
       return _this14;
     }
     /**
@@ -7619,7 +7622,7 @@
             return i.pathObject;
           })));
           _this17.paths = _this17.paths.filter(function (i) {
-            return paths.includes(i);
+            return !paths.includes(i);
           });
           // 清除映射
           paths.forEach(function (item) {
@@ -7631,15 +7634,15 @@
         };
         vizpath.on('clear', handler);
         vizpath.on('clearAll', function () {
-          canvas.remove.apply(canvas, _toConsumableArray(_this17.paths.map(function (i) {
-            return i.pathObject;
-          })));
           _this17.paths.forEach(function (item) {
             item.segment.forEach(function (_ref14) {
               var node = _ref14.node;
               if (node) _this17.nodePathMap["delete"](node);
             });
           });
+          canvas.remove.apply(canvas, _toConsumableArray(_this17.paths.map(function (i) {
+            return i.pathObject;
+          })));
           _this17.paths = [];
         });
       }
@@ -8418,11 +8421,16 @@
       value: function _initDeleteNodeEvents() {
         var _this27 = this;
         this.addCanvasEvent('mouse:down', function (event) {
-          var _a, _b, _c;
+          var _a, _b, _c, _d;
           if ((_a = _this27.disabledFunctionTokens.remove) === null || _a === void 0 ? void 0 : _a.length) return;
           if (_this27.get('mode') !== Mode.DELETE) return;
+          // 单选删除
           if (((_b = event.target) === null || _b === void 0 ? void 0 : _b[Editor.symbol]) === EditorSymbolType.NODE || ((_c = event.target) === null || _c === void 0 ? void 0 : _c[Editor.symbol]) === EditorSymbolType.CURVE_DOT) {
             _this27.remove(event.target);
+          }
+          // 多选节点删除
+          if (((_d = event.target) === null || _d === void 0 ? void 0 : _d.type) === 'activeSelection') {
+            _this27.remove.apply(_this27, _toConsumableArray(event.target.getObjects()));
           }
         });
       }
@@ -10041,17 +10049,14 @@
           if (a.key && !b.key) return -1;
           return ((_b = (_a = b.combinationKeys) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0) - ((_d = (_c = a.combinationKeys) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 0);
         });
+        // 如果还是上一个激活按键则不做处理
         var shortcut = activateKeys[0];
-        if (shortcut) {
-          if (((_a = this.activeShortcut) === null || _a === void 0 ? void 0 : _a.shortcut) === activateKeys[0]) return;
-          this.activeShortcut = {
-            shortcut: shortcut,
-            returnValue: shortcut.onActivate(e)
-          };
-        } else {
-          (_d = (_b = this.activeShortcut) === null || _b === void 0 ? void 0 : (_c = _b.shortcut).onDeactivate) === null || _d === void 0 ? void 0 : _d.call(_c, e, this.activeShortcut.returnValue);
-          this.activeShortcut = undefined;
-        }
+        if (shortcut && shortcut === ((_a = this.activeShortcut) === null || _a === void 0 ? void 0 : _a.shortcut)) return;
+        (_d = (_b = this.activeShortcut) === null || _b === void 0 ? void 0 : (_c = _b.shortcut).onDeactivate) === null || _d === void 0 ? void 0 : _d.call(_c, e, this.activeShortcut.returnValue);
+        this.activeShortcut = shortcut && {
+          shortcut: shortcut,
+          returnValue: shortcut.onActivate(e)
+        };
       }
     }, {
       key: "add",
@@ -10845,7 +10850,7 @@
           refreshPathTriggerTime: 'auto',
           refreshDeferDuration: 10,
       });
-      const editor = new Editor$1(fabricCanvas, true);
+      const editor = new Editor$1(fabricCanvas, { mode: 'move', dotSymmetricMode: 'entire' }, true);
       const operator = await vizpath
           .use(editor)
           .use(new EditorBackground())
@@ -10901,7 +10906,8 @@
                   if (!editor)
                       return;
                   return editor.set({
-                      dotSymmetricMode: editor.dotSymmetricAutoMode === 'none' ? 'angle' : 'none',
+                      mode: 'convert',
+                      dotSymmetricMode: 'none',
                   });
               },
               onDeactivate: (e, reset) => {
@@ -10915,7 +10921,8 @@
                   if (!editor)
                       return;
                   return editor.set({
-                      dotSymmetricMode: editor.dotSymmetricAutoMode === 'none' ? 'entire' : 'none',
+                      mode: 'convert',
+                      dotSymmetricMode: 'angle',
                   });
               },
               onDeactivate: (e, reset) => {

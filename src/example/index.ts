@@ -110,7 +110,7 @@ const EXAMPLE_PATH_D = {
     refreshDeferDuration: 10,
   });
 
-  const editor = new Editor(fabricCanvas, true);
+  const editor = new Editor(fabricCanvas, { mode: 'move', dotSymmetricMode: 'entire' }, true);
 
   const operator = await vizpath
     .use(editor)
@@ -170,7 +170,8 @@ const EXAMPLE_PATH_D = {
             if (!editor) return;
 
             return editor.set({
-              dotSymmetricMode: editor.dotSymmetricAutoMode === 'none' ? 'angle' : 'none',
+              mode: 'convert',
+              dotSymmetricMode: 'none',
             });
           },
           onDeactivate: (e, reset) => {
@@ -184,7 +185,8 @@ const EXAMPLE_PATH_D = {
             if (!editor) return;
 
             return editor.set({
-              dotSymmetricMode: editor.dotSymmetricAutoMode === 'none' ? 'entire' : 'none',
+              mode: 'convert',
+              dotSymmetricMode: 'angle',
             });
           },
           onDeactivate: (e, reset) => {

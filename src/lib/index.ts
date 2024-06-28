@@ -261,11 +261,12 @@ class VizPathCreator {
 
     const vizpath = this.vizpath;
 
-    this.modules.forEach((module) => {
+    this.modules.reverse().forEach((module) => {
       module.__unload(vizpath);
     });
 
     this.vizpath = null;
+    this.modules = [];
   }
 
   /**

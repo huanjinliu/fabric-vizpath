@@ -1,5 +1,6 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
+import defaults from 'lodash-es/defaults';
 import EditorModule from '../base.class';
 import type { ResponsiveCrood, ResponsivePath } from '../../vizpath.class';
 import {
@@ -89,12 +90,7 @@ class Editor extends EditorModule<{
    *
    * @note 通过 set 方法更改会触发 set 钩子，避免直接修改该字段以导致 set 钩子未执行
    */
-  private _settings: Partial<EditorSetting>[] = [
-    {
-      mode: Mode.MOVE,
-      dotSymmetricMode: 'auto',
-    },
-  ];
+  private _settings: Partial<EditorSetting>[] = [];
 
   /** 内部用于比较值的误差值 */
   deviation = 0.1 ** 8;
@@ -174,10 +170,21 @@ class Editor extends EditorModule<{
    * 构造函数
    * @param options 更多配置
    */
-  constructor(mountCanvas: fabric.Canvas, isolation = false) {
+  constructor(
+    mountCanvas: fabric.Canvas,
+    initialSetting: Partial<EditorSetting> = {},
+    isolation = false,
+  ) {
     super();
     this.mountCanvas = mountCanvas;
     this.isolation = isolation;
+
+    this._settings.push(
+      defaults(initialSetting, {
+        mode: Mode.MOVE,
+        dotSymmetricMode: 'auto',
+      }),
+    );
   }
 
   /**
@@ -461,7 +468,7 @@ class Editor extends EditorModule<{
     const handler = (paths: ResponsivePath[]) => {
       canvas.remove(...paths.map((i) => i.pathObject));
 
-      this.paths = this.paths.filter((i) => paths.includes(i));
+      this.paths = this.paths.filter((i) => !paths.includes(i));
 
       // 清除映射
       paths.forEach((item) => {
@@ -472,12 +479,12 @@ class Editor extends EditorModule<{
     };
     vizpath.on('clear', handler);
     vizpath.on('clearAll', () => {
-      canvas.remove(...this.paths.map((i) => i.pathObject));
       this.paths.forEach((item) => {
         item.segment.forEach(({ node }) => {
           if (node) this.nodePathMap.delete(node);
         });
       });
+      canvas.remove(...this.paths.map((i) => i.pathObject));
       this.paths = [];
     });
   }
@@ -1308,11 +1315,17 @@ class Editor extends EditorModule<{
       if (this.disabledFunctionTokens.remove?.length) return;
       if (this.get('mode') !== Mode.DELETE) return;
 
+      // 单选删除
       if (
         event.target?.[Editor.symbol] === EditorSymbolType.NODE ||
         event.target?.[Editor.symbol] === EditorSymbolType.CURVE_DOT
       ) {
         this.remove(event.target);
+      }
+
+      // 多选节点删除
+      if (event.target?.type === 'activeSelection') {
+        this.remove(...(event.target as fabric.ActiveSelection).getObjects());
       }
     });
   }
