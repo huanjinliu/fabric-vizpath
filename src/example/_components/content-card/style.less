@@ -1,0 +1,46 @@
+.content-card {
+  position: relative;
+  header {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    justify-content: space-between;
+    position: sticky;
+    top: 92px;
+    background-color: #fff;
+    .button {
+      display: flex;
+      align-items: center;
+      border: unset;
+      background-color: unset;
+      font-size: 14px;
+      cursor: pointer;
+      color: #666;
+      opacity: 0;
+      transition: all 0.1s;
+      &:hover {
+        color: #0d1117;
+      }
+    }
+  }
+  h5 {
+    font-size: 16px;
+    line-height: 32px;
+    color: #2d2d2d;
+  }
+  main {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  &:hover {
+    header .button {
+      opacity: 1;
+    }
+  }
+}
+
+@media only screen and (max-width: 650px) {
+  .content-card header .button {
+    display: none;
+  }
+}

@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "jsx": "react",
     "target": "es2017",
     "module": "ES2022",
     "lib": ["dom", "ES2021"],
@@ -18,8 +19,9 @@
     "baseUrl": ".",
     "paths": {
       "@": ["src"],
+      "@module": ["src/lib/module"],
       "@utils": ["src/lib/utils"],
-      "@themes": ["src/themes"]
-    }
-  }
+      "@themes": ["src/themes"],
+    },
+  },
 }

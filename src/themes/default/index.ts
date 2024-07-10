@@ -1,5 +1,6 @@
 import { fabric } from 'fabric';
-import type { ThemeConfigurators } from '../../lib/modules/editor-ui/index.class';
+import type VizPath from '../../lib/vizpath.class';
+import type { ThemeDecorator } from '../../lib/modules/editor-theme/index.class';
 
 export type ThemeShareState = {
   hoverNode: fabric.Object | null;
@@ -10,8 +11,11 @@ export type ThemeShareState = {
   selectedLine: fabric.Line | null;
 };
 
-const defaultTheme = ((editor, shareState) => {
-  editor.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
+const defaultTheme = (vizpath: VizPath, shareState: ThemeShareState) => {
+  const editor = vizpath.editor;
+  if (!editor) return {};
+
+  editor.events.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
     shareState.selectedNodes = nodes;
     shareState.selectedPoint = point;
     if (point) {
@@ -19,14 +23,14 @@ const defaultTheme = ((editor, shareState) => {
     }
   });
 
-  editor.on('deselected', () => {
+  editor.events.on('deselected', () => {
     shareState.selectedNodes = [];
     shareState.selectedPoint = null;
     shareState.selectedLine = null;
   });
 
   return {
-    path: (decorator, pathObject) => {
+    path: (decorator: ThemeDecorator<fabric.Path>, pathObject: fabric.Path) => {
       pathObject.set({
         stroke: '#333',
         strokeWidth: 4,
@@ -34,7 +38,7 @@ const defaultTheme = ((editor, shareState) => {
         strokeUniform: true,
       });
     },
-    node: (decorator) => {
+    node: (decorator: ThemeDecorator<fabric.Object>) => {
       const object = new fabric.Circle({
         strokeWidth: 4,
         radius: 6,
@@ -64,7 +68,7 @@ const defaultTheme = ((editor, shareState) => {
         });
       });
     },
-    dot: (decorator) => {
+    dot: (decorator: ThemeDecorator<fabric.Object>) => {
       const circle = new fabric.Circle({
         radius: 4,
         fill: '#bebebe',
@@ -90,7 +94,7 @@ const defaultTheme = ((editor, shareState) => {
         });
       });
     },
-    line: (decorator) => {
+    line: (decorator: ThemeDecorator<fabric.Line>) => {
       const line = new fabric.Line([0, 0, 0, 0], {
         stroke: '#bebebe',
         strokeWidth: 1,
@@ -104,6 +108,6 @@ const defaultTheme = ((editor, shareState) => {
       });
     },
   };
-}) as ThemeConfigurators<ThemeShareState>;
+};
 
 export default defaultTheme;

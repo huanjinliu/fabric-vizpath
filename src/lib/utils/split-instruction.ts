@@ -1,6 +1,6 @@
 import { Bezier } from 'bezier-js';
-import { InstructionType, type Instruction } from '..';
 import { fabric } from 'fabric';
+import { InstructionType, type Instruction } from '../vizpath.class';
 
 /**
  * 根据路径指令上的一点拆分路径指令

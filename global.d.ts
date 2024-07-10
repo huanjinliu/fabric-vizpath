@@ -12,4 +12,12 @@ declare type Transform = {
   scale: { x: number; y: number };
 };
 
-declare type ArrayElement<A> = A extends (infer T)[] ? T : never;
+declare module '*.less' {
+  const classes: { [key: string]: string };
+  export default classes;
+}
+
+declare module '*.md' {
+  const content: string;
+  export default content;
+}

@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import type { Instruction } from '..';
+import type { Instruction } from '../vizpath.class';
 
 /**
  * 重新修正路径的尺寸和位置

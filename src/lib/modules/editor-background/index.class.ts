@@ -1,8 +1,7 @@
 import { fabric } from 'fabric';
 import defaultsDeep from 'lodash-es/defaultsDeep';
-import type Vizpath from '../../vizpath.class';
-import EditorModule from '../base.class';
-import Editor from '../editor/index.class';
+import type Vizpath from '../../../lib/vizpath.class';
+import VizPathModule from '../../../lib/vizpath-module.class';
 
 type EditorBackgroundOptions = {
   grid?: boolean;
@@ -14,14 +13,14 @@ type EditorBackgroundOptions = {
   }>;
 };
 
-class EditorBackground extends EditorModule {
+class EditorBackground extends VizPathModule {
   static ID = 'editor-background';
 
   options: Required<EditorBackgroundOptions> = {
     grid: true,
     gridSize: 50,
     gridStyle: {
-      stroke: 'rgba(0, 0, 0, 0.05)',
+      stroke: 'rgba(0, 0, 0, 0.08)',
       strokeWidth: 1,
       strokeDashArray: [4, 2],
     },
@@ -60,7 +59,7 @@ class EditorBackground extends EditorModule {
   // }
 
   unload(vizpath: Vizpath) {
-    const editor = vizpath.context.find(Editor);
+    const editor = vizpath.editor;
     if (!editor) return;
 
     const canvas = editor.canvas;
@@ -71,7 +70,7 @@ class EditorBackground extends EditorModule {
   }
 
   async load(vizpath: Vizpath) {
-    const editor = vizpath.context.find(Editor);
+    const editor = vizpath.editor;
     if (!editor) return;
 
     const canvas = editor.canvas;

@@ -5,15 +5,15 @@
  */
 const transform = (
   crood: Crood,
-  process: ({ translate: Crood } | { scale: Crood } | { rotate: number })[],
+  process: ({ translate: Crood } | { scale: number | Crood } | { rotate: number })[],
 ) => {
   let { x, y } = crood;
 
   process.forEach((item) => {
     const { translate, scale, rotate } = item as Partial<Transform>;
     if (scale !== undefined) {
-      x *= scale.x;
-      y *= scale.y;
+      x *= typeof scale === 'number' ? scale : scale.x;
+      y *= typeof scale === 'number' ? scale : scale.y;
     }
 
     if (rotate !== undefined) {

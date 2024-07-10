@@ -1,21 +1,25 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
-import EditorModule from '../base.class';
-import type { ResponsiveCrood, ResponsivePath } from '../../vizpath.class';
-import {
-  calcCanvasCrood,
-  calcCroodsAngle,
-  calcCroodsDistance,
-  deepIterateGroup,
-  fireMouseUpAndSelect,
-  observe,
-  repairPath,
-  reversePath,
-  transform,
-} from '@utils';
-import EditorUI, { DEFAULT_THEME, type ThemeDecorator } from '../editor-ui/index.class';
-import VizPath from '../../vizpath.class';
-import VizPathCreator, { InstructionType, type Instruction, type PathNode } from 'src/lib';
+import type { ThemeDecorator } from './modules/editor-theme/index.class';
+import calcCanvasCrood from './utils/calc-canvas-crood';
+import calcCroodsAngle from './utils/calc-croods-angle';
+import calcCroodsDistance from './utils/calc-croods-distance';
+import deepIterateGroup from './utils/deep-iterate-group';
+import fireMouseUpAndSelect from './utils/fire-mouse-up-and-select';
+import transform from './utils/transform';
+import observe from './utils/observe';
+import repairPath from './utils/repair-path';
+import reversePath from './utils/reverse-path';
+import VizPathDOMEvent from './vizpath-dom-event.class';
+import VizPathModule from './vizpath-module.class';
+import VizPathTheme from './vizpath-theme.class';
+import VizPath, {
+  type VizPathNode,
+  type RCrood,
+  type VizPathSegment,
+  InstructionType,
+  type Instruction,
+} from './vizpath.class';
 
 export enum EditorSymbolType {
   PATH = 'path',
@@ -65,24 +69,74 @@ type EditorSetting = {
 
 type EditorCurveDot = {
   type: 'pre' | 'next';
-  pathNode: PathNode<ResponsiveCrood>;
-  curveDot: ResponsiveCrood;
+  pathNode: VizPathNode<RCrood>;
+  curveDot: RCrood;
   node: fabric.Object;
   point: fabric.Object;
   line: fabric.Line;
 };
 
-class Editor extends EditorModule<{
-  set: (setting: Partial<EditorSetting>) => void;
-  added: (node: fabric.Object) => void;
-  closed: (node: fabric.Object) => void;
-  removed: (nodes: fabric.Object[]) => void;
-  selected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
-  deselected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
-}> {
+/**
+ * 可视路径编辑器（内置模块）
+ */
+class VizPathEditor extends VizPathModule {
   static ID = 'editor';
 
   static symbol = Symbol('editor');
+
+  static defaultTheme: {
+    path: (decorator: ThemeDecorator<fabric.Path>, pathObject: fabric.Path) => void;
+    node: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
+    dot: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
+    line: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
+  } = {
+    path: (decorator, pathObject) => {
+      pathObject.set({
+        stroke: '#4b4b4b',
+        strokeWidth: 1,
+      });
+    },
+    node: () => {
+      const circle = new fabric.Circle({
+        radius: 3,
+        fill: '#ffffff',
+        stroke: '#4b4b4b',
+        strokeWidth: 1,
+      });
+
+      return circle;
+    },
+    dot: () => {
+      const circle = new fabric.Circle({
+        radius: 3,
+        fill: '#ffffff',
+        stroke: '#4b4b4bcc',
+        strokeWidth: 1,
+        strokeDashArray: [1, 1],
+      });
+
+      return circle;
+    },
+    line: () => {
+      const line = new fabric.Line([0, 0, 0, 0], {
+        stroke: '#bebebe',
+        strokeWidth: 1,
+      });
+
+      return line;
+    },
+  };
+
+  events = new VizPathDOMEvent<{
+    set: (setting: Partial<EditorSetting>) => void;
+    added: (node: fabric.Object) => void;
+    closed: (node: fabric.Object) => void;
+    removed: (nodes: fabric.Object[]) => void;
+    selected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
+    deselected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
+  }>();
+
+  themes = new VizPathTheme(VizPathEditor.defaultTheme);
 
   /**
    * 内置配置，配置的更改会影响编辑器的交互效果，配置以栈的形式储存，每次拿配置会从后往前拿
@@ -102,20 +156,7 @@ class Editor extends EditorModule<{
   /* ---------------------------- 画布相关配置 ---------------------------- */
 
   /** 挂载的画布 */
-  mountCanvas: fabric.Canvas | null = null;
-
-  /** 交互所在fabric画布 */
   canvas: fabric.Canvas | null = null;
-
-  /** 当前编辑器是否使用隔离画布（模拟克隆的新画布对象） */
-  isolation = false;
-
-  /** 监听事件 */
-  listeners: {
-    type: 'global' | 'canvas';
-    eventName: string;
-    handler: (e: any) => void;
-  }[] = [];
 
   /** 功能禁用请求凭证 */
   disabledFunctionTokens: Partial<
@@ -125,10 +166,10 @@ class Editor extends EditorModule<{
   /* ---------------------------- 路径相关配置 ---------------------------- */
 
   /** 路径汇总 */
-  paths: ResponsivePath[] = [];
+  paths: VizPathSegment<RCrood>[] = [];
 
   /** 节点路径映射 */
-  nodePathMap = new Map<ResponsiveCrood, ResponsivePath>([]);
+  nodePathMap = new Map<RCrood, VizPathSegment<RCrood>>([]);
 
   /* ---------------------------- 节点相关配置 ---------------------------- */
 
@@ -139,10 +180,10 @@ class Editor extends EditorModule<{
   curveDots: EditorCurveDot[] = [];
 
   /** 元素画布对象 与 路径节点对象 映射 */
-  objectNodeMap: Map<fabric.Object, PathNode<ResponsiveCrood>> = new Map([]);
+  objectNodeMap: Map<fabric.Object, VizPathNode<RCrood>> = new Map([]);
 
   /** 路径节点对象 与 元素画布对象 映射 */
-  nodeObjectMap: Map<PathNode<ResponsiveCrood>, fabric.Object> = new Map([]);
+  nodeObjectMap: Map<VizPathNode<RCrood>, fabric.Object> = new Map([]);
 
   /** 当前活跃的路径节点画布对象列表 */
   activeNodes: fabric.Object[] = [];
@@ -174,10 +215,15 @@ class Editor extends EditorModule<{
    * 构造函数
    * @param options 更多配置
    */
-  constructor(mountCanvas: fabric.Canvas, isolation = false) {
+  constructor(canvas: fabric.Canvas) {
     super();
-    this.mountCanvas = mountCanvas;
-    this.isolation = isolation;
+
+    if (!canvas) {
+      throw new TypeError('Please use valid canvas object.');
+    }
+
+    this.canvas = canvas;
+    this.events.mount(this.canvas);
   }
 
   /**
@@ -214,12 +260,12 @@ class Editor extends EditorModule<{
     }
 
     this._settings.push(setting);
-    this.fire('set', setting);
+    this.events.fire('set', setting);
     const reset = () => {
       const index = this._settings.indexOf(setting);
       if (index > 0) {
         this._settings.splice(index, 1);
-        this.fire(
+        this.events.fire(
           'set',
           Object.keys(setting).reduce((result, key) => {
             result[key] = this.get(key as keyof EditorSetting);
@@ -297,103 +343,18 @@ class Editor extends EditorModule<{
   }
 
   /**
-   * 基于挂载画布构建编辑器画布
-   */
-  private _createEditorCanvas(canvas: fabric.Canvas) {
-    const container = canvas.getElement().parentNode as HTMLDivElement;
-    if (!container) {
-      throw new TypeError('Please use fabric.Canvas which is mounted into the document.');
-    }
-
-    // 如果使用隔离画布则会参考配置构造新画布使与原画布隔离
-    if (this.isolation) {
-      const editorCanvas = document.createElement('canvas');
-      container.appendChild(editorCanvas);
-
-      const editorFabricCanvas = new fabric.Canvas(editorCanvas, {
-        // 跟随尺寸
-        width: container.clientWidth,
-        height: container.clientHeight,
-        // 允许画布多选
-        selection: true,
-        // 画布渲染不跳过离屏元素
-        skipOffscreen: false,
-        // 保持选中元素的层级关系
-        preserveObjectStacking: true,
-      });
-
-      // 保留画布变换
-      editorFabricCanvas.setViewportTransform(canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]);
-
-      // 更多画布配置需要使用者外部配置
-
-      return editorFabricCanvas;
-    }
-
-    return canvas;
-  }
-
-  /**
-   * 添加元素事件监听
-   */
-  addGlobalEvent(eventName: string, handler: (...args: any[]) => void) {
-    window.addEventListener(eventName, handler);
-
-    this.listeners.push({ type: 'global', eventName, handler });
-  }
-
-  addCanvasEvent(eventName: string, handler: (...args: any[]) => void) {
-    if (!this.canvas) return;
-
-    this.canvas.on(eventName, handler);
-
-    this.listeners.push({ type: 'canvas', eventName, handler });
-  }
-
-  /**
-   * 移除事件监听
-   */
-  removeGlobalEvent(eventName: string, handler?: (...args: any[]) => void) {
-    this.listeners = this.listeners.filter((listener) => {
-      if (handler && handler !== listener.handler) return true;
-      if (eventName === listener.eventName) {
-        window.removeEventListener(listener.eventName, listener.handler);
-        return false;
-      }
-      return true;
-    });
-  }
-
-  removeCanvasEvent(eventName: string, handler?: (...args: any[]) => void) {
-    const canvas = this.canvas;
-    if (!canvas) return;
-
-    this.listeners = this.listeners.filter((listener) => {
-      if (handler && handler !== listener.handler) return true;
-      if (eventName === listener.eventName) {
-        canvas.off(listener.eventName, listener.handler);
-        return false;
-      }
-      return true;
-    });
-  }
-
-  /**
    * 初始化路径绘制监听
    */
   private _initDrawPathListener(vizpath: VizPath) {
     const canvas = this.canvas;
     if (!canvas) return;
 
-    const handler = (paths: ResponsivePath[]) => {
-      const ui = vizpath.context.find(EditorUI);
-      const theme = ui?.theme ?? DEFAULT_THEME;
-
+    const handler = (paths: VizPathSegment<RCrood>[]) => {
       paths.forEach((item) => {
         const { pathObject } = item;
 
         // 如果已经带有标志则是已经添加进画布的路径
-        if (pathObject[Editor.symbol]) return;
+        if (pathObject[VizPathEditor.symbol]) return;
 
         const centerPoint = pathObject.getCenterPoint();
 
@@ -411,18 +372,14 @@ class Editor extends EditorModule<{
           // 避免路径轮廓宽度影响到路径偏移
           customPath.setPositionByOrigin(centerPoint, 'center', 'center');
 
-          customPath[Editor.symbol] = EditorSymbolType.PATH;
-
-          if (ui && callback) {
-            ui.objectPreRenderCallbackMap.set(customPath, callback);
-          }
+          customPath[VizPathEditor.symbol] = EditorSymbolType.PATH;
 
           return customPath;
         };
 
-        theme.path(decorator, pathObject);
+        this.themes.create('path')(decorator, pathObject);
 
-        if (!pathObject[Editor.symbol]) decorator(pathObject);
+        if (!pathObject[VizPathEditor.symbol]) decorator(pathObject);
       });
 
       // 添加新的路径对象
@@ -437,12 +394,12 @@ class Editor extends EditorModule<{
 
       // 建立映射关系，便于减少后续计算
       this.paths.forEach((item) => {
-        item.segment.forEach(({ node }) => {
+        item.nodes.forEach(({ node }) => {
           if (node) this.nodePathMap.set(node, item);
         });
       });
     };
-    vizpath.on('draw', handler);
+    vizpath.events.on('draw', handler);
   }
 
   /**
@@ -452,23 +409,23 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    const handler = (paths: ResponsivePath[]) => {
+    const handler = (paths: VizPathSegment<RCrood>[]) => {
       canvas.remove(...paths.map((i) => i.pathObject));
 
       this.paths = this.paths.filter((i) => paths.includes(i));
 
       // 清除映射
       paths.forEach((item) => {
-        item.segment.forEach(({ node }) => {
+        item.nodes.forEach(({ node }) => {
           if (node) this.nodePathMap.delete(node);
         });
       });
     };
-    vizpath.on('clear', handler);
-    vizpath.on('clearAll', () => {
+    vizpath.events.on('clear', handler);
+    vizpath.events.on('clearAll', () => {
       canvas.remove(...this.paths.map((i) => i.pathObject));
       this.paths.forEach((item) => {
-        item.segment.forEach(({ node }) => {
+        item.nodes.forEach(({ node }) => {
           if (node) this.nodePathMap.delete(node);
         });
       });
@@ -484,15 +441,12 @@ class Editor extends EditorModule<{
     const vizpath = this.vizpath;
     if (!vizpath) return { objects, objectNodeMap, nodeObjectMap };
 
-    const ui = vizpath.context.find(EditorUI);
-    const theme = ui?.theme ?? DEFAULT_THEME;
-
     /**
      * 创建路径节点对应的fabric对象
      * @param node 路径节点
      * @param originObject 来源对象
      */
-    const createNodeObject = (node: ResponsiveCrood, originObject?: fabric.Object) => {
+    const createNodeObject = (node: RCrood, originObject?: fabric.Object) => {
       const decorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
         customObject.set({
           name: uuid(),
@@ -511,18 +465,14 @@ class Editor extends EditorModule<{
           });
         });
 
-        customObject[Editor.symbol] = EditorSymbolType.NODE;
-
-        if (ui && callback) {
-          ui.objectPreRenderCallbackMap.set(customObject, callback);
-        }
+        customObject[VizPathEditor.symbol] = EditorSymbolType.NODE;
 
         return customObject;
       };
 
-      let object = originObject ?? theme.node(decorator);
+      let object = originObject ?? this.themes.create('node')(decorator);
 
-      if (!object[Editor.symbol]) object = decorator(object);
+      if (!object[VizPathEditor.symbol]) object = decorator(object);
 
       // 加入画布时添加自动响应
       const onAddedNode = () => {
@@ -568,8 +518,8 @@ class Editor extends EditorModule<{
     };
 
     // 第一轮遍历为了重用旧对象，避免每次更新fabric对象都变化还需要重新处理聚焦事件
-    vizpath.paths.forEach(({ segment }) => {
-      segment.forEach((item) => {
+    vizpath.segments.forEach(({ nodes }) => {
+      nodes.forEach((item) => {
         const { node } = item;
         if (!node) return;
 
@@ -586,8 +536,8 @@ class Editor extends EditorModule<{
     });
 
     // 第二轮遍历则是为了创建新对象
-    vizpath.paths.forEach(({ segment }) => {
-      segment.forEach((item) => {
+    vizpath.segments.forEach(({ nodes }) => {
+      nodes.forEach((item) => {
         const { node } = item;
         if (!node) return;
 
@@ -654,7 +604,7 @@ class Editor extends EditorModule<{
       if (storeActiveObjects.length) this.focus(...storeActiveObjects);
     };
 
-    vizpath.on('draw', updateNodes);
+    vizpath.events.on('draw', updateNodes);
   }
 
   /**
@@ -664,10 +614,10 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    vizpath.on('clear', (path) => {
+    vizpath.events.on('clear', (segment) => {
       const removeObjects: fabric.Object[] = [];
-      path.forEach(({ segment }) => {
-        segment.forEach((node) => {
+      segment.forEach(({ nodes }) => {
+        nodes.forEach((node) => {
           const object = this.nodeObjectMap.get(node);
           if (object) removeObjects.push(object);
         });
@@ -686,7 +636,7 @@ class Editor extends EditorModule<{
       this.nodes = this.nodes.filter((i) => !removeObjects.includes(i));
     });
 
-    vizpath.on('clearAll', () => {
+    vizpath.events.on('clearAll', () => {
       this.blur();
       canvas.remove(...this.nodes);
       this.nodes = [];
@@ -694,7 +644,7 @@ class Editor extends EditorModule<{
       this.nodeObjectMap.clear();
     });
 
-    vizpath.on('destroy', () => {
+    vizpath.events.on('destroy', () => {
       this._abandonedPool = {
         nodes: [],
         points: [],
@@ -713,9 +663,9 @@ class Editor extends EditorModule<{
       if (!group.canvas) return;
       if (group._objects.length !== initialObjectCount) return;
       this.vizpath?.onceRerenderOriginPath(() => {
-        const hadFollowedCroods = new Set<ResponsiveCrood>([]);
+        const hadFollowedCroods = new Set<RCrood>([]);
         for (const object of group._objects as fabric.Object[]) {
-          const followCurveDots: ResponsiveCrood[] = [];
+          const followCurveDots: RCrood[] = [];
           const pathNode = this.objectNodeMap.get(object)!;
           const curveDots = this.vizpath?.getNeighboringCurveDots(pathNode) ?? [];
           curveDots?.forEach(({ position, direction, from }) => {
@@ -760,7 +710,7 @@ class Editor extends EditorModule<{
     observe(object, ['left', 'top'], ({ left, top }) => {
       if (object.group) return;
 
-      const followCurveDots: ResponsiveCrood[] = [];
+      const followCurveDots: RCrood[] = [];
       const pathNode = this.objectNodeMap.get(object)!;
       const curveDots = this.vizpath?.getNeighboringCurveDots(pathNode) ?? [];
       curveDots?.forEach(({ position, direction, from }) => {
@@ -777,21 +727,21 @@ class Editor extends EditorModule<{
    * 初始画布节点选中事件
    */
   private _initSelectNodeEvents() {
-    this.addCanvasEvent('selection:created', (e) => {
+    this.events.canvas.on('selection:created', (e) => {
       if (this._deactivateSelectListeners) return;
       this.focus(...this.canvas!.getActiveObjects());
     });
-    this.addCanvasEvent('selection:updated', (e) => {
+    this.events.canvas.on('selection:updated', (e) => {
       if (this._deactivateSelectListeners) return;
       this.focus(...this.canvas!.getActiveObjects());
     });
-    this.addCanvasEvent('selection:cleared', () => {
+    this.events.canvas.on('selection:cleared', () => {
       if (this._deactivateSelectListeners) return;
       this.focus();
     });
     // 选中路径段时自动选中路线段内的所有指令路径节点
-    this.addCanvasEvent('mouse:dblclick', (e) => {
-      if (e.target && e.target[Editor.symbol]) return;
+    this.events.canvas.on('mouse:dblclick', (e) => {
+      if (e.target && e.target[VizPathEditor.symbol]) return;
 
       let focusPath: (typeof this.paths)[number] | undefined;
       for (let i = this.paths.length - 1; i >= 0; i--) {
@@ -818,22 +768,22 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    this.addCanvasEvent('mouse:down:before', (event) => {
+    this.events.canvas.on('mouse:down:before', (event) => {
       if (this.disabledFunctionTokens.add?.length) return;
       if (this.get('mode') !== Mode.ADD) return;
 
       let target: fabric.Object | undefined;
       // 路径闭合
-      if (event.target && event.target[Editor.symbol]) {
+      if (event.target && event.target[VizPathEditor.symbol]) {
         if (
           this.activeNodes.length === 1 &&
-          event.target[Editor.symbol] === EditorSymbolType.NODE
+          event.target[VizPathEditor.symbol] === EditorSymbolType.NODE
         ) {
           const joinNode = this.link(this.activeNodes[0]!, event.target);
           if (joinNode) target = this.nodeObjectMap.get(joinNode);
           if (target) {
             this.currentConvertNodeObject = target;
-            this.fire('closed', target);
+            this.events.fire('closed', target);
           }
         }
       }
@@ -843,7 +793,7 @@ class Editor extends EditorModule<{
         target = this.add({ left: pointer.x, top: pointer.y });
         if (target) {
           this.currentConvertNodeObject = target;
-          this.fire('added', target);
+          this.events.fire('added', target);
         }
       }
     });
@@ -888,12 +838,9 @@ class Editor extends EditorModule<{
       return;
     }
 
-    const ui = vizpath.context.find(EditorUI);
-    const theme = ui?.theme ?? DEFAULT_THEME;
-
     // 创建新的路径曲线变换点
     const curveDots: EditorCurveDot[] = [];
-    const curveDotSet = new WeakSet<ResponsiveCrood>([]);
+    const curveDotSet = new WeakSet<RCrood>([]);
     const neighboringCurveDots = vizpath
       .getNeighboringCurveDots(curPathNode)
       .filter(({ direction, from }) => {
@@ -945,16 +892,12 @@ class Editor extends EditorModule<{
             });
           });
 
-          customObject[Editor.symbol] = EditorSymbolType.CURVE_DOT;
-
-          if (ui && callback) {
-            ui.objectPreRenderCallbackMap.set(customObject, callback);
-          }
+          customObject[VizPathEditor.symbol] = EditorSymbolType.CURVE_DOT;
 
           return customObject;
         };
-        point = this._abandonedPool.points.pop() ?? theme.dot(pointDecorator);
-        if (!point[Editor.symbol]) point = pointDecorator(point);
+        point = this._abandonedPool.points.pop() ?? this.themes.create('dot')(pointDecorator);
+        if (!point[VizPathEditor.symbol]) point = pointDecorator(point);
       } else {
         const index = this._abandonedPool.points.indexOf(point);
         this._abandonedPool.points.splice(index, 1);
@@ -1065,16 +1008,12 @@ class Editor extends EditorModule<{
             objectCaching: false,
           });
 
-          customObject[Editor.symbol] = EditorSymbolType.LINE;
-
-          if (ui && callback) {
-            ui.objectPreRenderCallbackMap.set(customObject, callback);
-          }
+          customObject[VizPathEditor.symbol] = EditorSymbolType.LINE;
 
           return customObject;
         };
-        line = this._abandonedPool.lines.pop() ?? theme.line(lineDecorator);
-        if (!line[Editor.symbol]) line = lineDecorator(line);
+        line = this._abandonedPool.lines.pop() ?? this.themes.create('line')(lineDecorator);
+        if (!line[VizPathEditor.symbol]) line = lineDecorator(line);
       } else {
         const index = this._abandonedPool.lines.indexOf(line);
         this._abandonedPool.lines.splice(index, 1);
@@ -1146,13 +1085,13 @@ class Editor extends EditorModule<{
   /**
    * 获取路径节点进行转换的配置
    */
-  private _getConvertibleNodes(node: PathNode<ResponsiveCrood>) {
+  private _getConvertibleNodes(node: VizPathNode<RCrood>) {
     if (!this.vizpath) return [];
 
     const { instruction } = node;
     const { pre, next } = this.vizpath.getNeighboringInstructions(node);
 
-    const convertibleNodes: ['pre' | 'next', PathNode<ResponsiveCrood>][] = [];
+    const convertibleNodes: ['pre' | 'next', VizPathNode<RCrood>][] = [];
 
     switch (instruction[0]) {
       case InstructionType.START:
@@ -1209,12 +1148,12 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    this.addCanvasEvent('mouse:down', (event) => {
+    this.events.canvas.on('mouse:down', (event) => {
       if (this.disabledFunctionTokens.convert?.length) return;
 
       if (!this.currentConvertNodeObject) {
         if (this.get('mode') !== Mode.CONVERT) return;
-        if (event.target?.[Editor.symbol] !== EditorSymbolType.NODE) return;
+        if (event.target?.[VizPathEditor.symbol] !== EditorSymbolType.NODE) return;
         this.currentConvertNodeObject = event.target as fabric.Object;
       }
 
@@ -1225,7 +1164,7 @@ class Editor extends EditorModule<{
       }
     });
 
-    this.addCanvasEvent('mouse:move', (event) => {
+    this.events.canvas.on('mouse:move', (event) => {
       const target = this.currentConvertNodeObject;
       if (!target) return;
 
@@ -1285,7 +1224,7 @@ class Editor extends EditorModule<{
       }
     });
 
-    this.addCanvasEvent('mouse:up', () => {
+    this.events.canvas.on('mouse:up', () => {
       if (this.currentConvertNodeObject) {
         this.currentConvertNodeObject.set({ lockMovementX: false, lockMovementY: false });
         this.currentConvertNodeObject = null;
@@ -1298,13 +1237,13 @@ class Editor extends EditorModule<{
    * 初始路径节点删除事件
    */
   private _initDeleteNodeEvents() {
-    this.addCanvasEvent('mouse:down', (event) => {
+    this.events.canvas.on('mouse:down', (event) => {
       if (this.disabledFunctionTokens.remove?.length) return;
       if (this.get('mode') !== Mode.DELETE) return;
 
       if (
-        event.target?.[Editor.symbol] === EditorSymbolType.NODE ||
-        event.target?.[Editor.symbol] === EditorSymbolType.CURVE_DOT
+        event.target?.[VizPathEditor.symbol] === EditorSymbolType.NODE ||
+        event.target?.[VizPathEditor.symbol] === EditorSymbolType.CURVE_DOT
       ) {
         this.remove(event.target);
       }
@@ -1327,7 +1266,7 @@ class Editor extends EditorModule<{
       scaleY?: number;
       angle?: number;
     },
-    followCurveDots: ResponsiveCrood[] = [],
+    followCurveDots: RCrood[] = [],
   ) {
     const pathNode = this.objectNodeMap.get(object);
     if (!pathNode) return;
@@ -1432,7 +1371,7 @@ class Editor extends EditorModule<{
       const { segment } = pathNode;
 
       // 如果当前节点已闭合或非端点，无法实现节点添加
-      if (vizpath.isClosePath(segment)) return;
+      if (vizpath.isCloseSegment(segment)) return;
 
       const newCrood = this.calcRelativeCrood(
         position,
@@ -1452,7 +1391,7 @@ class Editor extends EditorModule<{
         return this.nodeObjectMap.get(addPathNode);
       }
       // 如果是末尾端点
-      else if (pathNode === segment[segment.length - 1]) {
+      else if (pathNode === segment.nodes[segment.nodes.length - 1]) {
         const addPathNode = vizpath.insertAfterNode(pathNode, [
           InstructionType.LINE,
           newCrood.x,
@@ -1463,9 +1402,9 @@ class Editor extends EditorModule<{
         return this.nodeObjectMap.get(addPathNode);
       }
     } else {
-      const path = VizPathCreator.parseFabricPath(new fabric.Path('M 0 0', position));
-      const responsivePath = vizpath.draw(path);
-      return this.nodeObjectMap.get(responsivePath[0].segment[0]);
+      const path = VizPath.parseFabricPath(new fabric.Path('M 0 0', position));
+      const segments = vizpath.draw(path);
+      return this.nodeObjectMap.get(segments[0].nodes[0]);
     }
   }
 
@@ -1495,11 +1434,13 @@ class Editor extends EditorModule<{
     const canvas = this.canvas;
     if (!canvas) return;
 
-    const nodeObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.NODE);
-    const pointObjects = objects.filter((i) => i[Editor.symbol] === EditorSymbolType.CURVE_DOT);
+    const nodeObjects = objects.filter((i) => i[VizPathEditor.symbol] === EditorSymbolType.NODE);
+    const pointObjects = objects.filter(
+      (i) => i[VizPathEditor.symbol] === EditorSymbolType.CURVE_DOT,
+    );
 
     if (nodeObjects.length) {
-      const removeNodes: ResponsiveCrood[] = [];
+      const removeNodes: RCrood[] = [];
       nodeObjects.forEach((object) => {
         const { node } = this.objectNodeMap.get(object)!;
         if (!node) return;
@@ -1542,7 +1483,7 @@ class Editor extends EditorModule<{
       next,
     };
 
-    const targets: [direction: 'pre' | 'next', pathNode: PathNode<ResponsiveCrood>][] = [];
+    const targets: [direction: 'pre' | 'next', pathNode: VizPathNode<RCrood>][] = [];
 
     if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
       targets.push(['pre', directionNodeMap.pre]);
@@ -1593,7 +1534,7 @@ class Editor extends EditorModule<{
       next,
     };
 
-    const targets: [direction: 'pre' | 'next', pathNode: PathNode<ResponsiveCrood>][] = [];
+    const targets: [direction: 'pre' | 'next', pathNode: VizPathNode<RCrood>][] = [];
 
     if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
       targets.push(['pre', directionNodeMap.pre]);
@@ -1667,8 +1608,8 @@ class Editor extends EditorModule<{
     }
 
     // 不同路径需要进行合并
-    let sourcePath = source.segment.map((i) => i.instruction);
-    let targetPath = target.segment.map((i) => i.instruction);
+    let sourcePath = source.segment.nodes.map((i) => i.instruction);
+    let targetPath = target.segment.nodes.map((i) => i.instruction);
 
     if (source.instruction === sourcePath[0]) {
       sourcePath = reversePath(sourcePath);
@@ -1682,9 +1623,9 @@ class Editor extends EditorModule<{
       for (let i = 0; i < instruction.length - 1; i += 2) {
         const position = this.calcAbsolutePosition(
           new fabric.Point(instruction[i + 1] as number, instruction[i + 2] as number),
-          vizpath.getPath(target.segment)!.pathObject,
+          target.segment.pathObject,
         );
-        const crood = this.calcRelativeCrood(position, vizpath.getPath(source.segment)!.pathObject);
+        const crood = this.calcRelativeCrood(position, target.segment.pathObject);
         instruction[i + 1] = crood.x;
         instruction[i + 2] = crood.y;
       }
@@ -1694,13 +1635,11 @@ class Editor extends EditorModule<{
 
     // 合并后添加回路径段集合
     const newPath = vizpath.onceRerenderOriginPath(() => {
-      vizpath.clear(target.segment);
-      return vizpath.replacePathSegments(vizpath.getPath(source.segment)!, [
-        mergePath,
-      ] as Instruction[][]);
+      vizpath.clear(target.segment.nodes);
+      return vizpath.replacePathSegments(source.segment, [mergePath] as Instruction[][]);
     });
 
-    return newPath[0].segment[joinIndex];
+    return newPath[0].nodes[joinIndex];
   }
 
   focus(...selectedObjects: fabric.Object[]) {
@@ -1711,7 +1650,7 @@ class Editor extends EditorModule<{
     const focusNodes: fabric.Object[] = [];
     const focusCurveDotPoints: fabric.Object[] = [];
     selectedObjects.forEach((object) => {
-      switch (object[Editor.symbol]) {
+      switch (object[VizPathEditor.symbol]) {
         case EditorSymbolType.NODE:
           focusNodes.push(object);
           break;
@@ -1725,7 +1664,7 @@ class Editor extends EditorModule<{
 
     // 触发内置失焦事件
     if (this.activePoint || this.activeNodes.length) {
-      this.fire('deselected', this.activeNodes, this.activePoint);
+      this.events.fire('deselected', this.activeNodes, this.activePoint);
     }
 
     this._deactivateSelectListeners = true;
@@ -1760,7 +1699,7 @@ class Editor extends EditorModule<{
         this._updateCurveDots();
         canvas.setActiveObject(activeSelection);
       }
-      this.fire('selected', focusNodes, null);
+      this.events.fire('selected', focusNodes, null);
     }
     // 考虑是否只有一个曲线变换点聚焦情况，不允许多曲线变换点同时聚焦
     else if (focusCurveDotPoints.length === 1) {
@@ -1771,7 +1710,7 @@ class Editor extends EditorModule<{
       const activePoint = this.curveDots.find((i) => i.node === node && i.type === type)!;
       this.activePoint = activePoint.point;
       canvas.setActiveObject(activePoint.point);
-      this.fire('selected', this.activeNodes, this.activePoint);
+      this.events.fire('selected', this.activeNodes, this.activePoint);
     }
     // 如都不符合上面情况则是所有节点都失去焦点
     else {
@@ -1843,35 +1782,18 @@ class Editor extends EditorModule<{
     this.nodePathMap.clear();
 
     // 画布相关配置
-    this.listeners.forEach(({ type, eventName, handler }) => {
-      if (type === 'global') this.removeGlobalEvent(eventName, handler);
-      if (type === 'canvas') this.removeCanvasEvent(eventName, handler);
-    });
-    this.mountCanvas = null;
+    this.events.clear();
     this.canvas = null;
-    this.isolation = false;
-    this.listeners.length = 0;
+    this.canvas = null;
     this.disabledFunctionTokens = {};
-
-    // 如果是隔离画布要销毁克隆画布
-    if (this.isolation) canvas.dispose();
-    else canvas.requestRenderAll();
+    canvas.requestRenderAll();
   }
 
   async load(vizpath: VizPath) {
-    if (!this.mountCanvas) {
-      throw new TypeError('Please use valid canvas object.');
-    }
-
-    if (!(this.mountCanvas instanceof fabric.Canvas)) {
-      throw new TypeError('Please use fabric.Canvas instead of fabric.StaticCanvas.');
-    }
-
-    this.canvas = this._createEditorCanvas(this.mountCanvas);
-
+    // 路径处理
     this._initDrawPathListener(vizpath);
     this._initClearPathListener(vizpath);
-
+    // 节点处理
     this._initDrawNodeEvents(vizpath);
     this._initClearNodeEvents(vizpath);
     this._initSelectNodeEvents();
@@ -1881,4 +1803,4 @@ class Editor extends EditorModule<{
   }
 }
 
-export default Editor;
+export default VizPathEditor;

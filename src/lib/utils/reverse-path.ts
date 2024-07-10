@@ -1,4 +1,4 @@
-import { InstructionType, type Instruction } from '..';
+import { InstructionType, type Instruction } from '../vizpath.class';
 
 /**
  * 反转路径

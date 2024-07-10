@@ -1,8 +1,6 @@
-import cloneDeep from 'lodash-es/cloneDeep';
 import isEqual from 'lodash-es/isEqual';
-import EditorModule from '../base.class';
-import Editor from '../editor/index.class';
-import type VizPath from '../../vizpath.class';
+import type VizPath from '../../../lib/vizpath.class';
+import VizPathModule from '../../../lib/vizpath-module.class';
 
 type CombinationKey = 'alt' | 'ctrl' | 'shift' | 'meta';
 
@@ -15,7 +13,7 @@ type Shortcut<ReturnValue = any> = {
 
 type ShortcutOptions<ReturnValue = any> = Partial<Shortcut<ReturnValue>>;
 
-class EditorShortcut extends EditorModule {
+class EditorShortcut extends VizPathModule {
   static ID = 'editor-shortcut';
 
   shortcuts: Shortcut[] = [];
@@ -135,28 +133,28 @@ class EditorShortcut extends EditorModule {
   }
 
   unload(vizpath: VizPath): void {
-    const editor = vizpath.context.find(Editor);
+    const editor = vizpath.editor;
     if (!editor) return;
 
-    editor.removeGlobalEvent('keydown', this._handleShortcutKey.bind(this));
-    editor.removeGlobalEvent('keyup', this._handleShortcutKey.bind(this));
-    editor.removeGlobalEvent('blur', this._handlePageDeactivate.bind(this));
+    editor.events.global.off('keydown', this._handleShortcutKey.bind(this));
+    editor.events.global.off('keyup', this._handleShortcutKey.bind(this));
+    editor.events.global.off('blur', this._handlePageDeactivate.bind(this));
 
     this.shortcuts.length = 0;
     this.activeShortcut = undefined;
   }
 
   load(vizpath: VizPath) {
-    const editor = vizpath.context.find(Editor);
+    const editor = vizpath.editor;
     if (!editor) return;
 
     this.shortcuts = (this.shortcutOptions ?? [])
       .map(this._tryGetValidShortcut.bind(this))
       .filter(Boolean) as typeof this.shortcuts;
 
-    editor.addGlobalEvent('keydown', this._handleShortcutKey.bind(this));
-    editor.addGlobalEvent('keyup', this._handleShortcutKey.bind(this));
-    editor.addGlobalEvent('blur', this._handlePageDeactivate.bind(this));
+    editor.events.global.on('keydown', this._handleShortcutKey.bind(this));
+    editor.events.global.on('keyup', this._handleShortcutKey.bind(this));
+    editor.events.global.on('blur', this._handlePageDeactivate.bind(this));
   }
 }
 

@@ -5,51 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fabric Path Editor</title>
     <link rel="icon" href="./favicon.ico" type="image/ico" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <script src="./static/iconfont.js"></script>
+    <script src="./static/react.production.min.js"></script>
+    <script src="./static/react-dom.production.min.js"></script>
+    <script src="./static/fabric.min.js"></script>
     <script>
       fabric.fabric = fabric;
     </script>
-    <script src="./index.js" defer></script>
+    <link href="./static/github-markdown-dark.css" rel="stylesheet">
     <style>
-      * {
-        margin: 0;
-        padding: 0;
+      @font-face {
+        font-family: 'comfortaa-medium';
+        src: url('./static/comfortaa-medium.ttf'); /* 替换 'path/to/font.ttf' 为字体文件的路径 */
       }
-      html,
       body {
-        height: 100%;
-        overflow: hidden;
+        font-family: 'comfortaa-medium', sans-serif; /* 使用自定义字体 */
       }
-      .container {
-        max-width: 580px;
-        margin: 32px auto;
-      }
-      fieldset {
-        padding: 8px 12px;
-        margin: 12px 0;
-      }
-      button {
-        padding: 2px 4px;
-        cursor: pointer;
-      }
-      main {
-        height: 500px;
-        margin: 20px auto;
-        border: 1px solid #efefef;
-        border-radius: 4px;
+    </style>
+    <style type="text/css">
+      .icon {
+        width: 1em; height: 1em;
+        vertical-align: -0.15em;
+        fill: currentColor;
         overflow: hidden;
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <main></main>
-      <footer>
-        <fieldset>
-          <legend>上传文件</legend>
-          <input id="upload" type="file" />
-        </fieldset>
-      </footer>
-    </div>
+    <div id="page"></div>
+    <script src="./index.js" defer></script>
   </body>
 </html>

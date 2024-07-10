@@ -9,7 +9,9 @@ import terser from '@rollup/plugin-terser';
 import serve from 'rollup-plugin-serve';
 import livereload from 'rollup-plugin-livereload';
 import clean from 'rollup-plugin-clear';
-import peerDepsExternal from 'rollup-plugin-peer-deps-external';
+import replace from '@rollup/plugin-replace';
+import postcss from 'rollup-plugin-postcss';
+import postcssLess from 'postcss-less';
 
 const build_umd = () => ({
   input: 'src/index.ts',
@@ -18,19 +20,20 @@ const build_umd = () => ({
       file: 'dist/index.js',
       format: 'umd',
       sourcemap: true,
-      name: 'FabricPathEditor',
+      name: 'FabricVizPath',
       globals: {
         fabric: 'fabric',
       },
     },
   ],
+  external: ['fabric'],
   plugins: [
+    clean({ targets: ['dist'] }),
     resolve(),
-    peerDepsExternal(),
     commonjs(),
     json(),
     typescript({
-      exclude: ['src/example/*'],
+      exclude: ['src/example/**/*'],
     }),
     babel({
       babelHelpers: 'bundled',
@@ -51,15 +54,14 @@ const build_es_lib = () => ({
       format: 'es',
     },
   ],
+  external: ['fabric'],
   plugins: [
-    clean({ targets: ['dist'] }),
     resolve(),
-    peerDepsExternal(),
     commonjs(),
     json(),
     typescript({
       declaration: false,
-      exclude: ['src/example/*'],
+      exclude: ['src/example/**/*'],
     }),
     babel({
       babelHelpers: 'bundled',
@@ -88,14 +90,14 @@ const build_es_theme = () => {
       format: 'es',
       preserveModules: true,
     },
+    external: ['fabric'],
     plugins: [
       resolve(),
-      peerDepsExternal(),
       commonjs(),
       json(),
       typescript({
         declaration: false,
-        exclude: ['src/example/*'],
+        exclude: ['src/example/**/*'],
       }),
       babel({
         babelHelpers: 'bundled',
@@ -108,25 +110,55 @@ const build_es_theme = () => {
   };
 };
 
+function markdownPlugin() {
+  return {
+    name: 'markdown-plugin',
+    transform(code, id) {
+      if (id.endsWith('.md')) {
+        const markdownContent = fs.readFileSync(id, 'utf-8');
+        return `export default ${JSON.stringify(markdownContent)};`;
+      }
+    },
+  };
+}
+
 const build_serve = () => {
   const config = {
-    input: 'src/example/index.ts',
+    input: 'src/example/index.tsx',
     output: [
       {
         file: 'docs/index.js',
         format: 'iife',
         globals: {
           fabric: 'fabric',
+          react: 'React',
+          'react-dom': 'ReactDOM',
         },
       },
     ],
+    external: ['fabric', 'react', 'react-dom'],
     plugins: [
-      resolve(),
-      peerDepsExternal(),
+      resolve({
+        browser: true,
+        preferBuiltins: false,
+      }),
+      replace({
+        preventAssignment: true,
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.BROWSER': JSON.stringify(true),
+      }),
       commonjs(),
+      markdownPlugin(),
       json(),
       typescript({
         declaration: false,
+      }),
+      postcss({
+        syntax: postcssLess,
+        namedExports: (id) => id.replace(/-([a-z])/g, (match, letter) => letter.toUpperCase()),
+        extensions: ['.css', '.less'],
+        minimize: true,
+        modules: true,
       }),
       babel({
         babelHelpers: 'bundled',

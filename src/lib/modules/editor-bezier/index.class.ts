@@ -1,10 +1,14 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
 import { Bezier } from 'bezier-js';
-import type Vizpath from '../../vizpath.class';
-import EditorModule from '../base.class';
-import Editor, { EditorSymbolType, Mode } from '../editor/index.class';
-import { InstructionType, type Instruction, type PathNode } from 'src/lib';
+import type Vizpath from '../../../lib/vizpath.class';
+import {
+  InstructionType,
+  type Instruction,
+  type RCrood,
+  type VizPathNode,
+} from '../../../lib/vizpath.class';
+import VizPathModule from '../../../lib/vizpath-module.class';
 import {
   calcCanvasCrood,
   curveFromLine,
@@ -12,26 +16,12 @@ import {
   deepIterateGroup,
   splitInstruction,
 } from '@utils';
-import type { ResponsiveCrood } from '../../vizpath.class';
-import EditorUI, { DEFAULT_THEME, type ThemeDecorator } from '../editor-ui/index.class';
 import defaultsDeep from 'lodash-es/defaultsDeep';
+import VizPathTheme from '../../../lib/vizpath-theme.class';
+import type { ThemeDecorator } from '../editor-theme/index.class';
+import VizPathEditor, { EditorSymbolType, Mode } from '../../../lib/vizpath-editor.class';
 
 type EditorBezierOptions = {
-  /**
-   * 拆分点的UI key值配置
-   * @default 'splitDot'
-   */
-  splitDotKey: string;
-  /**
-   * 虚拟点的样式key配置
-   * @default 'virtualNode'
-   */
-  virtualNodeKey: string;
-  /**
-   * 参考线的样式key配置
-   * @default 'virtualPath'
-   */
-  virtualPathKey: string;
   /**
    * 是否禁用路径拆分
    * @default false
@@ -50,9 +40,6 @@ type EditorBezierOptions = {
 };
 
 const DEFAULT_OPTIONS: EditorBezierOptions = {
-  virtualNodeKey: 'virtualNode',
-  virtualPathKey: 'virtualPath',
-  splitDotKey: 'splitDot',
   disabledSplit: false,
   disabledSplitDot: false,
   disabledDbclickConvert: false,
@@ -60,24 +47,45 @@ const DEFAULT_OPTIONS: EditorBezierOptions = {
 
 /**
  * 编辑器曲线化操作模块：1.双击实现指令升降级 2.实现路径选点拆分
- *
- * @note 注意：拆分点的样式需要在UI模块中配置，没配置默认使用UI模块中路径节点的样式
- *
- * @example
- *
- * vizpath
- * .use(new Editor(fabricCanvas))
- * .use(new EditorBezier())
- * .use(new EditorUI<EditorBezierThemeConfigurators>({
- *
- * }))
  */
-class EditorBezier extends EditorModule {
+class EditorBezier extends VizPathModule {
   static ID = 'editor-bezier';
 
   splitDot: fabric.Object | null = null;
 
   options: EditorBezierOptions;
+
+  themes = new VizPathTheme({
+    splitDot: (decorator: ThemeDecorator<fabric.Object>) => {
+      const circle = new fabric.Circle({
+        radius: 3,
+        fill: '#ffffff',
+        stroke: '#4b4b4b',
+        strokeWidth: 1,
+      });
+
+      return circle;
+    },
+    virtualNode: (decorator: ThemeDecorator<fabric.Object>) => {
+      const circle = new fabric.Circle({
+        radius: 3,
+        fill: '#ffffff',
+        stroke: '#4b4b4b',
+        strokeWidth: 1,
+      });
+
+      return circle;
+    },
+    virtualPath: (decorator: ThemeDecorator<fabric.Path>) => {
+      const path = new fabric.Path('M 0 0', {
+        fill: 'transparent',
+        stroke: '#bebebe',
+        strokeWidth: 1,
+      });
+
+      return path;
+    },
+  });
 
   constructor(options: Partial<EditorBezierOptions> = {}) {
     super();
@@ -89,7 +97,7 @@ class EditorBezier extends EditorModule {
    * 自动降级到直线
    */
   degrade(object: fabric.Object) {
-    const editor = this.vizpath?.context.find(Editor);
+    const editor = this.vizpath?.editor;
     if (!editor) return;
 
     editor.degrade(object, 'both', true);
@@ -102,7 +110,7 @@ class EditorBezier extends EditorModule {
     const vizpath = this.vizpath;
     if (!vizpath) return;
 
-    const editor = this.vizpath?.context.find(Editor);
+    const editor = this.vizpath?.editor;
     if (!editor) return;
 
     const pathNode = editor.objectNodeMap.get(object)!;
@@ -204,10 +212,6 @@ class EditorBezier extends EditorModule {
 
   // 创建拆分点
   private _initSpiltDot(vizpath: Vizpath) {
-    const ui = vizpath.context.find(EditorUI);
-    const splitDotTheme =
-      ui?.theme?.[this.options.splitDotKey] ?? ui?.theme?.node ?? DEFAULT_THEME.node;
-
     let decorated = false;
 
     const decorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
@@ -231,16 +235,12 @@ class EditorBezier extends EditorModule {
         });
       });
 
-      if (ui && callback) {
-        ui.objectPreRenderCallbackMap.set(customObject, callback);
-      }
-
       decorated = true;
 
       return customObject;
     };
 
-    let object = splitDotTheme(decorator);
+    let object: fabric.Object = this.themes.create('splitDot')(decorator);
     if (!decorated) object = decorator(object);
 
     return object;
@@ -249,16 +249,13 @@ class EditorBezier extends EditorModule {
   // 清除拆分点
   private _destorySplitDot(vizpath: Vizpath) {
     if (!this.splitDot) return;
-    const ui = vizpath.context.find(EditorUI);
-    ui?.objectPreRenderCallbackMap.delete(this.splitDot);
-
     this.splitDot.canvas?.remove(this.splitDot);
     this.splitDot = null;
   }
 
   // 注册双击节点变换事件
   private _initDbclickChangeEvent(vizpath: Vizpath) {
-    const editor = vizpath.context.find(Editor);
+    const editor = vizpath.editor;
     if (!editor) return;
 
     editor.canvas?.on('mouse:dblclick', (event) => {
@@ -275,14 +272,14 @@ class EditorBezier extends EditorModule {
 
   // 注册指令拆分事件
   private _initSplitEvent(vizpath: Vizpath) {
-    const editor = vizpath.context.find(Editor);
+    const editor = vizpath.editor;
     if (!editor) return;
 
     const canvas = editor.canvas;
     if (!canvas) return;
 
     let touchPath: fabric.Path | undefined;
-    let pathNode: PathNode<ResponsiveCrood> | undefined;
+    let pathNode: VizPathNode<RCrood> | undefined;
     let splitCrood: Crood | undefined;
     let disableAddToken: string | undefined;
 
@@ -299,12 +296,12 @@ class EditorBezier extends EditorModule {
       }
     };
 
-    editor.addCanvasEvent('mouse:move', (e) => {
+    editor.events.canvas.on('mouse:move', (e) => {
       clean();
 
       if (editor.get('mode') !== Mode.ADD) return;
 
-      if (e.target && e.target[Editor.symbol]) return;
+      if (e.target && e.target[VizPathEditor.symbol]) return;
 
       if (e.target && e.target.type === 'activeSelection') return;
 
@@ -312,7 +309,7 @@ class EditorBezier extends EditorModule {
 
       let minDistance = Infinity;
 
-      editor.paths.forEach(({ segment, pathObject }) => {
+      editor.paths.forEach(({ nodes, pathObject }) => {
         if (!pathObject.containsPoint(e.pointer)) return;
 
         const { x, y } = editor.calcRelativeCrood(
@@ -325,7 +322,7 @@ class EditorBezier extends EditorModule {
 
         const validDistance = Math.max((pathObject.strokeWidth ?? 0) / 2 || 1, 1);
 
-        for (const item of segment) {
+        for (const item of nodes) {
           let points: Crood[] = [];
 
           if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0]))
@@ -383,7 +380,7 @@ class EditorBezier extends EditorModule {
       }
     });
 
-    editor.addCanvasEvent('mouse:down:before', (e) => {
+    editor.events.canvas.on('mouse:down:before', (e) => {
       if (!pathNode || !splitCrood) return;
 
       const { pre } = vizpath.getNeighboringInstructions(pathNode, true);
@@ -421,9 +418,6 @@ class EditorBezier extends EditorModule {
 
   // 创建虚拟节点
   private _createVirtualNode(): fabric.Object {
-    const ui = this.vizpath?.context.find(EditorUI);
-    const theme = ui?.theme?.[this.options.virtualNodeKey] ?? ui?.theme?.node ?? DEFAULT_THEME.node;
-
     let decorated = false;
 
     const decorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
@@ -447,16 +441,12 @@ class EditorBezier extends EditorModule {
         });
       });
 
-      if (ui && callback) {
-        ui.objectPreRenderCallbackMap.set(customObject, callback);
-      }
-
       decorated = true;
 
       return customObject;
     };
 
-    let object = theme(decorator);
+    let object: fabric.Object = this.themes.create('virtualNode')(decorator);
     if (!decorated) object = decorator(object);
 
     return object;
@@ -464,22 +454,9 @@ class EditorBezier extends EditorModule {
 
   // 创建虚拟参考路径线
   private _createVirtualPath(): fabric.Path {
-    const ui = this.vizpath?.context.find(EditorUI);
-    const theme =
-      ui?.theme?.[this.options.virtualPathKey] ??
-      (() => {
-        const path = new fabric.Path('M 0 0', {
-          fill: 'transparent',
-          stroke: '#bebebe',
-          strokeWidth: 1,
-        });
-
-        return path;
-      });
-
     let decorated = false;
 
-    const decorator: ThemeDecorator<fabric.Line> = (customPath, callback) => {
+    const decorator: ThemeDecorator<fabric.Path> = (customPath, callback) => {
       customPath.set({
         name: uuid(),
         // 选中时不出现选中框
@@ -495,16 +472,12 @@ class EditorBezier extends EditorModule {
         objectCaching: false,
       });
 
-      if (ui && callback) {
-        ui.objectPreRenderCallbackMap.set(customPath, callback);
-      }
-
       decorated = true;
 
       return customPath;
     };
 
-    let path = theme(decorator);
+    let path = this.themes.create('virtualPath')(decorator);
     if (!decorated) path = decorator(path);
 
     return path;
@@ -517,21 +490,21 @@ class EditorBezier extends EditorModule {
    * @returns 构成曲线路径的变换点
    */
   private _findQuadraticCurvePoint(
-    originNode: PathNode<ResponsiveCrood>,
+    originNode: VizPathNode<RCrood>,
     newNodePoint: Crood,
   ): Crood | undefined {
-    const editor = this.vizpath?.context.find(Editor);
+    const editor = this.vizpath?.editor;
     if (!editor) return;
 
     if (!originNode.node) return;
 
     let curveDotPoint: Crood | undefined;
 
-    if (originNode === originNode.segment[0]) {
+    if (originNode === originNode.segment.nodes[0]) {
       curveDotPoint = originNode.curveDots?.next;
     }
 
-    if (originNode === originNode.segment[originNode.segment.length - 1]) {
+    if (originNode === originNode.segment.nodes[originNode.segment.nodes.length - 1]) {
       curveDotPoint = originNode.curveDots?.pre;
     }
 
@@ -542,7 +515,7 @@ class EditorBezier extends EditorModule {
 
   // 增强编辑器添加节点交互
   private _strengthenAddEvent(vizpath: Vizpath) {
-    const editor = vizpath.context.find(Editor);
+    const editor = vizpath.editor;
     if (!editor) return;
 
     const canvas = editor.canvas;
@@ -570,8 +543,12 @@ class EditorBezier extends EditorModule {
       const node = editor.objectNodeMap.get(activeNode);
       if (!node) return false;
 
-      if (vizpath.isClosePath(node.segment)) return false;
-      if (node !== node.segment[0] && node !== node.segment[node.segment.length - 1]) return false;
+      if (vizpath.isCloseSegment(node.segment)) return false;
+      if (
+        node !== node.segment.nodes[0] &&
+        node !== node.segment.nodes[node.segment.nodes.length - 1]
+      )
+        return false;
 
       if (this.splitDot && canvas.contains(this.splitDot)) return false;
 
@@ -604,7 +581,7 @@ class EditorBezier extends EditorModule {
       return true;
     };
 
-    editor.addCanvasEvent('mouse:move', (e) => {
+    editor.events.canvas.on('mouse:move', (e) => {
       const render = () => {
         if (editor.get('mode') !== 'add') return false;
 
@@ -613,7 +590,7 @@ class EditorBezier extends EditorModule {
 
         if (e.target) {
           if (
-            e.target[Editor.symbol] === EditorSymbolType.NODE &&
+            e.target[VizPathEditor.symbol] === EditorSymbolType.NODE &&
             editor.checkLinkable(activeNode, e.target)
           ) {
             return renderVirtualObjects(
@@ -632,14 +609,14 @@ class EditorBezier extends EditorModule {
       if (!render()) cleanVirtualObjects();
     });
 
-    editor.on('added', (object: fabric.Object) => {
+    editor.events.on('added', (object: fabric.Object) => {
       if (curvePoint) {
         const node = editor.objectNodeMap.get(object);
         if (!node) return;
 
-        let _node: PathNode<ResponsiveCrood> | undefined;
+        let _node: VizPathNode<RCrood> | undefined;
         if (node.instruction[0] === InstructionType.START) {
-          _node = node.segment[1];
+          _node = node.segment.nodes[1];
         } else {
           _node = node;
         }
@@ -656,7 +633,7 @@ class EditorBezier extends EditorModule {
       cleanVirtualObjects();
     });
 
-    editor.on('closed', (object: fabric.Object) => {
+    editor.events.on('closed', (object: fabric.Object) => {
       if (curvePoint) {
         const node = editor.objectNodeMap.get(object);
         if (!node) return;
@@ -675,7 +652,7 @@ class EditorBezier extends EditorModule {
       cleanVirtualObjects();
     });
 
-    editor.on('set', () => {
+    editor.events.on('set', () => {
       if (editor.get('mode') !== 'add') {
         cleanVirtualObjects();
       }

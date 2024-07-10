@@ -1,0 +1,111 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  overflow: hidden;
+}
+
+.page {
+  height: 100vh;
+  margin: 0 auto;
+  display: flex;
+  align-items: stretch;
+
+  .instruction {
+    overflow: auto;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+
+      &-track {
+        background: transparent;
+        border-radius: 2px;
+      }
+
+      &-thumb {
+        background: #66666633;
+        border-radius: 8px;
+        transition: all .1s;
+      }
+
+      &-thumb:hover {
+        background: #66666666;
+      }
+
+      &-corner {
+        background: transparent;
+      }
+    }
+
+    .logo {
+      z-index: 1;
+      position: sticky;
+      top: 0;
+      background-color: white;
+      padding: 20px 32px 12px;
+
+      .title {
+        font-size: 24px;
+        line-height: 32px;
+      }
+
+      .description {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #666666;
+      }
+    }
+
+    .content {
+      margin-bottom: 12px;
+    }
+
+    &>main {
+      padding: 0 32px;
+    }
+
+    &.maximize {
+      flex: 1;
+    }
+
+    &.minimize {
+      z-index: 0;
+      position: absolute;
+      pointer-events: none;
+
+      .logo {
+        background-color: unset;
+      }
+
+      &>main {
+        display: none;
+      }
+    }
+
+    &.half {
+      z-index: 999999;
+      max-width: 650px;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.08), 0 0 12px rgba(0, 0, 0, 0.04);
+    }
+    
+  }
+
+  .container {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    & > aside {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+}

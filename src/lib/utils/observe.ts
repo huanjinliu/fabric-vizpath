@@ -1,5 +1,7 @@
 import cloneDeep from 'lodash-es/cloneDeep';
 
+type ArrayElement<A> = A extends (infer T)[] ? T : never;
+
 /**
  * 注册响应式
  */

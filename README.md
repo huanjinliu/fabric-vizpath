@@ -1,3 +1,3 @@
-# fabric-path-editor
+# fabric-vizpath
 
-fabricjs路径编辑器
+fabric可视化路径编辑库

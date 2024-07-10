@@ -1,5 +1,6 @@
 import { fabric } from 'fabric';
-import type { ThemeConfigurators } from '../../lib/modules/editor-ui/index.class';
+import type VizPath from '../../lib/vizpath.class';
+import type { ThemeDecorator } from '../../lib/modules/editor-theme/index.class';
 
 export type ThemeShareState = {
   selectedNodes: fabric.Object[];
@@ -7,8 +8,11 @@ export type ThemeShareState = {
   selectedLine: fabric.Line | null;
 };
 
-const photoshopTheme = ((editor, shareState) => {
-  editor.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
+const photoshopTheme = (vizpath: VizPath, shareState: ThemeShareState) => {
+  const editor = vizpath.editor;
+  if (!editor) return {};
+
+  editor.events.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
     shareState.selectedNodes = nodes;
     shareState.selectedPoint = point;
     if (point) {
@@ -16,20 +20,20 @@ const photoshopTheme = ((editor, shareState) => {
     }
   });
 
-  editor.on('deselected', () => {
+  editor.events.on('deselected', () => {
     shareState.selectedNodes = [];
     shareState.selectedPoint = null;
     shareState.selectedLine = null;
   });
 
   return {
-    path: (decorator, pathObject) => {
+    path: (decorator: ThemeDecorator<fabric.Path>, pathObject: fabric.Path) => {
       pathObject.set({
         stroke: '#1884ec',
         strokeWidth: 1,
       });
     },
-    node: (decorator) => {
+    node: (decorator: ThemeDecorator<fabric.Object>) => {
       const rect = new fabric.Rect({
         width: 6,
         height: 6,
@@ -44,7 +48,7 @@ const photoshopTheme = ((editor, shareState) => {
         });
       });
     },
-    dot: (decorator) => {
+    dot: (decorator: ThemeDecorator<fabric.Object>) => {
       const circle = new fabric.Circle({
         radius: 3,
         fill: '#ffffff',
@@ -58,7 +62,7 @@ const photoshopTheme = ((editor, shareState) => {
         });
       });
     },
-    line: (decorator) => {
+    line: (decorator: ThemeDecorator<fabric.Line>) => {
       const line = new fabric.Line([0, 0, 0, 0], {
         stroke: '#1884ec',
         strokeWidth: 1,
@@ -67,6 +71,6 @@ const photoshopTheme = ((editor, shareState) => {
       return line;
     },
   };
-}) as ThemeConfigurators<ThemeShareState>;
+};
 
 export default photoshopTheme;
