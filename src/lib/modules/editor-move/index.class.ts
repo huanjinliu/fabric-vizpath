@@ -93,14 +93,10 @@ class EditorMoveModule extends VizPathModule {
 
   /** 偏移画布 */
   move(canvas: fabric.Canvas, offset: Crood) {
-    const newTransform = [
-      ...(canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]).slice(0, 4),
-      offset.x,
-      offset.y,
-    ];
-    canvas.setViewportTransform(newTransform);
-    canvas.requestRenderAll();
-
+    canvas.absolutePan({
+      x: -offset.x,
+      y: -offset.y,
+    });
     this.events.fire('move', canvas);
   }
 

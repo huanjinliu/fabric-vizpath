@@ -62,25 +62,15 @@ class EditorZoom extends VizPathModule {
    * @param zoomCenter 缩放中心点
    */
   zoom(canvas: fabric.Canvas, newZoom: number, zoomCenter?: { x: number; y: number }) {
-    const matrix = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
-    const [zoom, , , , offsetX, offsetY] = matrix;
-
     const width = canvas.getWidth();
     const height = canvas.getHeight();
 
-    const canvasZoomCenter = fabric.util.transformPoint(
+    canvas.zoomToPoint(
       zoomCenter
         ? new fabric.Point(zoomCenter.x, zoomCenter.y)
         : new fabric.Point(width / 2, height / 2),
-      fabric.util.invertTransform(matrix),
+      newZoom,
     );
-    const offset = {
-      x: width * (newZoom - zoom) * (canvasZoomCenter.x / width),
-      y: height * (newZoom - zoom) * (canvasZoomCenter.y / height),
-    };
-
-    canvas.setViewportTransform([newZoom, 0, 0, newZoom, offsetX - offset.x, offsetY - offset.y]);
-    canvas.requestRenderAll();
 
     this.events.fire('zoom', canvas);
   }

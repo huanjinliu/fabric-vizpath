@@ -10444,10 +10444,10 @@
 	  return _createClass(EditorMoveModule, [{
 	    key: "move",
 	    value: function move(canvas, offset) {
-	      var _a;
-	      var newTransform = [].concat(_toConsumableArray(((_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0]).slice(0, 4)), [offset.x, offset.y]);
-	      canvas.setViewportTransform(newTransform);
-	      canvas.requestRenderAll();
+	      canvas.absolutePan({
+	        x: -offset.x,
+	        y: -offset.y
+	      });
 	      this.events.fire('move', canvas);
 	    }
 	    /**
@@ -10639,21 +10639,9 @@
 	  }, {
 	    key: "zoom",
 	    value: function zoom(canvas, newZoom, zoomCenter) {
-	      var _a;
-	      var matrix = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0];
-	      var _matrix = _slicedToArray(matrix, 6),
-	        zoom = _matrix[0],
-	        offsetX = _matrix[4],
-	        offsetY = _matrix[5];
 	      var width = canvas.getWidth();
 	      var height = canvas.getHeight();
-	      var canvasZoomCenter = fabric.fabric.util.transformPoint(zoomCenter ? new fabric.fabric.Point(zoomCenter.x, zoomCenter.y) : new fabric.fabric.Point(width / 2, height / 2), fabric.fabric.util.invertTransform(matrix));
-	      var offset = {
-	        x: width * (newZoom - zoom) * (canvasZoomCenter.x / width),
-	        y: height * (newZoom - zoom) * (canvasZoomCenter.y / height)
-	      };
-	      canvas.setViewportTransform([newZoom, 0, 0, newZoom, offsetX - offset.x, offsetY - offset.y]);
-	      canvas.requestRenderAll();
+	      canvas.zoomToPoint(zoomCenter ? new fabric.fabric.Point(zoomCenter.x, zoomCenter.y) : new fabric.fabric.Point(width / 2, height / 2), newZoom);
 	      this.events.fire('zoom', canvas);
 	    }
 	  }, {
