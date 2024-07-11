@@ -75,9 +75,11 @@ const DEFAULT_OPTIONS: EditorBezierOptions = {
 class EditorBezier extends EditorModule {
   static ID = 'editor-bezier';
 
-  splitDot: fabric.Object | null = null;
-
   options: EditorBezierOptions;
+
+  splitDot: fabric.Object | null = null;
+  virtualPath: fabric.Path | null = null;
+  virtualNode: fabric.Object | null = null;
 
   constructor(options: Partial<EditorBezierOptions> = {}) {
     super();
@@ -244,16 +246,6 @@ class EditorBezier extends EditorModule {
     if (!decorated) object = decorator(object);
 
     return object;
-  }
-
-  // 清除拆分点
-  private _destorySplitDot(vizpath: Vizpath) {
-    if (!this.splitDot) return;
-    const ui = vizpath.context.find(EditorUI);
-    ui?.objectPreRenderCallbackMap.delete(this.splitDot);
-
-    this.splitDot.canvas?.remove(this.splitDot);
-    this.splitDot = null;
   }
 
   // 增强变换事件: 直接点击节点实现直线/曲线切换
@@ -572,15 +564,12 @@ class EditorBezier extends EditorModule {
     let activeNode: fabric.Object | undefined;
     let movePointPosition: Position | undefined;
     let hideNode: boolean;
-
-    let virtualPath: fabric.Path | undefined;
-    let virtualNode: fabric.Object | undefined;
     let curvePoint: Crood | undefined;
 
     const cleanVirtualObjects = () => {
       canvas.renderOnAddRemove = false;
-      if (virtualPath && canvas.contains(virtualPath)) canvas.remove(virtualPath);
-      if (virtualNode && canvas.contains(virtualNode)) canvas.remove(virtualNode);
+      if (this.virtualPath && canvas.contains(this.virtualPath)) canvas.remove(this.virtualPath);
+      if (this.virtualNode && canvas.contains(this.virtualNode)) canvas.remove(this.virtualNode);
       canvas.renderOnAddRemove = true;
       canvas.requestRenderAll();
 
@@ -604,26 +593,26 @@ class EditorBezier extends EditorModule {
 
       curvePoint = this._findQuadraticCurvePoint(node, editor.calcRelativeCrood(position, path));
 
-      virtualNode = virtualNode ?? this._createVirtualNode();
-      virtualPath = virtualPath ?? this._createVirtualPath();
+      this.virtualNode = this.virtualNode ?? this._createVirtualNode();
+      this.virtualPath = this.virtualPath ?? this._createVirtualPath();
 
-      virtualNode.set(position);
+      this.virtualNode.set(position);
       if (curvePoint) {
         const { left, top } = editor.calcAbsolutePosition(curvePoint, path);
-        virtualPath.initialize([
+        this.virtualPath.initialize([
           [InstructionType.START, activeNode.left, activeNode.top],
           [InstructionType.QUADRATIC_CURCE, left, top, position.left, position.top],
         ] as any);
       } else {
-        virtualPath.initialize([
+        this.virtualPath.initialize([
           [InstructionType.START, activeNode.left, activeNode.top],
           [InstructionType.LINE, position.left, position.top],
         ] as any);
       }
 
       canvas.renderOnAddRemove = false;
-      if (!editor.canvas!.contains(virtualPath)) editor.canvas!.add(virtualPath);
-      if (!editor.canvas!.contains(virtualNode) && !hideNode) editor.canvas!.add(virtualNode);
+      if (!editor.canvas!.contains(this.virtualPath)) editor.canvas!.add(this.virtualPath);
+      if (!editor.canvas!.contains(this.virtualNode) && !hideNode) editor.canvas!.add(this.virtualNode);
       canvas.renderOnAddRemove = true;
       editor.canvas?.requestRenderAll();
       return true;
@@ -715,7 +704,20 @@ class EditorBezier extends EditorModule {
   }
 
   unload(vizpath: Vizpath) {
-    this._destorySplitDot(vizpath);
+    const ui = vizpath.context.find(EditorUI);
+    const objects = [
+      this.splitDot,
+      this.virtualPath,
+      this.virtualNode,
+    ]
+    objects.forEach(object => {
+      if (!object) return;
+      ui?.objectPreRenderCallbackMap.delete(object);
+      object.canvas?.remove(object);
+    })
+    this.splitDot = null;
+    this.virtualPath = null;
+    this.virtualNode = null;
   }
 
   load(vizpath: Vizpath) {
