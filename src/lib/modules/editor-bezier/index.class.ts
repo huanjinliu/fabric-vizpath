@@ -1,25 +1,20 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
 import { Bezier } from 'bezier-js';
-import type Vizpath from '../../../lib/vizpath.class';
+import type Vizpath from '../../vizpath.class';
+import VizPathModule from '../../vizpath-module.class';
 import {
-  InstructionType,
-  type Instruction,
-  type RCrood,
-  type VizPathNode,
-} from '../../../lib/vizpath.class';
-import VizPathModule from '../../../lib/vizpath-module.class';
-import {
-  calcCanvasCrood,
+  calcCanvasCoord,
   curveFromLine,
   curveFromPoint,
   deepIterateGroup,
   splitInstruction,
 } from '@utils';
 import defaultsDeep from 'lodash-es/defaultsDeep';
-import VizPathTheme from '../../../lib/vizpath-theme.class';
+import VizPathTheme from '../../vizpath-theme.class';
 import type { ThemeDecorator } from '../editor-theme/index.class';
-import VizPathEditor, { EditorSymbolType, Mode } from '../../../lib/vizpath-editor.class';
+import VizPathEditor, { EditorSymbolType, Mode } from '../../vizpath-editor.class';
+import { InstructionType, type Instruction, type PathNode } from 'src/lib/path.class';
 
 type EditorBezierOptions = {
   /**
@@ -279,15 +274,15 @@ class EditorBezier extends VizPathModule {
     if (!canvas) return;
 
     let touchPath: fabric.Path | undefined;
-    let pathNode: VizPathNode<RCrood> | undefined;
-    let splitCrood: Crood | undefined;
+    let pathNode: PathNode | undefined;
+    let splitCoord: Coord | undefined;
     let disableAddToken: string | undefined;
 
     const clean = () => {
       if (pathNode) {
         if (this.splitDot) canvas.remove(this.splitDot);
         pathNode = undefined;
-        splitCrood = undefined;
+        splitCoord = undefined;
       }
 
       if (disableAddToken) {
@@ -305,65 +300,67 @@ class EditorBezier extends VizPathModule {
 
       if (e.target && e.target.type === 'activeSelection') return;
 
-      const pointer = calcCanvasCrood(canvas, e.pointer);
+      const pointer = calcCanvasCoord(canvas, e.pointer);
 
       let minDistance = Infinity;
 
-      editor.paths.forEach(({ nodes, pathObject }) => {
-        if (!pathObject.containsPoint(e.pointer)) return;
+      vizpath.paths.forEach(({ segments, object }) => {
+        if (!object.containsPoint(e.pointer)) return;
 
-        const { x, y } = editor.calcRelativeCrood(
+        const { x, y } = editor.calcRelativeCoord(
           {
             left: pointer.x,
             top: pointer.y,
           },
-          pathObject,
+          object,
         );
 
-        const validDistance = Math.max((pathObject.strokeWidth ?? 0) / 2 || 1, 1);
+        const validDistance = Math.max((object.strokeWidth ?? 0) / 2 || 1, 1);
 
-        for (const item of nodes) {
-          let points: Crood[] = [];
+        segments.forEach((segment) => {
+          for (const item of segment) {
+            let points: Coord[] = [];
 
-          if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0]))
-            continue;
-          if (item.instruction[0] === InstructionType.LINE) {
-            const { pre } = vizpath.getNeighboringNodes(item, true);
-            points = [
-              pre!.node!,
-              { x: item.instruction[1], y: item.instruction[2] },
-              { x: item.instruction[1], y: item.instruction[2] },
-            ];
-          } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
-            const { pre } = vizpath.getNeighboringNodes(item, true);
-            points = [
-              pre!.node!,
-              { x: item.instruction[1], y: item.instruction[2] },
-              { x: item.instruction[3], y: item.instruction[4] },
-            ];
-          } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
-            const { pre } = vizpath.getNeighboringNodes(item, true);
-            points = [
-              pre!.node!,
-              { x: item.instruction[1], y: item.instruction[2] },
-              { x: item.instruction[3], y: item.instruction[4] },
-              { x: item.instruction[5], y: item.instruction[6] },
-            ];
+            if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0]))
+              continue;
+            if (item.instruction[0] === InstructionType.LINE) {
+              const { pre } = vizpath.getNeighboringNodes(item, true);
+              points = [
+                pre!.node!,
+                { x: item.instruction[1], y: item.instruction[2] },
+                { x: item.instruction[1], y: item.instruction[2] },
+              ];
+            } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
+              const { pre } = vizpath.getNeighboringNodes(item, true);
+              points = [
+                pre!.node!,
+                { x: item.instruction[1], y: item.instruction[2] },
+                { x: item.instruction[3], y: item.instruction[4] },
+              ];
+            } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
+              const { pre } = vizpath.getNeighboringNodes(item, true);
+              points = [
+                pre!.node!,
+                { x: item.instruction[1], y: item.instruction[2] },
+                { x: item.instruction[3], y: item.instruction[4] },
+                { x: item.instruction[5], y: item.instruction[6] },
+              ];
+            }
+            const bezier = new Bezier(points);
+            const p = bezier.project({ x, y });
+
+            if (p.d && p.d < validDistance && p.d < minDistance) {
+              minDistance = p.d;
+              touchPath = object;
+              pathNode = item;
+              splitCoord = p;
+            }
           }
-          const bezier = new Bezier(points);
-          const p = bezier.project({ x, y });
-
-          if (p.d && p.d < validDistance && p.d < minDistance) {
-            minDistance = p.d;
-            touchPath = pathObject;
-            pathNode = item;
-            splitCrood = p;
-          }
-        }
+        });
       });
 
-      if (touchPath && pathNode && splitCrood) {
-        const { x, y } = splitCrood;
+      if (touchPath && pathNode && splitCoord) {
+        const { x, y } = splitCoord;
         const { left, top } = editor.calcAbsolutePosition({ x, y }, touchPath);
 
         if (!this.splitDot && !this.options.disabledSplitDot) {
@@ -381,7 +378,7 @@ class EditorBezier extends VizPathModule {
     });
 
     editor.events.canvas.on('mouse:down:before', (e) => {
-      if (!pathNode || !splitCrood) return;
+      if (!pathNode || !splitCoord) return;
 
       const { pre } = vizpath.getNeighboringInstructions(pathNode, true);
       if (!pre || !pre.node) return;
@@ -397,9 +394,9 @@ class EditorBezier extends VizPathModule {
               });
             }
             return list;
-          }, [] as Crood[]),
+          }, [] as Coord[]),
         ],
-        splitCrood,
+        splitCoord,
       );
 
       const node = vizpath.replace(pathNode, splitCurves.pre);
@@ -489,22 +486,19 @@ class EditorBezier extends VizPathModule {
    * @param newNodePoint 新添加的节点
    * @returns 构成曲线路径的变换点
    */
-  private _findQuadraticCurvePoint(
-    originNode: VizPathNode<RCrood>,
-    newNodePoint: Crood,
-  ): Crood | undefined {
+  private _findQuadraticCurvePoint(originNode: PathNode, newNodePoint: Coord): Coord | undefined {
     const editor = this.vizpath?.editor;
     if (!editor) return;
 
     if (!originNode.node) return;
 
-    let curveDotPoint: Crood | undefined;
+    let curveDotPoint: Coord | undefined;
 
-    if (originNode === originNode.segment.nodes[0]) {
+    if (originNode === originNode.segment[0]) {
       curveDotPoint = originNode.curveDots?.next;
     }
 
-    if (originNode === originNode.segment.nodes[originNode.segment.nodes.length - 1]) {
+    if (originNode === originNode.segment[originNode.segment.length - 1]) {
       curveDotPoint = originNode.curveDots?.pre;
     }
 
@@ -523,7 +517,7 @@ class EditorBezier extends VizPathModule {
 
     let virtualPath: fabric.Path | undefined;
     let virtualNode: fabric.Object | undefined;
-    let curvePoint: Crood | undefined;
+    let curvePoint: Coord | undefined;
 
     const cleanVirtualObjects = () => {
       canvas.renderOnAddRemove = false;
@@ -544,17 +538,13 @@ class EditorBezier extends VizPathModule {
       if (!node) return false;
 
       if (vizpath.isCloseSegment(node.segment)) return false;
-      if (
-        node !== node.segment.nodes[0] &&
-        node !== node.segment.nodes[node.segment.nodes.length - 1]
-      )
-        return false;
+      if (node !== node.segment[0] && node !== node.segment[node.segment.length - 1]) return false;
 
       if (this.splitDot && canvas.contains(this.splitDot)) return false;
 
-      const path = editor.nodePathMap.get(node.node!)!.pathObject;
+      const path = node.path.object;
 
-      curvePoint = this._findQuadraticCurvePoint(node, editor.calcRelativeCrood(position, path));
+      curvePoint = this._findQuadraticCurvePoint(node, editor.calcRelativeCoord(position, path));
 
       virtualNode = virtualNode ?? this._createVirtualNode();
       virtualPath = virtualPath ?? this._createVirtualPath();
@@ -600,7 +590,7 @@ class EditorBezier extends VizPathModule {
             );
           }
         } else {
-          const pointer = calcCanvasCrood(editor.canvas!, e.pointer);
+          const pointer = calcCanvasCoord(editor.canvas!, e.pointer);
           return renderVirtualObjects(activeNode, { left: pointer.x, top: pointer.y });
         }
 
@@ -614,9 +604,9 @@ class EditorBezier extends VizPathModule {
         const node = editor.objectNodeMap.get(object);
         if (!node) return;
 
-        let _node: VizPathNode<RCrood> | undefined;
+        let _node: PathNode | undefined;
         if (node.instruction[0] === InstructionType.START) {
-          _node = node.segment.nodes[1];
+          _node = node.segment[1];
         } else {
           _node = node;
         }

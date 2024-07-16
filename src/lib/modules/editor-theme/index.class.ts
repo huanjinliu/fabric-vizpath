@@ -1,6 +1,6 @@
 import VizPath from '../../vizpath.class';
 import VizPathModule from '../../vizpath-module.class';
-import VizPathEvent from '../../../lib/vizpath-event.class';
+import VizPathEvent from '../../vizpath-event.class';
 
 export type ThemeDecorator<InputType, OutputType = InputType> = (
   customObject: InputType,

@@ -1,6 +1,6 @@
 import isEqual from 'lodash-es/isEqual';
-import type VizPath from '../../../lib/vizpath.class';
-import VizPathModule from '../../../lib/vizpath-module.class';
+import type VizPath from '../../vizpath.class';
+import VizPathModule from '../../vizpath-module.class';
 
 type CombinationKey = 'alt' | 'ctrl' | 'shift' | 'meta';
 

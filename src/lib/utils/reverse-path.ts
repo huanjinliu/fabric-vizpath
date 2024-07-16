@@ -1,4 +1,4 @@
-import { InstructionType, type Instruction } from '../vizpath.class';
+import { InstructionType, type Instruction } from '../path.class';
 
 /**
  * 反转路径
@@ -12,11 +12,11 @@ const reversePath = (path: Instruction[]) => {
     const instruction = path[i];
 
     const preInstruction = path[i - 1];
-    const preMajorPointCrood = preInstruction?.slice(preInstruction.length - 2) as number[];
+    const preMajorPointCoord = preInstruction?.slice(preInstruction.length - 2) as number[];
 
     if (i === path.length - 1) {
       if (instruction[0] === InstructionType.CLOSE) {
-        _path.push([InstructionType.START, ...preMajorPointCrood] as Instruction);
+        _path.push([InstructionType.START, ...preMajorPointCoord] as Instruction);
       } else {
         _path.push([
           InstructionType.START,
@@ -30,14 +30,14 @@ const reversePath = (path: Instruction[]) => {
         if (isClosePath) _path.push([InstructionType.CLOSE]);
         break;
       case InstructionType.LINE:
-        _path.push([InstructionType.LINE, ...preMajorPointCrood]);
+        _path.push([InstructionType.LINE, ...preMajorPointCoord]);
         break;
       case InstructionType.QUADRATIC_CURCE:
         _path.push([
           InstructionType.QUADRATIC_CURCE,
           instruction[1],
           instruction[2],
-          ...preMajorPointCrood,
+          ...preMajorPointCoord,
         ]);
         break;
       case InstructionType.BEZIER_CURVE:
@@ -47,7 +47,7 @@ const reversePath = (path: Instruction[]) => {
           instruction[4],
           instruction[1],
           instruction[2],
-          ...preMajorPointCrood,
+          ...preMajorPointCoord,
         ]);
         break;
       case InstructionType.CLOSE:

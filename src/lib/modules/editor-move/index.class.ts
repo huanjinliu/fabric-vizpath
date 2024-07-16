@@ -1,16 +1,9 @@
 import { fabric } from 'fabric';
-import type Vizpath from '../../../lib/vizpath.class';
-import VizPathModule from '../../../lib/vizpath-module.class';
-import VizPathEvent from '../../../lib/vizpath-event.class';
+import type Vizpath from '../../vizpath.class';
+import VizPathModule from '../../vizpath-module.class';
+import VizPathEvent from '../../vizpath-event.class';
 
 export interface EditorMoveOptions {
-  /**
-   * 默认偏移
-   */
-  defaultOffset?: {
-    x: number;
-    y: number;
-  };
   /**
    * 是否默认允许拖拽
    * @default true
@@ -40,7 +33,6 @@ export interface EditorMoveOptions {
 
 /** 默认内容区配置 */
 const DEFAUlT_OPTIONS: Required<EditorMoveOptions> = {
-  defaultOffset: { x: 0, y: 0 },
   movable: true,
   spaceHoverCursor: 'move',
   moveCursor: 'move',
@@ -92,7 +84,7 @@ class EditorMoveModule extends VizPathModule {
   };
 
   /** 偏移画布 */
-  move(canvas: fabric.Canvas, offset: Crood) {
+  move(canvas: fabric.Canvas, offset: Coord) {
     canvas.absolutePan({
       x: -offset.x,
       y: -offset.y,
@@ -133,7 +125,7 @@ class EditorMoveModule extends VizPathModule {
     // 是否按下空格
     let space = false;
     // 起始移动坐标
-    let moveInitDistance: Crood | undefined;
+    let moveInitDistance: Coord | undefined;
     // 如果允许右键移动
     if (this._options.rightClickMove) {
       canvas.fireRightClick = true;
@@ -250,9 +242,6 @@ class EditorMoveModule extends VizPathModule {
     editor.events.canvas.on('mouse:down', moveHandlers.start);
     editor.events.canvas.on('mouse:move', moveHandlers.moving);
     editor.events.canvas.on('mouse:up', moveHandlers.finish);
-
-    const { defaultOffset } = this._options;
-    this.move(canvas, defaultOffset);
   }
 
   unload(vizpath: Vizpath) {}

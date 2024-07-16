@@ -1,12 +1,14 @@
 /**
  * 基础类
  */
+export { default as Path } from './lib/path.class';
+export type { PathNode, PathSegment, Instruction, InstructionType } from './lib/path.class';
+
 export { default as VizPath } from './lib/vizpath.class';
 export { default as VizPathTheme } from './lib/vizpath-theme.class';
 export { default as VizPathEvent } from './lib/vizpath-event.class';
 export { default as VizPathDOMEvent } from './lib/vizpath-dom-event.class';
 export { default as VizPathModule } from './lib/vizpath-module.class';
-export type { VizPathNode, VizPathSegment } from './lib/vizpath.class';
 
 /**
  * 内置模块类

@@ -1,6 +1,11 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect } from 'react';
 import { fabric } from 'fabric';
 import {
+  EditorBackground,
+  EditorMove,
+  EditorResize,
+  EditorZoom,
+  Path,
   VizPath,
   // Editor,
   // EditorBackground,
@@ -15,6 +20,7 @@ import {
 import { Instruction, PageContext } from '../Page';
 import content from './README.md';
 import { Markdown } from '../_components';
+import paths from '../paths.json';
 
 function Demo02() {
   const { canvas, currentDemo, setVizpath } = useContext(PageContext);
@@ -233,14 +239,41 @@ function Demo02() {
     if (!canvas) return;
     if (currentDemo !== Instruction._02_MORE_DRAWING_WAYS) return;
 
-    console.log('02');
-
-    const vizpath = new VizPath('', {
-      refreshPathTriggerTime: 'auto',
-      refreshDeferDuration: 10,
+    const path = new fabric.Path(paths.shapes, {
+      objectCaching: false,
+      noScaleCache: false,
+      fill: '#e1e1e1',
+      stroke: '#333',
+      strokeWidth: 2,
+      strokeDashArray: [5, 5],
+      // strokeLineJoin: 'round',
+      originX: 'center',
+      originY: 'center',
+      left: 0,
+      top: 0,
+      angle: 0,
+      // scaleX: 2,
+      // scaleY: 2,
     });
+    // canvas.add(path);
 
-    console.log(vizpath);
+    const vizpath = new VizPath();
+
+    vizpath
+      .use(new EditorBackground())
+      .use(new EditorMove())
+      .use(new EditorZoom())
+      .use(new EditorResize())
+      .mount(canvas);
+
+    vizpath.draw(path);
+
+    // const _paths = await Path.loadFabricPathFromURL('https://scannables.scdn.co/uri/plain/svg/000000/white/640/spotify:track:5h9dlUlCGZahkuaC3MShz3');
+    // _paths.forEach(path => {
+    //   vizpath.draw(path);
+    // });
+
+    setVizpath(vizpath);
   }, [currentDemo, canvas, setVizpath]);
 
   useEffect(() => {

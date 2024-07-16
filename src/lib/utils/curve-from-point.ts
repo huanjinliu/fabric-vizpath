@@ -1,7 +1,7 @@
 /**
  * 通过点与点实现曲线化
  */
-const curveFromPoint = (point0: Crood, point: Crood) => {
+const curveFromPoint = (point0: Coord, point: Coord) => {
   const centerPoint = {
     x: (point.x + point0.x) / 2,
     y: (point.y + point0.y) / 2,
@@ -12,7 +12,7 @@ const curveFromPoint = (point0: Crood, point: Crood) => {
     x: centerPoint.x - dy,
     y: centerPoint.y + dx,
   };
-  return midPoint as Crood;
+  return midPoint as Coord;
 };
 
 export default curveFromPoint;

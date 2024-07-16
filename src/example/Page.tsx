@@ -95,7 +95,7 @@ const Page = () => {
 
   const [canvas, setCanvas] = useState<fabric.Canvas>();
   const [vizpath, setVizpath] = useState<VizPath>();
-  const [currentDemo, setCurrentDemo] = useState<string>(Instruction._01_INSTALL_AND_START);
+  const [currentDemo, setCurrentDemo] = useState<string>(Instruction._02_MORE_DRAWING_WAYS);
 
   const initial = useCallback(async () => {
     if (!_canvasEl.current) return;
@@ -169,7 +169,10 @@ const Page = () => {
             <IconButton
               name="position"
               onClick={() => {
-                vizpath?.editor?.canvas?.setViewportTransform([1, 0, 0, 1, 0, 0]);
+                const canvas = vizpath?.editor?.canvas;
+                if (!canvas) return;
+                const center = canvas.getCenter();
+                canvas.setViewportTransform([1, 0, 0, 1, center.left, center.top]);
               }}
             />
             <IconButton

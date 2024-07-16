@@ -8,8 +8,8 @@ import transform from './transform';
 const clearPathOffset = (path: fabric.Path) => {
   const segment = path.path as unknown as [string, ...number[]];
   segment.forEach((item, pathIdx) => {
-    const [, ...croods] = item as unknown as [type: string, ...croods: number[]];
-    for (let i = 0; i < croods.length; i += 2) {
+    const [, ...coords] = item as unknown as [type: string, ...coords: number[]];
+    for (let i = 0; i < coords.length; i += 2) {
       const { x, y } = transform(
         {
           x: segment[pathIdx][i + 1] as number,

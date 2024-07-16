@@ -1,10 +1,10 @@
 import cloneDeep from 'lodash-es/cloneDeep';
-import type { Instruction } from '../vizpath.class';
+import type { Instruction } from '../path.class';
 
 /**
  * 获取二阶曲线的三阶表现
  */
-const getCubicFromQuadratic = (p0: Crood, instruction: Instruction) => {
+const getCubicFromQuadratic = (p0: Coord, instruction: Instruction) => {
   // 如果不是二阶直接返回
   if (instruction[0] !== 'Q') return cloneDeep(instruction);
 
@@ -12,7 +12,7 @@ const getCubicFromQuadratic = (p0: Crood, instruction: Instruction) => {
   const points = Array.from({ length: 2 }).map((_, i) => ({
     x: instruction[i * 2 + 1],
     y: instruction[i * 2 + 2],
-  })) as Crood[];
+  })) as Coord[];
 
   // 二阶贝塞尔曲线的点
   const [p1, p2] = points;

@@ -7,9 +7,9 @@ export { default as deepIterateGroup } from './deep-iterate-group';
 export { default as fireFabricMouseDown } from './fire-fabric-mouse-down';
 export { default as fireFabricMouseUp } from './fire-fabric-mouse-up';
 export { default as fireMouseUpAndSelect } from './fire-mouse-up-and-select';
-export { default as calcCroodsAngle } from './calc-croods-angle';
-export { default as calcCroodsDistance } from './calc-croods-distance';
-export { default as calcCanvasCrood } from './calc-canvas-crood';
+export { default as calcCoordsAngle } from './calc-coords-angle';
+export { default as calcCoordsDistance } from './calc-coords-distance';
+export { default as calcCanvasCoord } from './calc-canvas-coord';
 
 /**
  * 路径操作

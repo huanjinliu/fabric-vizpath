@@ -1,11 +1,11 @@
 import { Bezier } from 'bezier-js';
 import { fabric } from 'fabric';
-import { InstructionType, type Instruction } from '../vizpath.class';
+import { InstructionType, type Instruction } from '../path.class';
 
-/**
+/**s
  * 根据路径指令上的一点拆分路径指令
  */
-const splitInstruction = (points: Crood[], point: Crood) => {
+const splitInstruction = (points: Coord[], point: Coord) => {
   if (points.length === 2) {
     return {
       pre: [InstructionType.LINE, point.x, point.y] as Instruction,

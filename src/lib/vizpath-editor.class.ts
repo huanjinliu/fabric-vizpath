@@ -1,9 +1,9 @@
 import { fabric } from 'fabric';
 import { v4 as uuid } from 'uuid';
 import type { ThemeDecorator } from './modules/editor-theme/index.class';
-import calcCanvasCrood from './utils/calc-canvas-crood';
-import calcCroodsAngle from './utils/calc-croods-angle';
-import calcCroodsDistance from './utils/calc-croods-distance';
+import calcCanvasCoord from './utils/calc-canvas-coord';
+import calcCoordsAngle from './utils/calc-coords-angle';
+import calcCoordsDistance from './utils/calc-coords-distance';
 import deepIterateGroup from './utils/deep-iterate-group';
 import fireMouseUpAndSelect from './utils/fire-mouse-up-and-select';
 import transform from './utils/transform';
@@ -13,13 +13,9 @@ import reversePath from './utils/reverse-path';
 import VizPathDOMEvent from './vizpath-dom-event.class';
 import VizPathModule from './vizpath-module.class';
 import VizPathTheme from './vizpath-theme.class';
-import VizPath, {
-  type VizPathNode,
-  type RCrood,
-  type VizPathSegment,
-  InstructionType,
-  type Instruction,
-} from './vizpath.class';
+import VizPath from './vizpath.class';
+import Path, { InstructionType } from './path.class';
+import type { PathNode, PathSegment, Instruction, RCoord } from './path.class';
 
 export enum EditorSymbolType {
   PATH = 'path',
@@ -69,8 +65,8 @@ type EditorSetting = {
 
 type EditorCurveDot = {
   type: 'pre' | 'next';
-  pathNode: VizPathNode<RCrood>;
-  curveDot: RCrood;
+  pathNode: PathNode;
+  curveDot: RCoord;
   node: fabric.Object;
   point: fabric.Object;
   line: fabric.Line;
@@ -90,12 +86,7 @@ class VizPathEditor extends VizPathModule {
     dot: (decorator: ThemeDecorator<fabric.Object>) => fabric.Object;
     line: (decorator: ThemeDecorator<fabric.Line>) => fabric.Line;
   } = {
-    path: (decorator, pathObject) => {
-      pathObject.set({
-        stroke: '#4b4b4b',
-        strokeWidth: 1,
-      });
-    },
+    path: (decorator, pathObject) => {},
     node: () => {
       const circle = new fabric.Circle({
         radius: 3,
@@ -163,14 +154,6 @@ class VizPathEditor extends VizPathModule {
     Record<'add' | 'remove' | 'upgrade' | 'degrade' | 'convert' | 'link', string[]>
   > = {};
 
-  /* ---------------------------- 路径相关配置 ---------------------------- */
-
-  /** 路径汇总 */
-  paths: VizPathSegment<RCrood>[] = [];
-
-  /** 节点路径映射 */
-  nodePathMap = new Map<RCrood, VizPathSegment<RCrood>>([]);
-
   /* ---------------------------- 节点相关配置 ---------------------------- */
 
   /** 路径节点对象 */
@@ -180,10 +163,10 @@ class VizPathEditor extends VizPathModule {
   curveDots: EditorCurveDot[] = [];
 
   /** 元素画布对象 与 路径节点对象 映射 */
-  objectNodeMap: Map<fabric.Object, VizPathNode<RCrood>> = new Map([]);
+  objectNodeMap: Map<fabric.Object, PathNode> = new Map([]);
 
   /** 路径节点对象 与 元素画布对象 映射 */
-  nodeObjectMap: Map<VizPathNode<RCrood>, fabric.Object> = new Map([]);
+  nodeObjectMap: Map<PathNode, fabric.Object> = new Map([]);
 
   /** 当前活跃的路径节点画布对象列表 */
   activeNodes: fabric.Object[] = [];
@@ -281,7 +264,7 @@ class VizPathEditor extends VizPathModule {
   /**
    * 将画布坐标转化为特定路径的相对指令坐标位置
    */
-  calcAbsolutePosition(crood: Crood, object: fabric.Object): Position {
+  calcAbsolutePosition(coord: Coord, object: fabric.Object): Position {
     const matrix = [...object.calcOwnMatrix()];
 
     // 路径如果带有偏移则需要移除偏移带来的影响
@@ -296,7 +279,7 @@ class VizPathEditor extends VizPathModule {
       matrix[5] -= offset.y;
     }
 
-    const point = fabric.util.transformPoint(new fabric.Point(crood.x, crood.y), matrix);
+    const point = fabric.util.transformPoint(new fabric.Point(coord.x, coord.y), matrix);
 
     return { left: point.x, top: point.y };
   }
@@ -304,7 +287,7 @@ class VizPathEditor extends VizPathModule {
   /**
    * 将路径内的相对指令坐标位置转为所在画布的坐标位置
    */
-  calcRelativeCrood(position: Position, object: fabric.Object): Crood {
+  calcRelativeCoord(position: Position, object: fabric.Object): Coord {
     const matrix = [...object.calcOwnMatrix()];
 
     if (object.type === 'path') {
@@ -349,55 +332,42 @@ class VizPathEditor extends VizPathModule {
     const canvas = this.canvas;
     if (!canvas) return;
 
-    const handler = (paths: VizPathSegment<RCrood>[]) => {
-      paths.forEach((item) => {
-        const { pathObject } = item;
+    const handler = (path: Path) => {
+      const { object } = path;
 
-        // 如果已经带有标志则是已经添加进画布的路径
-        if (pathObject[VizPathEditor.symbol]) return;
+      // 如果已经带有标志则是已经添加进画布的路径
+      if (object[VizPathEditor.symbol]) return;
 
-        const centerPoint = pathObject.getCenterPoint();
+      const centerPoint = object.getCenterPoint();
 
-        const decorator: ThemeDecorator<fabric.Path> = (customPath, callback) => {
-          customPath.set({
-            name: uuid(),
-            // 路径本身不可选中，后续通过操纵点和线条来更改路径
-            selectable: false,
-            // 不触发事件
-            evented: false,
-            // 防止因为缓存没有显示正确的路径
-            objectCaching: false,
-          });
+      const decorator: ThemeDecorator<fabric.Path> = (customPath, callback) => {
+        customPath.set({
+          name: uuid(),
+          // 路径本身不可选中，后续通过操纵点和线条来更改路径
+          selectable: false,
+          // 不触发事件
+          evented: false,
+          // 防止因为缓存没有显示正确的路径
+          objectCaching: false,
+        });
 
-          // 避免路径轮廓宽度影响到路径偏移
-          customPath.setPositionByOrigin(centerPoint, 'center', 'center');
+        // 避免路径轮廓宽度影响到路径偏移
+        customPath.setPositionByOrigin(centerPoint, 'center', 'center');
 
-          customPath[VizPathEditor.symbol] = EditorSymbolType.PATH;
+        customPath[VizPathEditor.symbol] = EditorSymbolType.PATH;
 
-          return customPath;
-        };
+        return customPath;
+      };
 
-        this.themes.create('path')(decorator, pathObject);
+      this.themes.create('path')(decorator, object);
 
-        if (!pathObject[VizPathEditor.symbol]) decorator(pathObject);
-      });
+      if (!object[VizPathEditor.symbol]) decorator(object);
 
       // 添加新的路径对象
       canvas.renderOnAddRemove = true;
-      paths.forEach(({ pathObject }) => {
-        if (!canvas.contains(pathObject)) canvas.add(pathObject);
-      });
+      if (!canvas.contains(object)) canvas.add(object);
       canvas.renderOnAddRemove = false;
       canvas.requestRenderAll();
-
-      this.paths.push(...paths);
-
-      // 建立映射关系，便于减少后续计算
-      this.paths.forEach((item) => {
-        item.nodes.forEach(({ node }) => {
-          if (node) this.nodePathMap.set(node, item);
-        });
-      });
     };
     vizpath.events.on('draw', handler);
   }
@@ -409,27 +379,12 @@ class VizPathEditor extends VizPathModule {
     const canvas = this.canvas;
     if (!canvas) return;
 
-    const handler = (paths: VizPathSegment<RCrood>[]) => {
-      canvas.remove(...paths.map((i) => i.pathObject));
-
-      this.paths = this.paths.filter((i) => paths.includes(i));
-
-      // 清除映射
-      paths.forEach((item) => {
-        item.nodes.forEach(({ node }) => {
-          if (node) this.nodePathMap.delete(node);
-        });
-      });
+    const handler = (path: Path) => {
+      canvas.remove(path.object);
     };
     vizpath.events.on('clear', handler);
     vizpath.events.on('clearAll', () => {
-      canvas.remove(...this.paths.map((i) => i.pathObject));
-      this.paths.forEach((item) => {
-        item.nodes.forEach(({ node }) => {
-          if (node) this.nodePathMap.delete(node);
-        });
-      });
-      this.paths = [];
+      canvas.remove(...vizpath.paths.map((i) => i.object));
     });
   }
 
@@ -446,7 +401,7 @@ class VizPathEditor extends VizPathModule {
      * @param node 路径节点
      * @param originObject 来源对象
      */
-    const createNodeObject = (node: RCrood, originObject?: fabric.Object) => {
+    const createNodeObject = (node: RCoord, originObject?: fabric.Object) => {
       const decorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
         customObject.set({
           name: uuid(),
@@ -480,10 +435,10 @@ class VizPathEditor extends VizPathModule {
           (x, y) => {
             const position = this.calcAbsolutePosition(
               { x, y },
-              this.nodePathMap.get(node)!.pathObject,
+              vizpath.coordNodeMap.get(node)!.path.object,
             );
             if (object.group) {
-              const relativePosition = this.calcRelativeCrood(position, object.group);
+              const relativePosition = this.calcRelativeCoord(position, object.group);
               object
                 .set({
                   left: relativePosition.x,
@@ -518,42 +473,46 @@ class VizPathEditor extends VizPathModule {
     };
 
     // 第一轮遍历为了重用旧对象，避免每次更新fabric对象都变化还需要重新处理聚焦事件
-    vizpath.segments.forEach(({ nodes }) => {
-      nodes.forEach((item) => {
-        const { node } = item;
-        if (!node) return;
+    vizpath.paths.forEach((path) => {
+      path.segments.forEach((segment) => {
+        segment.forEach((item) => {
+          const { node } = item;
+          if (!node) return;
 
-        const reuseObject = this.nodeObjectMap.get(item);
-        if (reuseObject) {
-          const object = createNodeObject(node, reuseObject);
+          const reuseObject = this.nodeObjectMap.get(item);
+          if (reuseObject) {
+            const object = createNodeObject(node, reuseObject);
+            if (!object) return;
+
+            objects.push(object);
+            objectNodeMap.set(object, item);
+            nodeObjectMap.set(item, object);
+          }
+        });
+      });
+    });
+
+    // 第二轮遍历则是为了创建新对象
+    vizpath.paths.forEach((path) => {
+      path.segments.forEach((segment) => {
+        segment.forEach((item) => {
+          const { node } = item;
+          if (!node) return;
+
+          if (nodeObjectMap.has(item)) return;
+
+          let recycleObject: fabric.Object | undefined;
+          do {
+            recycleObject = this._abandonedPool.nodes.pop();
+          } while (recycleObject && objectNodeMap.has(recycleObject));
+
+          const object = createNodeObject(node, recycleObject);
           if (!object) return;
 
           objects.push(object);
           objectNodeMap.set(object, item);
           nodeObjectMap.set(item, object);
-        }
-      });
-    });
-
-    // 第二轮遍历则是为了创建新对象
-    vizpath.segments.forEach(({ nodes }) => {
-      nodes.forEach((item) => {
-        const { node } = item;
-        if (!node) return;
-
-        if (nodeObjectMap.has(item)) return;
-
-        let recycleObject: fabric.Object | undefined;
-        do {
-          recycleObject = this._abandonedPool.nodes.pop();
-        } while (recycleObject && objectNodeMap.has(recycleObject));
-
-        const object = createNodeObject(node, recycleObject);
-        if (!object) return;
-
-        objects.push(object);
-        objectNodeMap.set(object, item);
-        nodeObjectMap.set(item, object);
+        });
       });
     });
 
@@ -614,10 +573,10 @@ class VizPathEditor extends VizPathModule {
     const canvas = this.canvas;
     if (!canvas) return;
 
-    vizpath.events.on('clear', (segment) => {
+    vizpath.events.on('clear', (path) => {
       const removeObjects: fabric.Object[] = [];
-      segment.forEach(({ nodes }) => {
-        nodes.forEach((node) => {
+      path.segments.forEach((segment) => {
+        segment.forEach((node) => {
           const object = this.nodeObjectMap.get(node);
           if (object) removeObjects.push(object);
         });
@@ -663,18 +622,18 @@ class VizPathEditor extends VizPathModule {
       if (!group.canvas) return;
       if (group._objects.length !== initialObjectCount) return;
       this.vizpath?.onceRerenderOriginPath(() => {
-        const hadFollowedCroods = new Set<RCrood>([]);
+        const hadFollowedCoords = new Set<RCoord>([]);
         for (const object of group._objects as fabric.Object[]) {
-          const followCurveDots: RCrood[] = [];
+          const followCurveDots: RCoord[] = [];
           const pathNode = this.objectNodeMap.get(object)!;
           const curveDots = this.vizpath?.getNeighboringCurveDots(pathNode) ?? [];
           curveDots?.forEach(({ position, direction, from }) => {
-            const crood = from.curveDots?.[direction];
-            if (position !== 'cur' || !crood) return;
+            const coord = from.curveDots?.[direction];
+            if (position !== 'cur' || !coord) return;
             // 避免重复的曲线变换点跟随更改
-            if (hadFollowedCroods.has(crood)) return;
-            followCurveDots.push(crood);
-            hadFollowedCroods.add(crood);
+            if (hadFollowedCoords.has(coord)) return;
+            followCurveDots.push(coord);
+            hadFollowedCoords.add(coord);
           });
 
           object.set({
@@ -698,7 +657,7 @@ class VizPathEditor extends VizPathModule {
             followCurveDots,
           );
         }
-        hadFollowedCroods.clear();
+        hadFollowedCoords.clear();
       });
     });
   }
@@ -710,13 +669,13 @@ class VizPathEditor extends VizPathModule {
     observe(object, ['left', 'top'], ({ left, top }) => {
       if (object.group) return;
 
-      const followCurveDots: RCrood[] = [];
+      const followCurveDots: RCoord[] = [];
       const pathNode = this.objectNodeMap.get(object)!;
       const curveDots = this.vizpath?.getNeighboringCurveDots(pathNode) ?? [];
       curveDots?.forEach(({ position, direction, from }) => {
-        const crood = from.curveDots?.[direction];
-        if (position !== 'cur' || !crood) return;
-        followCurveDots.push(crood);
+        const coord = from.curveDots?.[direction];
+        if (position !== 'cur' || !coord) return;
+        followCurveDots.push(coord);
       });
 
       this._transform(object, { left: left!, top: top! }, followCurveDots);
@@ -743,19 +702,18 @@ class VizPathEditor extends VizPathModule {
     this.events.canvas.on('mouse:dblclick', (e) => {
       if (e.target && e.target[VizPathEditor.symbol]) return;
 
-      let focusPath: (typeof this.paths)[number] | undefined;
-      for (let i = this.paths.length - 1; i >= 0; i--) {
-        const path = this.paths[i];
-        if (path.pathObject.containsPoint(e.pointer)) {
+      const paths = this.vizpath?.paths ?? [];
+      let focusPath: Path | undefined;
+      for (let i = paths.length - 1; i >= 0; i--) {
+        const path = paths[i];
+        if (path.object.containsPoint(e.pointer)) {
           focusPath = path;
           break;
         }
       }
       if (focusPath) {
         this.focus(
-          ...this.nodes.filter(
-            (node) => this.nodePathMap.get(this.objectNodeMap.get(node)!.node!) === focusPath,
-          ),
+          ...this.nodes.filter((node) => this.objectNodeMap.get(node)!.path === focusPath),
         );
       }
     });
@@ -789,7 +747,7 @@ class VizPathEditor extends VizPathModule {
       }
       // 新增节点
       else {
-        const pointer = calcCanvasCrood(canvas, event.pointer);
+        const pointer = calcCanvasCoord(canvas, event.pointer);
         target = this.add({ left: pointer.x, top: pointer.y });
         if (target) {
           this.currentConvertNodeObject = target;
@@ -840,7 +798,7 @@ class VizPathEditor extends VizPathModule {
 
     // 创建新的路径曲线变换点
     const curveDots: EditorCurveDot[] = [];
-    const curveDotSet = new WeakSet<RCrood>([]);
+    const curveDotSet = new WeakSet<RCoord>([]);
     const neighboringCurveDots = vizpath
       .getNeighboringCurveDots(curPathNode)
       .filter(({ direction, from }) => {
@@ -910,7 +868,7 @@ class VizPathEditor extends VizPathModule {
             if (point.canvas?.getActiveObject() === point) return;
             const position = this.calcAbsolutePosition(
               { x, y },
-              this.nodePathMap.get(node)!.pathObject,
+              vizpath.coordNodeMap.get(node)!.path.object,
             );
             point.set(position).setCoords();
           },
@@ -937,12 +895,12 @@ class VizPathEditor extends VizPathModule {
 
             // 响应式更改指令信息
             if (point.canvas?.getActiveObject() === point) {
-              const crood = this.calcRelativeCrood(
+              const coord = this.calcRelativeCoord(
                 {
                   left: left!,
                   top: top!,
                 },
-                this.nodePathMap.get(node)!.pathObject,
+                vizpath.coordNodeMap.get(node)!.path.object,
               );
               // 曲线变换点对称操作
               const symmetricMode =
@@ -954,23 +912,23 @@ class VizPathEditor extends VizPathModule {
                 if (symmetricCurveDot) {
                   const { curveDot: _curveDot } = symmetricCurveDot;
                   // 旧镜像曲线变换点到路径节点的距离
-                  const d = calcCroodsDistance(_curveDot, node);
+                  const d = calcCoordsDistance(_curveDot, node);
                   // 新镜像曲线变换点到路径节点的距离
-                  const new_d = calcCroodsDistance(
+                  const new_d = calcCoordsDistance(
                     {
-                      x: node.x - (crood.x - node.x),
-                      y: node.y - (crood.y - node.y),
+                      x: node.x - (coord.x - node.x),
+                      y: node.y - (coord.y - node.y),
                     },
                     node,
                   );
                   const scale = symmetricMode === 'entire' ? 1 : d / new_d;
-                  _curveDot.setCrood({
-                    x: node.x - (crood.x - node.x) * scale,
-                    y: node.y - (crood.y - node.y) * scale,
+                  _curveDot.setCoord({
+                    x: node.x - (coord.x - node.x) * scale,
+                    y: node.y - (coord.y - node.y) * scale,
                   });
                 }
               }
-              curveDot.setCrood(crood, [point.name]);
+              curveDot.setCoord(coord, [point.name]);
             }
           },
           true,
@@ -1025,7 +983,7 @@ class VizPathEditor extends VizPathModule {
           (x, y) => {
             const position = this.calcAbsolutePosition(
               { x, y },
-              this.nodePathMap.get(node)!.pathObject,
+              vizpath.coordNodeMap.get(node)!.path.object,
             );
             line.set({ x1: position.left, y1: position.top });
           },
@@ -1038,7 +996,7 @@ class VizPathEditor extends VizPathModule {
           (x, y) => {
             const position = this.calcAbsolutePosition(
               { x, y },
-              this.nodePathMap.get(node)!.pathObject,
+              vizpath.coordNodeMap.get(node)!.path.object,
             );
             line.set({ x2: position.left, y2: position.top });
           },
@@ -1072,7 +1030,7 @@ class VizPathEditor extends VizPathModule {
     });
 
     // 添加新的画布元素
-    const baseIndex = canvas._objects.indexOf(this.paths[0].pathObject) + this.paths.length;
+    const baseIndex = canvas._objects.indexOf(vizpath.paths[0].object) + vizpath.paths.length;
     curveDots.forEach((i, idx) => {
       canvas.insertAt(i.line, baseIndex + idx, false);
       canvas.add(i.point);
@@ -1085,13 +1043,13 @@ class VizPathEditor extends VizPathModule {
   /**
    * 获取路径节点进行转换的配置
    */
-  private _getConvertibleNodes(node: VizPathNode<RCrood>) {
+  private _getConvertibleNodes(node: PathNode) {
     if (!this.vizpath) return [];
 
     const { instruction } = node;
     const { pre, next } = this.vizpath.getNeighboringInstructions(node);
 
-    const convertibleNodes: ['pre' | 'next', VizPathNode<RCrood>][] = [];
+    const convertibleNodes: ['pre' | 'next', PathNode][] = [];
 
     switch (instruction[0]) {
       case InstructionType.START:
@@ -1171,10 +1129,10 @@ class VizPathEditor extends VizPathModule {
       // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
       if (target.containsPoint(event.pointer)) return;
 
-      const pointer = calcCanvasCrood(canvas, event.pointer);
+      const pointer = calcCanvasCoord(canvas, event.pointer);
 
       const targetNode = this.objectNodeMap.get(target)!;
-      const pathObject = this.nodePathMap.get(targetNode.node!)!.pathObject;
+      const pathObject = targetNode.path.object;
       const neighboringNodes = this.vizpath!.getNeighboringNodes(targetNode, true);
 
       // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
@@ -1184,8 +1142,8 @@ class VizPathEditor extends VizPathModule {
         convertibleNodes = this._getConvertibleNodes(targetNode);
       }
 
-      const position = this.calcRelativeCrood({ left: pointer.x, top: pointer.y }, pathObject);
-      const antiPosition = this.calcRelativeCrood(
+      const position = this.calcRelativeCoord({ left: pointer.x, top: pointer.y }, pathObject);
+      const antiPosition = this.calcRelativeCoord(
         {
           left: target.left! - (pointer.x - target.left!),
           top: target.top! - (pointer.y - target.top!),
@@ -1197,20 +1155,20 @@ class VizPathEditor extends VizPathModule {
       if (convertibleNodes.length > 1) {
         convertibleNodes.sort((a, b) => {
           return (
-            calcCroodsAngle(position, targetNode.node!, neighboringNodes[a[0]]!.node!) -
-            calcCroodsAngle(position, targetNode.node!, neighboringNodes[b[0]]!.node!)
+            calcCoordsAngle(position, targetNode.node!, neighboringNodes[a[0]]!.node!) -
+            calcCoordsAngle(position, targetNode.node!, neighboringNodes[b[0]]!.node!)
           );
         });
       }
 
       convertibleNodes.forEach((item, index) => {
-        const newCrood = [position, antiPosition][index];
+        const newCoord = [position, antiPosition][index];
         const newInstruction = [...item[1].instruction] as Instruction;
         newInstruction[0] = {
           [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
           [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
         }[newInstruction[0]];
-        newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCrood.x, newCrood.y);
+        newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCoord.x, newCoord.y);
         this.vizpath?.replace(item[1], newInstruction);
       });
 
@@ -1266,7 +1224,7 @@ class VizPathEditor extends VizPathModule {
       scaleY?: number;
       angle?: number;
     },
-    followCurveDots: RCrood[] = [],
+    followCurveDots: RCoord[] = [],
   ) {
     const pathNode = this.objectNodeMap.get(object);
     if (!pathNode) return;
@@ -1275,33 +1233,36 @@ class VizPathEditor extends VizPathModule {
 
     const { left, top, scaleX = 1, scaleY = 1, angle = 0 } = options;
 
-    const newCrood = this.calcRelativeCrood({ left, top }, this.nodePathMap.get(node!)!.pathObject);
+    const newCoord = this.calcRelativeCoord(
+      { left, top },
+      this.vizpath!.coordNodeMap.get(node!)!.path.object,
+    );
 
     // 需要跟随变化的曲线曲线变换点
     followCurveDots.forEach((curveDot) => {
       if (!curveDot) return;
       const relativeDiff = transform(
         {
-          x: curveDot.x - newCrood.x,
-          y: curveDot.y - newCrood.y,
+          x: curveDot.x - newCoord.x,
+          y: curveDot.y - newCoord.y,
         },
         [
           {
             translate: {
-              x: newCrood.x - node!.x,
-              y: newCrood.y - node!.y,
+              x: newCoord.x - node!.x,
+              y: newCoord.y - node!.y,
             },
           },
           { scale: { x: scaleX, y: scaleY } },
           { rotate: angle },
         ],
       );
-      curveDot.x = newCrood.x + relativeDiff.x;
-      curveDot.y = newCrood.y + relativeDiff.y;
+      curveDot.x = newCoord.x + relativeDiff.x;
+      curveDot.y = newCoord.y + relativeDiff.y;
     });
 
     // 节点位置更新
-    node!.setCrood(newCrood, [object!.name]);
+    node!.setCoord(newCoord, [object!.name]);
 
     object.canvas?.requestRenderAll();
   }
@@ -1373,38 +1334,34 @@ class VizPathEditor extends VizPathModule {
       // 如果当前节点已闭合或非端点，无法实现节点添加
       if (vizpath.isCloseSegment(segment)) return;
 
-      const newCrood = this.calcRelativeCrood(
-        position,
-        this.nodePathMap.get(pathNode.node!)!.pathObject,
-      );
+      const newCoord = this.calcRelativeCoord(position, pathNode.path.object);
 
       // 如果是起始点
       if (pathNode === segment[0]) {
         // 添加新的起始
         const addPathNode = vizpath.insertBeforeNode(pathNode, [
           InstructionType.START,
-          newCrood.x,
-          newCrood.y,
+          newCoord.x,
+          newCoord.y,
         ]);
         if (!addPathNode) return;
 
         return this.nodeObjectMap.get(addPathNode);
       }
       // 如果是末尾端点
-      else if (pathNode === segment.nodes[segment.nodes.length - 1]) {
+      else if (pathNode === segment[segment.length - 1]) {
         const addPathNode = vizpath.insertAfterNode(pathNode, [
           InstructionType.LINE,
-          newCrood.x,
-          newCrood.y,
+          newCoord.x,
+          newCoord.y,
         ]);
         if (!addPathNode) return;
 
         return this.nodeObjectMap.get(addPathNode);
       }
     } else {
-      const path = VizPath.parseFabricPath(new fabric.Path('M 0 0', position));
-      const segments = vizpath.draw(path);
-      return this.nodeObjectMap.get(segments[0].nodes[0]);
+      const paths = vizpath.draw('M 0 0', position);
+      return this.nodeObjectMap.get(paths[0].segments[0][0]);
     }
   }
 
@@ -1440,7 +1397,7 @@ class VizPathEditor extends VizPathModule {
     );
 
     if (nodeObjects.length) {
-      const removeNodes: RCrood[] = [];
+      const removeNodes: RCoord[] = [];
       nodeObjects.forEach((object) => {
         const { node } = this.objectNodeMap.get(object)!;
         if (!node) return;
@@ -1483,7 +1440,7 @@ class VizPathEditor extends VizPathModule {
       next,
     };
 
-    const targets: [direction: 'pre' | 'next', pathNode: VizPathNode<RCrood>][] = [];
+    const targets: [direction: 'pre' | 'next', pathNode: PathNode][] = [];
 
     if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
       targets.push(['pre', directionNodeMap.pre]);
@@ -1534,7 +1491,7 @@ class VizPathEditor extends VizPathModule {
       next,
     };
 
-    const targets: [direction: 'pre' | 'next', pathNode: VizPathNode<RCrood>][] = [];
+    const targets: [direction: 'pre' | 'next', pathNode: PathNode][] = [];
 
     if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
       targets.push(['pre', directionNodeMap.pre]);
@@ -1608,8 +1565,8 @@ class VizPathEditor extends VizPathModule {
     }
 
     // 不同路径需要进行合并
-    let sourcePath = source.segment.nodes.map((i) => i.instruction);
-    let targetPath = target.segment.nodes.map((i) => i.instruction);
+    let sourcePath = source.segment.map((i) => i.instruction);
+    let targetPath = target.segment.map((i) => i.instruction);
 
     if (source.instruction === sourcePath[0]) {
       sourcePath = reversePath(sourcePath);
@@ -1623,11 +1580,11 @@ class VizPathEditor extends VizPathModule {
       for (let i = 0; i < instruction.length - 1; i += 2) {
         const position = this.calcAbsolutePosition(
           new fabric.Point(instruction[i + 1] as number, instruction[i + 2] as number),
-          target.segment.pathObject,
+          target.path.object,
         );
-        const crood = this.calcRelativeCrood(position, target.segment.pathObject);
-        instruction[i + 1] = crood.x;
-        instruction[i + 2] = crood.y;
+        const coord = this.calcRelativeCoord(position, target.path.object);
+        instruction[i + 1] = coord.x;
+        instruction[i + 2] = coord.y;
       }
     });
     const joinIndex = sourcePath.length;
@@ -1635,11 +1592,11 @@ class VizPathEditor extends VizPathModule {
 
     // 合并后添加回路径段集合
     const newPath = vizpath.onceRerenderOriginPath(() => {
-      vizpath.clear(target.segment.nodes);
-      return vizpath.replacePathSegments(source.segment, [mergePath] as Instruction[][]);
+      vizpath.clearPathSegment(target.path, target.segment);
+      return vizpath.redraw(source.path, mergePath as Instruction[]);
     });
 
-    return newPath[0].nodes[joinIndex];
+    return newPath[0].segments[0][joinIndex];
   }
 
   focus(...selectedObjects: fabric.Object[]) {
@@ -1728,14 +1685,14 @@ class VizPathEditor extends VizPathModule {
       const relativeDot = this.getRelativeCurveDot(this.activePoint)!;
       if (
         relativeDot &&
-        180 - calcCroodsAngle(dot.curveDot, dot.pathNode.node!, relativeDot.curveDot) <=
+        180 - calcCoordsAngle(dot.curveDot, dot.pathNode.node!, relativeDot.curveDot) <=
           this.deviation
       ) {
         this.dotSymmetricAutoMode = 'angle';
         if (
           Math.abs(
-            calcCroodsDistance(dot.curveDot, dot.pathNode.node!) -
-              calcCroodsDistance(dot.pathNode.node!, relativeDot.curveDot),
+            calcCoordsDistance(dot.curveDot, dot.pathNode.node!) -
+              calcCoordsDistance(dot.pathNode.node!, relativeDot.curveDot),
           ) <= this.deviation
         ) {
           this.dotSymmetricAutoMode = 'entire';
@@ -1752,12 +1709,12 @@ class VizPathEditor extends VizPathModule {
     this.focus();
   }
 
-  unload() {
+  unload(vizpath: VizPath) {
     const canvas = this.canvas;
     if (!canvas) return;
 
     canvas.remove(
-      ...this.paths.map((i) => i.pathObject),
+      ...vizpath.paths.map((i) => i.object),
       ...this.nodes,
       ...this.curveDots.map((i) => i.point),
       ...this.curveDots.map((i) => i.line),
@@ -1776,10 +1733,6 @@ class VizPathEditor extends VizPathModule {
     this._abandonedPool.nodes.length = 0;
     this._abandonedPool.points.length = 0;
     this._abandonedPool.lines.length = 0;
-
-    // 路径相关配置
-    this.paths.length = 0;
-    this.nodePathMap.clear();
 
     // 画布相关配置
     this.events.clear();

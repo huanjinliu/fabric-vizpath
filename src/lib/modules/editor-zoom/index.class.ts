@@ -1,13 +1,9 @@
 import { fabric } from 'fabric';
-import type Vizpath from '../../../lib/vizpath.class';
-import VizPathModule from '../../../lib/vizpath-module.class';
-import VizPathEvent from '../../../lib/vizpath-event.class';
+import type Vizpath from '../../vizpath.class';
+import VizPathModule from '../../vizpath-module.class';
+import VizPathEvent from '../../vizpath-event.class';
 
 export interface EditorZoomOptions {
-  /**
-   * 默认缩放值
-   */
-  defaultZoom?: number;
   /**
    * 是否允许缩放
    * @default true
@@ -26,7 +22,6 @@ export interface EditorZoomOptions {
 }
 
 const DEFAUlT_OPTIONS: Required<EditorZoomOptions> = {
-  defaultZoom: 1,
   zoomable: true,
   zoomCenter: 'mouse',
   zoomLimit: [0.5, 5],
@@ -92,21 +87,19 @@ class EditorZoom extends VizPathModule {
       const { offsetX, offsetY, deltaY } = event.e;
       const dZoom = 0.999 ** (deltaY / 2);
       const newZoom = Math.min(Math.max(zoom * dZoom, zoomLimit[0]), zoomLimit[1]);
+      const canvasCenter = canvas.getCenter();
 
       this.zoom(
         canvas,
         newZoom,
         {
-          canvas: { x: canvas.getWidth() / 2, y: canvas.getHeight() / 2 },
+          canvas: { x: canvasCenter.left, y: canvasCenter.top },
           mouse: { x: offsetX, y: offsetY },
         }[zoomCenter],
       );
     };
 
     editor.events.canvas.on('mouse:wheel', handler);
-
-    const { defaultZoom } = this._options;
-    this.zoom(canvas, defaultZoom);
   }
 
   unload(vizpath: Vizpath) {}

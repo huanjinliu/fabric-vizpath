@@ -1,7 +1,7 @@
 import throttle from 'lodash-es/throttle';
-import type Vizpath from '../../../lib/vizpath.class';
-import VizPathModule from '../../../lib/vizpath-module.class';
-import VizPathEvent from '../../../lib/vizpath-event.class';
+import type Vizpath from '../../vizpath.class';
+import VizPathModule from '../../vizpath-module.class';
+import VizPathEvent from '../../vizpath-event.class';
 
 export interface EditorResizeOptions {
   /**
@@ -10,15 +10,15 @@ export interface EditorResizeOptions {
    */
   interval?: number;
   /**
-   * 自动居中
-   * @default true
+   * 自动调整视图偏移
+   * @default 'center'
    */
-  autoCenter?: boolean;
+  autoAdjustView?: 'leftTop' | 'center' | 'none';
 }
 
 const DEFAUlT_OPTIONS: Required<EditorResizeOptions> = {
   interval: 60,
-  autoCenter: true,
+  autoAdjustView: 'center',
 };
 
 class EditorResize extends VizPathModule {
@@ -49,6 +49,27 @@ class EditorResize extends VizPathModule {
     this._parentNode = null;
   }
 
+  resize(canvas: fabric.Canvas, width: number, height: number) {
+    const oldWidth = canvas.getWidth();
+    const oldHeight = canvas.getHeight();
+
+    const viewportTransform = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+    const offset = {
+      leftTop: { x: 0, y: 0 },
+      center: { x: width / 2, y: height / 2 },
+      none: {
+        x: viewportTransform[4] + (width - oldWidth) / 2,
+        y: viewportTransform[5] + (height - oldHeight) / 2,
+      },
+    }[this._options.autoAdjustView];
+    const newViewportTransfrom = [...viewportTransform.slice(0, 4), offset.x, offset.y];
+
+    canvas.setViewportTransform(newViewportTransfrom);
+    canvas.setDimensions({ width, height });
+
+    this.events.fire('resize', canvas);
+  }
+
   /**
    * 流式布局尺寸变更监听
    */
@@ -59,7 +80,8 @@ class EditorResize extends VizPathModule {
     const canvas = editor.canvas;
     if (!canvas) return;
 
-    const parentNode = this._parentNode ?? canvas.getElement().parentNode?.parentNode;
+    const parentNode = (this._parentNode ??
+      canvas.getElement().parentNode?.parentNode) as HTMLDivElement;
     if (!parentNode) return;
 
     this._parentNode = parentNode as HTMLDivElement;
@@ -74,25 +96,12 @@ class EditorResize extends VizPathModule {
           const target = entries[0].target;
           if (!target) return;
 
-          const width = canvas.getWidth();
-          const height = canvas.getHeight();
-
           const { clientWidth: newWidth, clientHeight: newHeight } = target;
-          if (newWidth === width && newHeight === height) return;
-          const viewportTransform = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
-          const newViewportTransfrom = this._options.autoCenter
-            ? [...viewportTransform.slice(0, 4), 0, 0]
-            : [
-                ...viewportTransform.slice(0, 4),
-                viewportTransform[4] + (newWidth - width) / 2,
-                viewportTransform[5] + (newHeight - height) / 2,
-              ];
-          canvas.setViewportTransform(newViewportTransfrom);
-          canvas.setDimensions({
-            width: newWidth,
-            height: newHeight,
-          });
-          this.events.fire('resize', canvas);
+          const oldWidth = canvas.getWidth();
+          const oldHeight = canvas.getHeight();
+          if (newWidth === oldWidth && newHeight === oldHeight) return;
+
+          this.resize(canvas, newWidth, newHeight);
         },
         interval,
         {
@@ -104,6 +113,8 @@ class EditorResize extends VizPathModule {
     observer.observe(this._parentNode);
 
     this._observer = observer;
+
+    this.resize(canvas, parentNode.clientWidth, parentNode.clientHeight);
   }
 }
 

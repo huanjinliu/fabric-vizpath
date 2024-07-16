@@ -1,9 +1,9 @@
-import { InstructionType, type Instruction } from '../vizpath.class';
+import { InstructionType, type Instruction } from '../path.class';
 
 /**
  * 将二阶曲线转换为三阶贝塞尔曲线
  */
-const convertQuadraticToCubic = (p0: Crood, instruction: Instruction) => {
+const convertQuadraticToCubic = (p0: Coord, instruction: Instruction) => {
   // 如果不是二阶直接返回
   if (instruction[0] !== InstructionType.QUADRATIC_CURCE) return instruction;
 
@@ -11,7 +11,7 @@ const convertQuadraticToCubic = (p0: Crood, instruction: Instruction) => {
   const points = Array.from({ length: 2 }).map((_, i) => ({
     x: instruction[i * 2 + 1],
     y: instruction[i * 2 + 2],
-  })) as Crood[];
+  })) as Coord[];
 
   // 二阶贝塞尔曲线的点
   const [p1, p2] = points;

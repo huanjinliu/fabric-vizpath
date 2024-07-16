@@ -1,7 +1,7 @@
 import { fabric } from 'fabric';
 import defaultsDeep from 'lodash-es/defaultsDeep';
-import type Vizpath from '../../../lib/vizpath.class';
-import VizPathModule from '../../../lib/vizpath-module.class';
+import type Vizpath from '../../vizpath.class';
+import VizPathModule from '../../vizpath-module.class';
 
 type EditorBackgroundOptions = {
   grid?: boolean;
@@ -90,8 +90,8 @@ class EditorBackground extends VizPathModule {
             new fabric.Pattern({
               source: image,
               repeat: 'repeat',
-              offsetX: -(canvas.getWidth() % gridSize) / 2,
-              offsetY: -(canvas.getHeight() % gridSize) / 2,
+              // offsetX: -(canvas.getWidth() % gridSize) / 2,
+              // offsetY: -(canvas.getHeight() % gridSize) / 2,
             }),
             () => {
               canvas.requestRenderAll();

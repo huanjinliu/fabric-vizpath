@@ -1,7 +1,7 @@
 /**
  * 计算三点间的夹角，b为相交点
  */
-const calcCroodsAngle = (a: Crood, b: Crood, c: Crood) => {
+const calcCoordsAngle = (a: Coord, b: Coord, c: Coord) => {
   const angleA = Math.atan2(b.y - a.y, b.x - a.x);
   const angleC = Math.atan2(b.y - c.y, b.x - c.x);
   let angle = Math.abs(angleA - angleC) * (180 / Math.PI);
@@ -11,4 +11,4 @@ const calcCroodsAngle = (a: Crood, b: Crood, c: Crood) => {
   return angle;
 };
 
-export default calcCroodsAngle;
+export default calcCoordsAngle;

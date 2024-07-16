@@ -1,13 +1,13 @@
 /**
  * 变换
- * @param crood 路径
+ * @param coord 路径
  * @param process 变换流程
  */
 const transform = (
-  crood: Crood,
-  process: ({ translate: Crood } | { scale: number | Crood } | { rotate: number })[],
+  coord: Coord,
+  process: ({ translate: Coord } | { scale: number | Coord } | { rotate: number })[],
 ) => {
-  let { x, y } = crood;
+  let { x, y } = coord;
 
   process.forEach((item) => {
     const { translate, scale, rotate } = item as Partial<Transform>;
