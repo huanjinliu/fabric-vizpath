@@ -3425,7 +3425,11 @@
     path.initialize(_d);
     path.path = instructions;
     // 计算路径偏移差值
-    var repairOffset = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - (path.width - oldInfo.width) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - (path.height - oldInfo.height) / 2 - oldInfo.pathOffset.y), [].concat(_toConsumableArray(path.calcOwnMatrix().slice(0, 4)), [0, 0]));
+    var inverse = function inverse(value) {
+      var inverse = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+      return value * Math.pow(-1, Number(inverse));
+    };
+    var repairOffset = fabric.fabric.util.transformPoint(new fabric.fabric.Point(path.pathOffset.x - inverse(path.width - oldInfo.width, path.flipX) / 2 - oldInfo.pathOffset.x, path.pathOffset.y - inverse(path.height - oldInfo.height, path.flipY) / 2 - oldInfo.pathOffset.y), [].concat(_toConsumableArray(path.calcOwnMatrix().slice(0, 4)), [0, 0]));
     // 设置回正确的偏移位置
     path.set({
       left: oldInfo.left + repairOffset.x,
@@ -10137,6 +10141,8 @@
       _classCallCheck(this, EditorBezier);
       _this36 = _callSuper(this, EditorBezier);
       _this36.splitDot = null;
+      _this36.virtualPath = null;
+      _this36.virtualNode = null;
       _this36.options = defaultsDeep(options, DEFAULT_OPTIONS);
       return _this36;
     }
@@ -10254,17 +10260,6 @@
         var object = splitDotTheme(decorator);
         if (!decorated) object = decorator(object);
         return object;
-      }
-      // 清除拆分点
-    }, {
-      key: "_destorySplitDot",
-      value: function _destorySplitDot(vizpath) {
-        var _a;
-        if (!this.splitDot) return;
-        var ui = vizpath.context.find(EditorUI);
-        ui === null || ui === void 0 ? void 0 : ui.objectPreRenderCallbackMap["delete"](this.splitDot);
-        (_a = this.splitDot.canvas) === null || _a === void 0 ? void 0 : _a.remove(this.splitDot);
-        this.splitDot = null;
       }
       // 增强变换事件: 直接点击节点实现直线/曲线切换
     }, {
@@ -10561,20 +10556,18 @@
         var activeNode;
         var movePointPosition;
         var hideNode;
-        var virtualPath;
-        var virtualNode;
         var curvePoint;
         var cleanVirtualObjects = function cleanVirtualObjects() {
           canvas.renderOnAddRemove = false;
-          if (virtualPath && canvas.contains(virtualPath)) canvas.remove(virtualPath);
-          if (virtualNode && canvas.contains(virtualNode)) canvas.remove(virtualNode);
+          if (_this39.virtualPath && canvas.contains(_this39.virtualPath)) canvas.remove(_this39.virtualPath);
+          if (_this39.virtualNode && canvas.contains(_this39.virtualNode)) canvas.remove(_this39.virtualNode);
           canvas.renderOnAddRemove = true;
           canvas.requestRenderAll();
           curvePoint = undefined;
         };
         var renderVirtualObjects = function renderVirtualObjects(activeNode, position) {
           var hideNode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
-          var _a;
+          var _a, _b, _c;
           var node = editor.objectNodeMap.get(activeNode);
           if (!node) return false;
           if (vizpath.isClosePath(node.segment)) return false;
@@ -10582,22 +10575,22 @@
           if (_this39.splitDot && canvas.contains(_this39.splitDot)) return false;
           var path = editor.nodePathMap.get(node.node).pathObject;
           curvePoint = _this39._findQuadraticCurvePoint(node, editor.calcRelativeCrood(position, path));
-          virtualNode = virtualNode !== null && virtualNode !== void 0 ? virtualNode : _this39._createVirtualNode();
-          virtualPath = virtualPath !== null && virtualPath !== void 0 ? virtualPath : _this39._createVirtualPath();
-          virtualNode.set(position);
+          _this39.virtualNode = (_a = _this39.virtualNode) !== null && _a !== void 0 ? _a : _this39._createVirtualNode();
+          _this39.virtualPath = (_b = _this39.virtualPath) !== null && _b !== void 0 ? _b : _this39._createVirtualPath();
+          _this39.virtualNode.set(position);
           if (curvePoint) {
             var _editor$calcAbsoluteP2 = editor.calcAbsolutePosition(curvePoint, path),
               left = _editor$calcAbsoluteP2.left,
               top = _editor$calcAbsoluteP2.top;
-            virtualPath.initialize([[InstructionType.START, activeNode.left, activeNode.top], [InstructionType.QUADRATIC_CURCE, left, top, position.left, position.top]]);
+            _this39.virtualPath.initialize([[InstructionType.START, activeNode.left, activeNode.top], [InstructionType.QUADRATIC_CURCE, left, top, position.left, position.top]]);
           } else {
-            virtualPath.initialize([[InstructionType.START, activeNode.left, activeNode.top], [InstructionType.LINE, position.left, position.top]]);
+            _this39.virtualPath.initialize([[InstructionType.START, activeNode.left, activeNode.top], [InstructionType.LINE, position.left, position.top]]);
           }
           canvas.renderOnAddRemove = false;
-          if (!editor.canvas.contains(virtualPath)) editor.canvas.add(virtualPath);
-          if (!editor.canvas.contains(virtualNode) && !hideNode) editor.canvas.add(virtualNode);
+          if (!editor.canvas.contains(_this39.virtualPath)) editor.canvas.add(_this39.virtualPath);
+          if (!editor.canvas.contains(_this39.virtualNode) && !hideNode) editor.canvas.add(_this39.virtualNode);
           canvas.renderOnAddRemove = true;
-          (_a = editor.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+          (_c = editor.canvas) === null || _c === void 0 ? void 0 : _c.requestRenderAll();
           return true;
         };
         editor.addCanvasEvent('mouse:move', function (e) {
@@ -10664,7 +10657,17 @@
     }, {
       key: "unload",
       value: function unload(vizpath) {
-        this._destorySplitDot(vizpath);
+        var ui = vizpath.context.find(EditorUI);
+        var objects = [this.splitDot, this.virtualPath, this.virtualNode];
+        objects.forEach(function (object) {
+          var _a;
+          if (!object) return;
+          ui === null || ui === void 0 ? void 0 : ui.objectPreRenderCallbackMap["delete"](object);
+          (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.remove(object);
+        });
+        this.splitDot = null;
+        this.virtualPath = null;
+        this.virtualNode = null;
       }
     }, {
       key: "load",
@@ -10818,7 +10821,8 @@
           originY: 'center',
           left: fabricCanvas.getWidth() / 2,
           top: fabricCanvas.getHeight() / 2,
-          // angle: 45,
+          angle: 45,
+          flipY: true,
           scaleX: 1.2,
           scaleY: 1.2,
       });
@@ -11004,6 +11008,8 @@
               scaleX: 1,
               scaleY: 1,
               angle: 0,
+              flipX: false,
+              flipY: false,
               strokeWidth: path.strokeWidth * path.scaleX,
           });
           path.initialize(d);

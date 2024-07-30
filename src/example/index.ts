@@ -74,7 +74,8 @@ const EXAMPLE_PATH_D = {
     originY: 'center',
     left: fabricCanvas.getWidth() / 2,
     top: fabricCanvas.getHeight() / 2,
-    // angle: 45,
+    angle: 45,
+    flipY: true,
     scaleX: 1.2,
     scaleY: 1.2,
   });
@@ -276,6 +277,8 @@ const EXAMPLE_PATH_D = {
       scaleX: 1,
       scaleY: 1,
       angle: 0,
+      flipX: false,
+      flipY: false,
       strokeWidth: path.strokeWidth! * path.scaleX!,
     });
     path.initialize(d as any);

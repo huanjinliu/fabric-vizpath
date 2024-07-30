@@ -30,10 +30,15 @@ const repairPath = (path: fabric.Path) => {
   path.path = instructions;
 
   // 计算路径偏移差值
+  const inverse = (value: number, inverse = false) => value * (-1) ** Number(inverse);
   const repairOffset = fabric.util.transformPoint(
     new fabric.Point(
-      path.pathOffset.x - (path.width! - oldInfo.width) / 2 - oldInfo.pathOffset.x,
-      path.pathOffset.y - (path.height! - oldInfo.height) / 2 - oldInfo.pathOffset.y,
+      path.pathOffset.x -
+        inverse(path.width! - oldInfo.width, path.flipX) / 2 -
+        oldInfo.pathOffset.x,
+      path.pathOffset.y -
+        inverse(path.height! - oldInfo.height, path.flipY) / 2 -
+        oldInfo.pathOffset.y,
     ),
     [...path.calcOwnMatrix().slice(0, 4), 0, 0],
   );
