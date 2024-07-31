@@ -1,4 +1,4 @@
-import VizPath from '../../vizpath.class';
+import VizPathEditor from '../../vizpath-editor.class';
 import VizPathModule from '../../vizpath-module.class';
 import VizPathEvent from '../../vizpath-event.class';
 
@@ -18,16 +18,36 @@ class EditorTheme<
   shareState: ShareState;
 
   events = new VizPathEvent<{
-    ['state-update']: (vizpath: VizPath, shareState: ShareState) => void;
+    ['state-update']: (editor: VizPathEditor, shareState: ShareState) => void;
   }>();
 
   /**
    * 主题配置器
    */
   private _configurators = new WeakMap<
-    VizPathModule,
-    (vizpath: VizPath, shareState: ShareState) => Partial<VizPathModule['themes']['__themes']>
+    VizPathEditor | VizPathModule,
+    (editor: VizPathEditor, shareState: ShareState) => Partial<VizPathModule['themes']['__themes']>
   >();
+
+  /**
+   * 暂存配置器
+   */
+  private _stashConfigurators: (
+    | {
+        module: null;
+        configurator: (
+          editor: VizPathEditor,
+          shareState: ShareState,
+        ) => Partial<VizPathEditor['themes']['__themes']>;
+      }
+    | {
+        module: VizPathModule;
+        configurator: (
+          editor: VizPathEditor,
+          shareState: ShareState,
+        ) => Partial<VizPathModule['themes']['__themes']>;
+      }
+  )[] = [];
 
   /**
    * 临时共享状态的getter观察者
@@ -39,9 +59,19 @@ class EditorTheme<
    */
   private _rerenderDependencies = new Map<keyof ShareState, Set<() => void>>([]);
 
-  constructor(initialShareState: ShareState) {
+  constructor(
+    editorConfigurator: (
+      editor: VizPathEditor,
+      shareState: ShareState,
+    ) => Partial<VizPathEditor['themes']['__themes']>,
+    initialShareState: ShareState,
+  ) {
     super();
     this.shareState = initialShareState;
+    this._stashConfigurators.push({
+      module: null,
+      configurator: editorConfigurator,
+    });
   }
 
   /**
@@ -65,40 +95,13 @@ class EditorTheme<
   configure<Module extends VizPathModule>(
     module: Module,
     configurator: (
-      vizpath: VizPath,
+      editor: VizPathEditor,
       shareState: ShareState,
     ) => Partial<Module['themes']['__themes']>,
   ) {
-    this._configurators.set(module, (editor, shareState) => {
-      const themes = configurator(editor, shareState);
-
-      for (const themeKey in themes) {
-        const theme = themes[themeKey];
-        themes[themeKey] = ((decorator: ThemeDecorator<any>, ...args: any[]) => {
-          return theme!(
-            (customObject, callback) => {
-              decorator(customObject);
-              if (callback) {
-                const _added = () => {
-                  this._observeCallback(callback);
-                  customObject.canvas.requestRenderAll();
-                };
-                const _removed = () => {
-                  this._rerenderDependencies.forEach((set) => {
-                    set.delete(callback);
-                  });
-                };
-                customObject.on('added', _added);
-                customObject.on('removed', _removed);
-              }
-              return customObject;
-            },
-            ...args,
-          );
-        }) as typeof theme;
-      }
-
-      return themes;
+    this._stashConfigurators.push({
+      module,
+      configurator,
     });
   }
 
@@ -111,12 +114,7 @@ class EditorTheme<
     this._rerenderDependencies.clear();
   }
 
-  load(vizpath: VizPath) {
-    const editor = vizpath.editor;
-    if (!editor) {
-      throw new TypeError('Please use editor module before using ui module.');
-    }
-
+  load(editor: VizPathEditor) {
     const canvas = editor.canvas;
     if (!canvas) return;
 
@@ -132,7 +130,7 @@ class EditorTheme<
         const needRerender = target[p as string] !== newValue;
         const result = Reflect.set(target, p, newValue, receiver);
         if (needRerender) {
-          this.events.fire('state-update', vizpath, this.shareState);
+          this.events.fire('state-update', editor, this.shareState);
 
           // 重新渲染
           const callbackSet = this._rerenderDependencies.get(p as string);
@@ -156,13 +154,48 @@ class EditorTheme<
       },
     });
 
-    vizpath.modules.forEach((module) => {
+    this._stashConfigurators.forEach(({ module, configurator }) => {
+      this._configurators.set(module ?? editor, (editor, shareState) => {
+        const themes = configurator(editor, shareState);
+
+        for (const themeKey in themes) {
+          const theme = themes[themeKey] as any;
+          themes[themeKey] = ((decorator: ThemeDecorator<any>, ...args: any[]) => {
+            return theme(
+              (customObject, callback) => {
+                decorator(customObject);
+                if (callback) {
+                  const _added = () => {
+                    this._observeCallback(callback);
+                    customObject.canvas.requestRenderAll();
+                  };
+                  const _removed = () => {
+                    this._rerenderDependencies.forEach((set) => {
+                      set.delete(callback);
+                    });
+                  };
+                  customObject.on('added', _added);
+                  customObject.on('removed', _removed);
+                }
+                return customObject;
+              },
+              ...args,
+            );
+          }) as typeof theme;
+        }
+
+        return themes;
+      });
+    });
+    this._stashConfigurators.length = 0;
+
+    [editor, ...editor.modules].forEach((module) => {
       const configurator = this._configurators.get(module);
       if (!configurator) return;
 
       module.themes.__themes = {
         ...module.themes.__themes,
-        ...configurator(vizpath, this.shareState),
+        ...configurator(editor, this.shareState),
       } as typeof module.themes.__themes;
     });
   }

@@ -2,7 +2,8 @@ import React, { createContext, useCallback, useEffect, useRef, useState } from '
 import classnames from 'classnames';
 import { fabric } from 'fabric';
 import {
-  VizPath,
+  VizPathEditor,
+  // VizPath,
   // Editor,
   // EditorBackground,
   // EditorTheme,
@@ -82,10 +83,10 @@ const contents = [
 export const PageContext = createContext<{
   canvas?: fabric.Canvas;
   currentDemo?: string;
-  vizpath?: VizPath;
-  setVizpath: React.Dispatch<React.SetStateAction<VizPath | undefined>>;
+  editor?: VizPathEditor;
+  setEditor: React.Dispatch<React.SetStateAction<VizPathEditor | undefined>>;
 }>({
-  setVizpath: () => {},
+  setEditor: () => {},
 });
 
 const Page = () => {
@@ -94,8 +95,8 @@ const Page = () => {
   const [view, setView] = useState<'only-docs' | 'only-demo' | 'both'>('only-demo');
 
   const [canvas, setCanvas] = useState<fabric.Canvas>();
-  const [vizpath, setVizpath] = useState<VizPath>();
-  const [currentDemo, setCurrentDemo] = useState<string>(Instruction._02_MORE_DRAWING_WAYS);
+  const [editor, setEditor] = useState<VizPathEditor>();
+  const [currentDemo, setCurrentDemo] = useState<string>(Instruction._01_INSTALL_AND_START);
 
   const initial = useCallback(async () => {
     if (!_canvasEl.current) return;
@@ -120,15 +121,15 @@ const Page = () => {
   const handleSelect = useCallback(
     (item: string) => {
       if (currentDemo === item) return;
-      vizpath?.destroy();
-      setVizpath(undefined);
+      editor?.destroy();
+      setEditor(undefined);
       setCurrentDemo(item);
     },
-    [currentDemo, vizpath],
+    [currentDemo, editor],
   );
 
   return (
-    <PageContext.Provider value={{ canvas, currentDemo, vizpath, setVizpath }}>
+    <PageContext.Provider value={{ canvas, currentDemo, editor, setEditor }}>
       <div className={styles.page}>
         <div
           className={classnames(styles.instruction, {
@@ -169,7 +170,7 @@ const Page = () => {
             <IconButton
               name="position"
               onClick={() => {
-                const canvas = vizpath?.editor?.canvas;
+                const canvas = editor?.canvas;
                 if (!canvas) return;
                 const center = canvas.getCenter();
                 canvas.setViewportTransform([1, 0, 0, 1, center.left, center.top]);

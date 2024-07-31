@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import { v4 as uuid } from 'uuid';
+import uniqueId from 'lodash-es/uniqueId';
 import { Bezier } from 'bezier-js';
 import type Vizpath from '../../vizpath.class';
 import VizPathModule from '../../vizpath-module.class';
@@ -13,8 +13,8 @@ import {
 import defaultsDeep from 'lodash-es/defaultsDeep';
 import VizPathTheme from '../../vizpath-theme.class';
 import type { ThemeDecorator } from '../editor-theme/index.class';
-import VizPathEditor, { EditorSymbolType, Mode } from '../../vizpath-editor.class';
-import { InstructionType, type Instruction, type PathNode } from 'src/lib/path.class';
+import VizPathEditor, { EditorObjectID, Mode } from '../../vizpath-editor.class';
+import { InstructionType, type Instruction, type PathNode } from 'src/lib.bak/path.class';
 
 type EditorBezierOptions = {
   /**
@@ -211,7 +211,7 @@ class EditorBezier extends VizPathModule {
 
     const decorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
       customObject.set({
-        name: uuid(),
+        name: uniqueId(),
         // 选中时不出现选中框
         hasBorders: false,
         hasControls: false,
@@ -242,7 +242,7 @@ class EditorBezier extends VizPathModule {
   }
 
   // 清除拆分点
-  private _destorySplitDot(vizpath: Vizpath) {
+  private _destroySplitDot(vizpath: Vizpath) {
     if (!this.splitDot) return;
     this.splitDot.canvas?.remove(this.splitDot);
     this.splitDot = null;
@@ -304,25 +304,24 @@ class EditorBezier extends VizPathModule {
 
       let minDistance = Infinity;
 
-      vizpath.paths.forEach(({ segments, object }) => {
-        if (!object.containsPoint(e.pointer)) return;
+      vizpath.paths.forEach((path) => {
+        if (!path.containsPoint(e.pointer)) return;
 
         const { x, y } = editor.calcRelativeCoord(
           {
             left: pointer.x,
             top: pointer.y,
           },
-          object,
+          path,
         );
 
-        const validDistance = Math.max((object.strokeWidth ?? 0) / 2 || 1, 1);
+        const validDistance = Math.max((path.strokeWidth ?? 0) / 2 || 1, 1);
 
-        segments.forEach((segment) => {
+        path.segments.forEach((segment) => {
           for (const item of segment) {
             let points: Coord[] = [];
 
-            if ([InstructionType.START, InstructionType.CLOSE].includes(item.instruction[0]))
-              continue;
+            if (['M', 'Z'].includes(item.instruction[0])) continue;
             if (item.instruction[0] === InstructionType.LINE) {
               const { pre } = vizpath.getNeighboringNodes(item, true);
               points = [
@@ -351,7 +350,7 @@ class EditorBezier extends VizPathModule {
 
             if (p.d && p.d < validDistance && p.d < minDistance) {
               minDistance = p.d;
-              touchPath = object;
+              touchPath = path;
               pathNode = item;
               splitCoord = p;
             }
@@ -419,7 +418,7 @@ class EditorBezier extends VizPathModule {
 
     const decorator: ThemeDecorator<fabric.Object> = (customObject, callback) => {
       customObject.set({
-        name: uuid(),
+        name: uniqueId(),
         // 选中时不出现选中框
         hasBorders: false,
         hasControls: false,
@@ -455,7 +454,7 @@ class EditorBezier extends VizPathModule {
 
     const decorator: ThemeDecorator<fabric.Path> = (customPath, callback) => {
       customPath.set({
-        name: uuid(),
+        name: uniqueId(),
         // 选中时不出现选中框
         hasBorders: false,
         hasControls: false,
@@ -537,12 +536,12 @@ class EditorBezier extends VizPathModule {
       const node = editor.objectNodeMap.get(activeNode);
       if (!node) return false;
 
-      if (vizpath.isCloseSegment(node.segment)) return false;
+      if (vizpath.isClosedSegment(node.segment)) return false;
       if (node !== node.segment[0] && node !== node.segment[node.segment.length - 1]) return false;
 
       if (this.splitDot && canvas.contains(this.splitDot)) return false;
 
-      const path = node.path.object;
+      const path = node.path;
 
       curvePoint = this._findQuadraticCurvePoint(node, editor.calcRelativeCoord(position, path));
 
@@ -580,7 +579,7 @@ class EditorBezier extends VizPathModule {
 
         if (e.target) {
           if (
-            e.target[VizPathEditor.symbol] === EditorSymbolType.NODE &&
+            e.target[VizPathEditor.symbol] === EditorObjectID.NODE &&
             editor.checkLinkable(activeNode, e.target)
           ) {
             return renderVirtualObjects(
@@ -650,7 +649,7 @@ class EditorBezier extends VizPathModule {
   }
 
   unload(vizpath: Vizpath) {
-    this._destorySplitDot(vizpath);
+    this._destroySplitDot(vizpath);
   }
 
   load(vizpath: Vizpath) {

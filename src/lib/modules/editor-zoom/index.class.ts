@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import type Vizpath from '../../vizpath.class';
+import type VizPathEditor from '../../vizpath-editor.class';
 import VizPathModule from '../../vizpath-module.class';
 import VizPathEvent from '../../vizpath-event.class';
 
@@ -70,10 +70,7 @@ class EditorZoom extends VizPathModule {
     this.events.fire('zoom', canvas);
   }
 
-  initZoomListener(vizpath: Vizpath) {
-    const editor = vizpath.editor;
-    if (!editor) return;
-
+  initZoomListener(editor: VizPathEditor) {
     const canvas = editor.canvas;
     if (!canvas) return;
 
@@ -102,10 +99,10 @@ class EditorZoom extends VizPathModule {
     editor.events.canvas.on('mouse:wheel', handler);
   }
 
-  unload(vizpath: Vizpath) {}
+  unload(editor: VizPathEditor) {}
 
-  load(vizpath: Vizpath) {
-    this.initZoomListener(vizpath);
+  load(editor: VizPathEditor) {
+    this.initZoomListener(editor);
   }
 }
 

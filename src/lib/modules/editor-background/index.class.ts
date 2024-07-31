@@ -1,6 +1,6 @@
 import { fabric } from 'fabric';
 import defaultsDeep from 'lodash-es/defaultsDeep';
-import type Vizpath from '../../vizpath.class';
+import type VizPathEditor from '../../vizpath-editor.class';
 import VizPathModule from '../../vizpath-module.class';
 
 type EditorBackgroundOptions = {
@@ -58,10 +58,7 @@ class EditorBackground extends VizPathModule {
   //   });
   // }
 
-  unload(vizpath: Vizpath) {
-    const editor = vizpath.editor;
-    if (!editor) return;
-
+  async unload(editor: VizPathEditor) {
     const canvas = editor.canvas;
     if (!canvas) return;
 
@@ -69,10 +66,7 @@ class EditorBackground extends VizPathModule {
     canvas.requestRenderAll();
   }
 
-  async load(vizpath: Vizpath) {
-    const editor = vizpath.editor;
-    if (!editor) return;
-
+  async load(editor: VizPathEditor) {
     const canvas = editor.canvas;
     if (!canvas) return;
 

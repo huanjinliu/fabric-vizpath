@@ -1,12 +1,13 @@
 import React, { useCallback, useContext, useEffect } from 'react';
+import { wait } from 'vivid-wait';
 import { fabric } from 'fabric';
 import {
-  EditorBackground,
-  EditorMove,
-  EditorResize,
-  EditorZoom,
+  // EditorBackground,
+  // EditorMove,
+  // EditorResize,
+  // EditorZoom,
+  // Path,
   Path,
-  VizPath,
   // Editor,
   // EditorBackground,
   // EditorTheme,
@@ -23,7 +24,7 @@ import { Markdown } from '../_components';
 import paths from '../paths.json';
 
 function Demo02() {
-  const { canvas, currentDemo, setVizpath } = useContext(PageContext);
+  const { canvas, currentDemo, setEditor } = useContext(PageContext);
 
   // const init = useCallback(async (canvas: HTMLCanvasElement) => {
   //   const container = canvas.parentNode as HTMLDivElement;
@@ -239,42 +240,103 @@ function Demo02() {
     if (!canvas) return;
     if (currentDemo !== Instruction._02_MORE_DRAWING_WAYS) return;
 
-    const path = new fabric.Path(paths.shapes, {
-      objectCaching: false,
-      noScaleCache: false,
-      fill: '#e1e1e1',
-      stroke: '#333',
-      strokeWidth: 2,
-      strokeDashArray: [5, 5],
-      // strokeLineJoin: 'round',
-      originX: 'center',
-      originY: 'center',
-      left: 0,
-      top: 0,
-      angle: 0,
-      // scaleX: 2,
-      // scaleY: 2,
-    });
-    // canvas.add(path);
-
-    const vizpath = new VizPath();
-
-    vizpath
-      .use(new EditorBackground())
-      .use(new EditorMove())
-      .use(new EditorZoom())
-      .use(new EditorResize())
-      .mount(canvas);
-
-    vizpath.draw(path);
-
-    // const _paths = await Path.loadFabricPathFromURL('https://scannables.scdn.co/uri/plain/svg/000000/white/640/spotify:track:5h9dlUlCGZahkuaC3MShz3');
-    // _paths.forEach(path => {
-    //   vizpath.draw(path);
+    // const path = new fabric.Path(paths.shapes, {
+    //   objectCaching: false,
+    //   noScaleCache: false,
+    //   fill: '#e1e1e1',
+    //   stroke: '#333',
+    //   strokeWidth: 2,
+    //   strokeDashArray: [5, 5],
+    //   // strokeLineJoin: 'round',
+    //   originX: 'center',
+    //   originY: 'center',
+    //   left: 0,
+    //   top: 0,
+    //   angle: 0,
+    //   // scaleX: 2,
+    //   // scaleY: 2,
     // });
 
-    setVizpath(vizpath);
-  }, [currentDemo, canvas, setVizpath]);
+    const path = new Path(paths.diamond);
+    const vizpath = path.visualize();
+    path.set({
+      objectCaching: false,
+      fill: '#333',
+      stroke: '#000',
+      strokeWidth: 1,
+      left: 150,
+      top: 150,
+      strokeUniform: true,
+    });
+    canvas.add(path);
+
+    await wait(3000);
+
+    // console.log(path._observers.size);
+
+    const examples = async () => {
+      // 改变节点位置
+      // const node = path.segments[0][2].node;
+      // if (node) node.set(node.x + 2, node.y - 1);
+      // 删除指令 = 删除节点/拆分指令
+      // path.remove(path.segments[0][0].node, path.segments[1][0].node);
+      // 新增指令
+      // path.insert(path.segments[1], 2, ['Q', 300, 100, 150, 200]);
+      // 插入指令
+      // path.add(path.segments[1], ['Q', 300, 100, 150, 200]);
+      // 替换指令
+      // path.replace(path.segments[0][0], ['Q', 300, 100, 150, 200]);
+      // 移除路径片段
+      // const removePath = path.removeSegment(path.segments[0]);
+      // console.log(removePath, path);
+      // 拆分路径片段
+      // const splitPath = path.splitSegment(path.segments[0]);
+      // if (splitPath) {
+      //   canvas.add(splitPath);
+      //   console.log(splitPath);
+      // }
+      // 反转路径片段
+      // path.reverseSegment(path.segments[0]);
+      // 合并路径片段
+      // path.closeSegment(path.segments[0]);
+      // 拼接路径片段
+      // path.joinSegment(path.segments[0][1], path.segments[1][1]);
+      // 获取路径指令
+      // console.log(path.getPathData());
+      // 使用新的路径指令构建路径
+      // path.reinitialize(Path.toInstructions(paths.bubble));
+      // 读取SVG并作为路径段加入当前路径对象
+      // const _paths = await Path.loadFabricPathFromURL(
+      //   'https://scannables.scdn.co/uri/plain/svg/000000/white/640/spotify:track:5h9dlUlCGZahkuaC3MShz3',
+      // );
+      // _paths.forEach((_path) => path.addSegment(_path));
+    };
+    await examples();
+
+    // console.log(path.toSVG());
+
+    // const { left, top, width, height } = path.object._calcDimensions();
+
+    // console.log({ left, top, width, height });
+    // path.object.pathOffset = { x: -(width + left) / 2, y: -(height + top) / 2 };
+    // path.object.set({ width, height });
+    // console.log(...path.segments[0]);
+
+    // console.log(path.object._calcDimensions());
+    // console.log(path.object.path);
+    // const vizpath = new VizPath();
+
+    // vizpath
+    //   .use(new EditorBackground())
+    //   .use(new EditorMove())
+    //   .use(new EditorZoom())
+    //   .use(new EditorResize())
+    //   .mount(canvas);
+
+    // vizpath.draw(path);
+
+    // setEditor(vizpath);
+  }, [currentDemo, canvas, setEditor]);
 
   useEffect(() => {
     run();

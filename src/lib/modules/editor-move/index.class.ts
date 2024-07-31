@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import type Vizpath from '../../vizpath.class';
+import type VizPathEditor from '../../vizpath-editor.class';
 import VizPathModule from '../../vizpath-module.class';
 import VizPathEvent from '../../vizpath-event.class';
 
@@ -103,7 +103,7 @@ class EditorMoveModule extends VizPathModule {
    * 回到画布中心
    */
   backToCenter() {
-    const editor = this.vizpath?.editor;
+    const editor = this.editor;
     if (!editor) return;
 
     const canvas = editor.canvas;
@@ -115,11 +115,8 @@ class EditorMoveModule extends VizPathModule {
   /**
    * 移动监听
    */
-  private initMoveListener(vizpath: Vizpath) {
-    const editor = vizpath.editor;
-    if (!editor) return;
-
-    const canvas = vizpath.editor?.canvas;
+  private initMoveListener(editor: VizPathEditor) {
+    const canvas = editor?.canvas;
     if (!canvas) return;
 
     // 是否按下空格
@@ -244,10 +241,10 @@ class EditorMoveModule extends VizPathModule {
     editor.events.canvas.on('mouse:up', moveHandlers.finish);
   }
 
-  unload(vizpath: Vizpath) {}
+  unload(editor: VizPathEditor) {}
 
-  load(vizpath: Vizpath) {
-    this.initMoveListener(vizpath);
+  load(editor: VizPathEditor) {
+    this.initMoveListener(editor);
   }
 }
 

@@ -1,5 +1,5 @@
 import throttle from 'lodash-es/throttle';
-import type Vizpath from '../../vizpath.class';
+import type VizPathEditor from '../../vizpath-editor.class';
 import VizPathModule from '../../vizpath-module.class';
 import VizPathEvent from '../../vizpath-event.class';
 
@@ -34,16 +34,16 @@ class EditorResize extends VizPathModule {
 
   private _observer: ResizeObserver | undefined;
 
-  constructor(parentNode?: HTMLElement, options: EditorResizeOptions = {}) {
+  constructor(parentNode: HTMLElement | null = null, options: EditorResizeOptions = {}) {
     super();
-    this._parentNode = parentNode ?? null;
+    this._parentNode = parentNode;
     this._options = {
       ...DEFAUlT_OPTIONS,
       ...options,
     };
   }
 
-  unload(vizpath: Vizpath) {
+  unload(editor: VizPathEditor) {
     this._observer?.disconnect();
     this._observer = undefined;
     this._parentNode = null;
@@ -73,10 +73,7 @@ class EditorResize extends VizPathModule {
   /**
    * 流式布局尺寸变更监听
    */
-  load(vizpath: Vizpath) {
-    const editor = vizpath.editor;
-    if (!editor) return;
-
+  load(editor: VizPathEditor) {
     const canvas = editor.canvas;
     if (!canvas) return;
 
@@ -86,8 +83,13 @@ class EditorResize extends VizPathModule {
 
     this._parentNode = parentNode as HTMLDivElement;
 
-    // 如果不兼容，抛出错误
-    if (typeof ResizeObserver === undefined) throw Error('ResizeObserver is incompatible!');
+    // 如果不兼容，抛出警告但不报错
+    if (typeof window.ResizeObserver === 'undefined') {
+      console.warn(
+        '(VizPath Warning) The ResizeObserver API is incompatible with this browser version.',
+      );
+      return;
+    }
 
     const { interval } = this._options;
     const observer = new ResizeObserver(

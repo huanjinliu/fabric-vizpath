@@ -1,5 +1,5 @@
 import { fabric } from 'fabric';
-import type VizPath from '../../lib/vizpath.class';
+import type VizPathEditor from '../../lib/vizpath-editor.class';
 import type { ThemeDecorator } from '../../lib/modules/editor-theme/index.class';
 
 export type ThemeShareState = {
@@ -11,15 +11,13 @@ export type ThemeShareState = {
   selectedLine: fabric.Line | null;
 };
 
-const defaultTheme = (vizpath: VizPath, shareState: ThemeShareState) => {
-  const editor = vizpath.editor;
-  if (!editor) return {};
-
+const defaultTheme = (editor: VizPathEditor, shareState: ThemeShareState) => {
   editor.events.on('selected', (nodes: fabric.Object[], point: fabric.Object | null) => {
     shareState.selectedNodes = nodes;
     shareState.selectedPoint = point;
     if (point) {
-      shareState.selectedLine = editor.curveDots.find((i) => i.point === point)?.line ?? null;
+      shareState.selectedLine =
+        editor.deformers.find((i) => i.curveDot === point)?.curveBar ?? null;
     }
   });
 
@@ -78,7 +76,8 @@ const defaultTheme = (vizpath: VizPath, shareState: ThemeShareState) => {
 
       circle.on('mouseover', () => {
         shareState.hoverPoint = circle;
-        shareState.hoverLine = editor.curveDots.find((i) => i.point === circle)?.line ?? null;
+        shareState.hoverLine =
+          editor.deformers.find((i) => i.curveDot === circle)?.curveBar ?? null;
         circle.canvas?.requestRenderAll();
       });
 

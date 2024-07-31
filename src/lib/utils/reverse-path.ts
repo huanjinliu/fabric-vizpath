@@ -1,4 +1,4 @@
-import { InstructionType, type Instruction } from '../path.class';
+import { InstructionType, type Instruction } from '../vizpath.class';
 
 /**
  * 反转路径
@@ -6,17 +6,17 @@ import { InstructionType, type Instruction } from '../path.class';
 const reversePath = (path: Instruction[]) => {
   const _path: Instruction[] = [];
 
-  let isClosePath = false;
+  let isClosedSegment = false;
 
   for (let i = path.length - 1; i >= 0; i--) {
     const instruction = path[i];
 
     const preInstruction = path[i - 1];
-    const preMajorPointCoord = preInstruction?.slice(preInstruction.length - 2) as number[];
+    const preInstructionCoord = preInstruction?.slice(preInstruction.length - 2) as number[];
 
     if (i === path.length - 1) {
       if (instruction[0] === InstructionType.CLOSE) {
-        _path.push([InstructionType.START, ...preMajorPointCoord] as Instruction);
+        _path.push([InstructionType.START, ...preInstructionCoord] as Instruction);
       } else {
         _path.push([
           InstructionType.START,
@@ -27,17 +27,17 @@ const reversePath = (path: Instruction[]) => {
 
     switch (instruction[0]) {
       case InstructionType.START:
-        if (isClosePath) _path.push([InstructionType.CLOSE]);
+        if (isClosedSegment) _path.push([InstructionType.CLOSE]);
         break;
       case InstructionType.LINE:
-        _path.push([InstructionType.LINE, ...preMajorPointCoord]);
+        _path.push([InstructionType.LINE, ...preInstructionCoord]);
         break;
       case InstructionType.QUADRATIC_CURCE:
         _path.push([
           InstructionType.QUADRATIC_CURCE,
           instruction[1],
           instruction[2],
-          ...preMajorPointCoord,
+          ...preInstructionCoord,
         ]);
         break;
       case InstructionType.BEZIER_CURVE:
@@ -47,11 +47,11 @@ const reversePath = (path: Instruction[]) => {
           instruction[4],
           instruction[1],
           instruction[2],
-          ...preMajorPointCoord,
+          ...preInstructionCoord,
         ]);
         break;
       case InstructionType.CLOSE:
-        isClosePath = true;
+        isClosedSegment = true;
         break;
       default:
         break;

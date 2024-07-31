@@ -1,35 +1,77 @@
 import React, { useCallback, useContext, useEffect } from 'react';
-import { EditorBackground, EditorMove, EditorResize, EditorZoom, VizPath } from 'fabric-vizpath';
+import { fabric } from 'fabric';
+import {
+  EditorBackground,
+  EditorMove,
+  EditorResize,
+  EditorZoom,
+  EditorTheme,
+  Path,
+  VizPathEditor,
+  EditorShortcut,
+} from 'fabric-vizpath';
+import defaultTheme from 'fabric-vizpath/dist/themes/default';
 import { Instruction, PageContext } from '../Page';
 import content from './README.md';
 import { Markdown } from '../_components';
 import paths from '../paths.json';
+import { wait } from 'vivid-wait';
 
 function Demo01() {
-  const { canvas, currentDemo, setVizpath } = useContext(PageContext);
+  const { canvas, currentDemo, setEditor } = useContext(PageContext);
 
   const run = useCallback(async () => {
     if (!canvas) return;
     if (currentDemo !== Instruction._01_INSTALL_AND_START) return;
 
-    const vizpath = new VizPath(paths.shapes);
+    const path = new Path(paths.bubble);
+    const vizpath = path.visualize();
 
-    // vizpath.segments[0].pathObject.set({
-    //   left: 0,
-    //   top: 0,
-    //   scaleX: 5,
-    //   scaleY: 5
-    // })
-
-    vizpath
+    const editor = new VizPathEditor();
+    await editor
       .use(new EditorBackground())
       .use(new EditorMove())
       .use(new EditorZoom())
       .use(new EditorResize())
+      .use(
+        new EditorShortcut(
+          [
+            {
+              key: 'O',
+              combinationKeys: ['ctrl'],
+              onActivate: () => {
+                console.log(vizpath.getPathData(null, { withTransform: true }));
+              },
+            },
+            {
+              key: 'BACKSPACE',
+              onActivate: () => {
+                if (editor.activePoint) editor.remove(editor.activePoint);
+                else editor.remove(...editor.activeNodes);
+              },
+            },
+          ],
+          /** verbose */ false,
+        ),
+      )
+      .use(
+        new EditorTheme(defaultTheme, {
+          hoverNode: null,
+          hoverPoint: null,
+          hoverLine: null,
+          selectedNodes: [],
+          selectedPoint: null,
+          selectedLine: null,
+        }),
+      )
       .mount(canvas);
 
-    setVizpath(vizpath);
-  }, [currentDemo, canvas, setVizpath]);
+    await editor.enterEditing(vizpath);
+
+    editor.focus(editor.nodes[6]);
+
+    setEditor(editor);
+  }, [currentDemo, canvas, setEditor]);
 
   useEffect(() => {
     run();

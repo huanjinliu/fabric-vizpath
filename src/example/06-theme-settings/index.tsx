@@ -1,20 +1,21 @@
 import React, { useCallback, useContext, useEffect } from 'react';
-import { VizPath } from 'fabric-vizpath';
+import { Path } from 'fabric-vizpath';
 import { Instruction, PageContext } from '../Page';
 import content from './README.md';
 import { Markdown } from '../_components';
 
 function Demo06() {
-  const { canvas, currentDemo, setVizpath } = useContext(PageContext);
+  const { canvas, currentDemo, setEditor } = useContext(PageContext);
 
   const run = useCallback(async () => {
     if (!canvas) return;
     if (currentDemo !== Instruction._06_THEME_SETTINGS) return;
 
-    const vizpath = new VizPath();
+    const path = new Path();
+    const vizpath = path.visualize();
 
     console.log(vizpath);
-  }, [currentDemo, canvas, setVizpath]);
+  }, [currentDemo, canvas, setEditor]);
 
   useEffect(() => {
     run();

@@ -1,4 +1,4 @@
-import { InstructionType, type Instruction } from '../path.class';
+import { InstructionType, type Instruction } from '../vizpath.class';
 
 /**
  * 将二阶曲线转换为三阶贝塞尔曲线

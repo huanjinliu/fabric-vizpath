@@ -1,5 +1,5 @@
 import cloneDeep from 'lodash-es/cloneDeep';
-import type { Instruction } from '../path.class';
+import type { Instruction } from '../vizpath.class';
 
 /**
  * 获取二阶曲线的三阶表现

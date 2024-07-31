@@ -29,6 +29,7 @@ const clearPathOffset = (path: fabric.Path) => {
     }
   });
   path.pathOffset = new fabric.Point(0, 0);
+  return path;
 };
 
 export default clearPathOffset;

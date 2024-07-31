@@ -1,12 +1,12 @@
-import type VizPath from './vizpath.class';
+import type VizPathEditor from './vizpath-editor.class';
 import VizPathTheme from './vizpath-theme.class';
 import VizPathEvent from './vizpath-event.class';
-import type { ThemeDecorator } from './modules/editor-theme/index.class';
+import type { ThemeDecorator } from '../lib.bak/modules/editor-theme/index.class';
 
 abstract class VizPathModule {
   static ID: string;
 
-  vizpath: VizPath | null = null;
+  editor: VizPathEditor | null = null;
 
   events = new VizPathEvent<Record<string, (...args: any[]) => void>>();
 
@@ -14,22 +14,23 @@ abstract class VizPathModule {
     Record<string, (decorator: ThemeDecorator<any>, ...args: any[]) => any>
   >({});
 
-  async prepare() {}
+  abstract unload(editor: VizPathEditor): void | Promise<void>;
 
-  abstract unload(vizpath: VizPath): void;
+  abstract load(editor: VizPathEditor): void | Promise<void>;
 
-  abstract load(vizpath: VizPath): void;
+  get name() {
+    return (this.constructor as typeof VizPathModule).ID;
+  }
 
-  __unload(vizpath: VizPath) {
-    this.unload(vizpath);
-    this.vizpath = null;
+  async __unload(editor: VizPathEditor) {
+    await Promise.resolve(this.unload(editor));
+    this.editor = null;
     this.events.clear();
   }
 
-  async __load(vizpath: VizPath) {
-    await this.prepare();
-    this.vizpath = vizpath;
-    this.load(vizpath);
+  async __load(editor: VizPathEditor) {
+    this.editor = editor;
+    await Promise.resolve(this.load(editor));
   }
 }
 

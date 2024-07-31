@@ -1,8 +1,10 @@
 import isEqual from 'lodash-es/isEqual';
-import type VizPath from '../../vizpath.class';
+import type VizPathEditor from '../../vizpath-editor.class';
 import VizPathModule from '../../vizpath-module.class';
 
-type CombinationKey = 'alt' | 'ctrl' | 'shift' | 'meta';
+const COMBINATION_KEYS = ['alt', 'ctrl', 'shift', 'meta'] as const;
+
+type CombinationKey = (typeof COMBINATION_KEYS)[number];
 
 type Shortcut<ReturnValue = any> = {
   key?: string;
@@ -16,6 +18,8 @@ type ShortcutOptions<ReturnValue = any> = Partial<Shortcut<ReturnValue>>;
 class EditorShortcut extends VizPathModule {
   static ID = 'editor-shortcut';
 
+  verbose = false;
+
   shortcuts: Shortcut[] = [];
 
   shortcutOptions: ShortcutOptions[];
@@ -25,10 +29,63 @@ class EditorShortcut extends VizPathModule {
     returnValue: any;
   };
 
-  constructor(options: ShortcutOptions[] = []) {
+  private _preEvent?: KeyboardEvent | undefined;
+
+  /**
+   * 快捷键模块初始化
+   * @param shortcuts 快捷键配置列表
+   * @param verbose 输出每次的按键信息，默认false
+   */
+  constructor(shortcuts: ShortcutOptions[] = [], verbose = false) {
     super();
 
-    this.shortcutOptions = options;
+    this.shortcutOptions = shortcuts;
+    this.verbose = verbose;
+  }
+
+  private _verbose(e: KeyboardEvent, activeShortcut: Shortcut | undefined, callback: () => void) {
+    if (!this.verbose) callback();
+    else {
+      const isLogActivateInfo = activeShortcut && activeShortcut !== this.activeShortcut?.shortcut;
+
+      const activateKeys = isLogActivateInfo
+        ? [activeShortcut.combinationKeys, activeShortcut.key]
+        : [COMBINATION_KEYS.filter((i) => e[`${i}Key`]), { Control: 'ctrl' }[e.key] ?? e.key];
+      const activateInfo = [
+        ...new Set(
+          activateKeys
+            .flat(Infinity)
+            .map((i) => (i as string).toUpperCase())
+            .filter(Boolean),
+        ),
+      ].join(' + ');
+
+      console.groupCollapsed(
+        `%cVizPath Shortcut Event: ${e.type} > ${activateInfo.toUpperCase()}`,
+        `color:${isLogActivateInfo ? 'lightgreen' : 'gray'}`,
+      );
+
+      console.groupCollapsed('Keyboard Event');
+      console.log(e);
+      console.groupEnd();
+
+      if (this.activeShortcut && this.activeShortcut.shortcut !== activeShortcut) {
+        console.groupCollapsed('Deactivate Shortcut');
+        console.log(this.activeShortcut.shortcut);
+        console.groupEnd();
+      }
+
+      if (isLogActivateInfo) {
+        console.groupCollapsed('Activate Shortcut');
+        console.log(activeShortcut);
+        console.groupEnd();
+      }
+
+      console.groupCollapsed('Other Logs');
+      callback();
+      console.groupEnd();
+      console.groupEnd();
+    }
   }
 
   private _tryGetValidShortcut(shortcut: ShortcutOptions) {
@@ -58,8 +115,15 @@ class EditorShortcut extends VizPathModule {
     }
   }
 
+  private _checkIfEventSame(newEvent: KeyboardEvent, oldEvent: KeyboardEvent) {
+    if (newEvent.type !== oldEvent.type) return false;
+    if (newEvent.key !== oldEvent.key) return false;
+    return COMBINATION_KEYS.every((key) => newEvent[key] === oldEvent[key]);
+  }
+
   private _handleShortcutKey(e: KeyboardEvent) {
-    // 寻找所有匹配的按键
+    if (this._preEvent && this._checkIfEventSame(e, this._preEvent)) return;
+
     const activateKeys = this.shortcuts.filter((shortcut) => {
       const { key, combinationKeys = [] } = shortcut;
 
@@ -99,13 +163,20 @@ class EditorShortcut extends VizPathModule {
     });
 
     const shortcut = activateKeys[0];
-    if (shortcut) {
-      if (this.activeShortcut?.shortcut === activateKeys[0]) return;
-      this.activeShortcut = { shortcut, returnValue: shortcut.onActivate(e) };
-    } else {
-      this.activeShortcut?.shortcut.onDeactivate?.(e, this.activeShortcut.returnValue);
-      this.activeShortcut = undefined;
-    }
+    this._verbose(e, shortcut, () => {
+      if (shortcut && this.activeShortcut?.shortcut === activateKeys[0]) return;
+      if (this.activeShortcut?.shortcut) {
+        const deactivateShortcut = this.activeShortcut;
+        deactivateShortcut.shortcut.onDeactivate?.(e, this.activeShortcut.returnValue);
+      }
+      if (shortcut) {
+        this.activeShortcut = { shortcut, returnValue: shortcut.onActivate(e) };
+      } else {
+        this.activeShortcut = undefined;
+      }
+    });
+
+    this._preEvent = e;
   }
 
   add(shortcut: ShortcutOptions) {
@@ -132,22 +203,17 @@ class EditorShortcut extends VizPathModule {
     }
   }
 
-  unload(vizpath: VizPath): void {
-    const editor = vizpath.editor;
-    if (!editor) return;
-
+  unload(editor: VizPathEditor): void {
     editor.events.global.off('keydown', this._handleShortcutKey.bind(this));
     editor.events.global.off('keyup', this._handleShortcutKey.bind(this));
     editor.events.global.off('blur', this._handlePageDeactivate.bind(this));
 
     this.shortcuts.length = 0;
     this.activeShortcut = undefined;
+    this._preEvent = undefined;
   }
 
-  load(vizpath: VizPath) {
-    const editor = vizpath.editor;
-    if (!editor) return;
-
+  load(editor: VizPathEditor) {
     this.shortcuts = (this.shortcutOptions ?? [])
       .map(this._tryGetValidShortcut.bind(this))
       .filter(Boolean) as typeof this.shortcuts;
