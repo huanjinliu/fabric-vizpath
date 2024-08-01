@@ -24,8 +24,10 @@ function Demo01() {
     if (!canvas) return;
     if (currentDemo !== Instruction._01_INSTALL_AND_START) return;
 
-    const path = new Path(paths.bubble);
+    const path = new Path(paths.circle);
     const vizpath = path.visualize();
+
+    // console.log(vizpath.joinSegment(vizpath.segments[0][0], vizpath.segments[0][5]));
 
     const editor = new VizPathEditor();
     await editor
@@ -36,6 +38,24 @@ function Demo01() {
       .use(
         new EditorShortcut(
           [
+            {
+              key: 'D',
+              onActivate: () => {
+                return editor.set('mode', 'delete');
+              },
+              onDeactivate: (e, reset) => {
+                reset();
+              },
+            },
+            {
+              key: 'P',
+              onActivate: () => {
+                return editor.set('mode', 'add');
+              },
+              onDeactivate: (e, reset) => {
+                reset();
+              },
+            },
             {
               key: 'O',
               combinationKeys: ['ctrl'],
@@ -68,7 +88,9 @@ function Demo01() {
 
     await editor.enterEditing(vizpath);
 
-    editor.focus(editor.nodes[6]);
+    // editor.focus(editor.nodes[0]);
+
+    // editor.remove(editor.nodes[0], editor.nodes[2]);
 
     setEditor(editor);
   }, [currentDemo, canvas, setEditor]);

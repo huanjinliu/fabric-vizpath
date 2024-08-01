@@ -224,6 +224,18 @@ export class VizPath {
   }
 
   /**
+   * 转为起始指令
+   *
+   * @note 不允许将闭合指令转起始指令
+   */
+  private _toStartInstruction(instruction: Instruction) {
+    instruction[0] = InstructionType.START;
+    instruction[1] = instruction[instruction.length - 2] as number;
+    instruction[2] = instruction[instruction.length - 1] as number;
+    instruction.length = 3;
+  }
+
+  /**
    * 修复指令，缺失的坐标统统补0
    */
   private _repairInstruction(instruction: Instruction) {
@@ -352,9 +364,8 @@ export class VizPath {
           instruction,
         };
 
+        pathNode.path = this;
         pathNode.segment = pathNodes;
-        delete pathNode.node;
-        delete pathNode.deformers;
 
         pathNodes.push(pathNode);
         this.instructionNodeMap.set(instruction, pathNode);
@@ -804,6 +815,63 @@ export class VizPath {
   }
 
   /**
+   * 获取路径节点可进行变换的前后配置
+   */
+  getConvertibleNodes(node: PathNode) {
+    const { instruction } = node;
+    const { pre, next } = this.getNeighboringInstructions(node);
+
+    const convertibleNodes: ['pre' | 'next', PathNode][] = [];
+
+    switch (instruction[0]) {
+      case InstructionType.START:
+        if (
+          pre?.instruction[0] === InstructionType.LINE ||
+          pre?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['pre', pre]);
+        }
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      case InstructionType.LINE:
+        convertibleNodes.push(['pre', node]);
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      case InstructionType.QUADRATIC_CURCE:
+        convertibleNodes.push(['pre', node]);
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      case InstructionType.BEZIER_CURVE:
+        if (
+          next?.instruction[0] === InstructionType.LINE ||
+          next?.instruction[0] === InstructionType.QUADRATIC_CURCE
+        ) {
+          convertibleNodes.push(['next', next]);
+        }
+        break;
+      default:
+        break;
+    }
+
+    return convertibleNodes;
+  }
+
+  /**
    * 是否是闭合路径段
    * @param segment 路径段
    */
@@ -812,175 +880,22 @@ export class VizPath {
   }
 
   /**
+   * 是否是路径端点
+   */
+  isTerminalNode(node: PathNode) {
+    // 闭合路径必然不存在端点
+    if (this.isClosedSegment(node.segment)) return false;
+
+    const index = node.segment.indexOf(node);
+
+    return index === 0 || index === node.segment.length - 1;
+  }
+
+  /**
    * 遍历路径节点
    */
   forEachNodes(callbackfn: (node: PathNode) => void) {
     this.segments.forEach((segment) => segment.forEach(callbackfn));
-  }
-
-  /**
-   * 移除路径节点
-   *
-   * @note
-   *
-   * ① 只有一个删除节点时，删除节点前后线段，连接前后节点
-   *
-   * ② 有多个删除节点，仅删除节点间的线段，中间节点同时也会被移除，独立节点不受影响
-   */
-  remove(...nodes: (PathNode | undefined)[]) {
-    // 找出需要删除的路径和指令索引映射，便于后续同路径下节点的批量操作
-    const segmentIndexMap = nodes.reduce((maps, node) => {
-      if (!node) return maps;
-
-      const { segment, instruction } = node;
-
-      const indexes = maps.get(segment) ?? [];
-
-      const index = segment.findIndex((i) => i.instruction === instruction);
-
-      indexes.push(index);
-
-      maps.set(segment, indexes);
-
-      return maps;
-    }, new Map<PathSegment, number[]>([]));
-
-    const needRemoveSegments = Array.from(segmentIndexMap).map((item) => {
-      const [nodes, indexes] = item;
-
-      indexes.sort();
-
-      const isMultipleRemove = indexes.length > 1;
-      const isIncludeStartNode = indexes[0] === 0;
-      const isClosedSegment = nodes[nodes.length - 1].instruction[0] === InstructionType.CLOSE;
-      if (isMultipleRemove && isIncludeStartNode && isClosedSegment) indexes.push(nodes.length - 2);
-
-      return item;
-    });
-
-    const newSegments = needRemoveSegments.map(([segment, indexes]) => {
-      // 先替换掉路径信息，避免拼接路径信息修改到原路径对象
-      this.path.path = cloneDeep(segment.map((i) => i.instruction)) as any;
-
-      let isClosedSegment = this.isClosedSegment(segment);
-
-      // 如果路径片段所有点都在删除列表列表中，直接移除整个片段
-      const isWholeSegment =
-        indexes.length === segment.length ||
-        (isClosedSegment && indexes.length === segment.length - 1);
-      if (isWholeSegment) return [];
-
-      /**
-       * 删除节点
-       */
-      const removeNode = (index: number) => {
-        const _segments: Instruction[][] = [segment.map((i) => i.instruction)];
-
-        const instructions = _segments[0];
-
-        const pre = instructions.slice(0, index);
-        const next = instructions.slice(index);
-
-        if (isClosedSegment) {
-          pre.shift();
-          next.pop();
-          if (next[0][0] === InstructionType.START) next.pop();
-        }
-
-        next.shift();
-        next[0]?.splice(0, next[0].length, InstructionType.START, ...next[0].slice(-2));
-
-        _segments.shift();
-        if (isClosedSegment) {
-          next.push(...pre);
-          pre.length = 0;
-        }
-        // else {
-        //   if (pre.length > 0 && next[0]) next[0][0] = InstructionType.LINE;
-        //   pre.push(...next);
-        //   next.length = 0;
-        // }
-
-        if (next.length >= 1) _segments.unshift(next);
-        if (pre.length >= 1) _segments.unshift(pre);
-
-        // 如果原本是闭合路径，且剩余节点多于1个，保留闭合状态
-        // if (isClosedSegment && _segments[0].length > 1) {
-        //   _segments[0].push([InstructionType.LINE, ..._segments[0][0].slice(-2)] as Instruction, [
-        //     InstructionType.CLOSE,
-        //   ]);
-        // }
-
-        return _segments;
-      };
-
-      /**
-       * 删除节点间的线段
-       */
-      const removeLine = (indexes: number[]) => {
-        const _segments: Instruction[][] = [segment.map((i) => i.instruction)];
-
-        for (let i = indexes.length - 1, startIndex = 0; i >= 0; i--) {
-          const instructions = _segments[0];
-          const index = startIndex + indexes[i];
-
-          const pre = instructions.slice(0, index);
-          const next = instructions.slice(index);
-
-          if (isClosedSegment) {
-            pre.shift();
-            next.pop();
-            if (next[0][0] === InstructionType.START) next.pop();
-          }
-
-          next[0]?.splice(0, next[0].length, InstructionType.START, ...next[0].slice(-2));
-
-          _segments.shift();
-          if (isClosedSegment) {
-            startIndex = next.length - 1;
-            next.push(...pre);
-            pre.length = 0;
-          }
-
-          if (next.length > 1) _segments.unshift(next);
-          if (pre.length > 1) _segments.unshift(pre);
-
-          isClosedSegment = false;
-        }
-
-        return _segments;
-      };
-
-      const removeLineIndexes =
-        indexes.length <= 1
-          ? []
-          : indexes.filter(
-              (i, idx, arr) => arr.length <= 1 || (idx >= 1 && arr[idx - 1] + 1 === i),
-            );
-
-      if (removeLineIndexes.length) return removeLine(removeLineIndexes).flat(1);
-
-      return removeNode(indexes[0]).flat(1);
-    });
-
-    // 构建新的路径指令列表
-    const instructions = this.segments.reduce((list, item) => {
-      if (segmentIndexMap.has(item)) {
-        const newSegment = newSegments.find((_, index) => item === needRemoveSegments[index][0]);
-        if (newSegment?.length) list.push(...newSegment);
-      } else {
-        list.push(
-          ...this.getInstructions((segment) =>
-            segment === item ? item.map((i) => i.instruction) : [],
-          ),
-        );
-      }
-      return list;
-    }, [] as Instruction[]);
-
-    segmentIndexMap.clear();
-
-    this.setInstructions(instructions);
   }
 
   /**
@@ -997,7 +912,7 @@ export class VizPath {
         instruction,
       },
     ]);
-    return segment[index];
+    return this.instructionNodeMap.get(instruction);
   }
 
   /**
@@ -1034,7 +949,6 @@ export class VizPath {
    * @param instruction 新指令
    */
   add(segment: PathSegment, instruction: Instruction) {
-    const index = segment.length;
     this._executeUpdateCommands(segment, [
       {
         type: 'add',
@@ -1042,7 +956,73 @@ export class VizPath {
         instruction,
       },
     ]);
-    return segment[index];
+    return this.instructionNodeMap.get(instruction);
+  }
+
+  /**
+   * 移除路径节点
+   *
+   * @note
+   *
+   * ① 只有一个删除节点时，删除节点前后线段，连接前后节点
+   *
+   * ② 有多个删除节点，仅删除节点间的线段，中间节点同时也会被移除，独立节点不受影响
+   */
+  remove(...nodes: (PathNode | undefined)[]) {
+    // 找出需要删除的路径和指令索引映射，便于后续同路径下节点的批量操作
+    const segmentRemoveIndexsMap = nodes.reduce((maps, node) => {
+      if (!node) return maps;
+
+      const { segment, instruction } = node;
+
+      const indexes = maps.get(segment) ?? [];
+
+      const index = segment.findIndex((i) => i.instruction === instruction);
+
+      indexes.push(index);
+
+      maps.set(segment, indexes);
+
+      return maps;
+    }, new Map<PathSegment, number[]>([]));
+
+    const newInstructions = this.getInstructions((segment) => {
+      const instructions = segment.map((i) => i.instruction);
+      if (!segmentRemoveIndexsMap.has(segment)) return instructions;
+
+      const indexes = segmentRemoveIndexsMap.get(segment) as number[];
+      if (!indexes.length) return instructions;
+
+      const isClosedSegment = segment[segment.length - 1].instruction[0] === InstructionType.CLOSE;
+
+      indexes.sort();
+
+      for (let i = 0; i < indexes.length; i++) {
+        const index = indexes[i] - i;
+        if (instructions[index + 1] && instructions[index + 1][0] !== InstructionType.CLOSE) {
+          this._toStartInstruction(instructions[index + 1]);
+        }
+        instructions.splice(index, 1);
+      }
+
+      // 处理闭合路径
+      if (isClosedSegment) {
+        instructions.pop();
+        const coincideNode = instructions.pop()!;
+        if (instructions.length) {
+          if (indexes[0] !== 0) {
+            instructions[0].splice(0, instructions[0].length, ...coincideNode);
+          }
+          while (instructions[0][0] !== InstructionType.START) {
+            instructions.push(instructions.shift() as Instruction);
+          }
+        }
+      }
+
+      return instructions;
+    });
+
+    this.setInstructions(newInstructions);
   }
 
   /**
@@ -1058,9 +1038,8 @@ export class VizPath {
 
     const isClosed = this.isClosedSegment(segment);
 
-    let index = segment.indexOf(node);
+    const index = segment.indexOf(node);
     if (index === -1) return;
-    if (isClosed && index === segment.length - 2) index = 0;
 
     const updateCommands: {
       type: 'add' | 'update';
@@ -1092,7 +1071,93 @@ export class VizPath {
 
     this._executeUpdateCommands(segment, updateCommands);
 
-    return segment[index];
+    return this.instructionNodeMap.get(node.instruction);
+  }
+
+  /**
+   * 路径升级
+   *
+   * @note
+   *
+   * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
+   */
+  upgrade(node: PathNode, direction: 'pre' | 'next' | 'both' = 'both') {
+    const { instruction, node: nodeCoord } = node;
+
+    const { pre, next } = this.getNeighboringInstructions(node, true);
+
+    const directionNodeMap = {
+      pre: instruction[0] === InstructionType.START ? pre : node,
+      next,
+    };
+
+    const targets: [direction: 'pre' | 'next', pathNode: PathNode][] = [];
+
+    if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
+      targets.push(['pre', directionNodeMap.pre]);
+    }
+
+    if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
+      targets.push(['next', directionNodeMap.next]);
+    }
+
+    targets.forEach(([direction, pathNode]) => {
+      const oldInstruction = pathNode.instruction;
+      if (oldInstruction[0] === InstructionType.BEZIER_CURVE) return;
+
+      const newInstruction = [...oldInstruction] as Instruction;
+      newInstruction[0] = {
+        [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
+        [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
+      }[newInstruction[0]];
+      newInstruction.splice({ pre: -2, next: 1 }[direction], 0, nodeCoord!.x, nodeCoord!.y);
+
+      this.replace(pathNode, newInstruction);
+    });
+  }
+
+  /**
+   * 路径降级
+   *
+   * @note
+   *
+   * 二阶贝塞尔曲线会降级为直线；三阶贝塞尔曲线会先降级为二阶贝塞尔曲线，再降级才会转化为直线。
+   */
+  degrade(node: PathNode, direction: 'pre' | 'next' | 'both' = 'both', lowest = false) {
+    const { pre, next } = this.getNeighboringInstructions(node, true);
+
+    const directionNodeMap = {
+      pre: node.instruction[0] === InstructionType.START ? pre : node,
+      next,
+    };
+
+    const targets: [direction: 'pre' | 'next', pathNode: PathNode][] = [];
+
+    if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
+      targets.push(['pre', directionNodeMap.pre]);
+    }
+
+    if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
+      targets.push(['next', directionNodeMap.next]);
+    }
+
+    targets.forEach(([direction, pathNode]) => {
+      const instruction = pathNode.instruction;
+      if (['M', 'L'].includes(instruction[0])) return;
+
+      if (lowest) {
+        instruction[0] = InstructionType.LINE;
+        instruction.splice(1, instruction.length - 3);
+      } else {
+        instruction[0] = {
+          [InstructionType.QUADRATIC_CURCE]: InstructionType.LINE,
+          [InstructionType.BEZIER_CURVE]: InstructionType.QUADRATIC_CURCE,
+        }[instruction[0]];
+        instruction.splice({ pre: -4, next: 1 }[direction], 2);
+      }
+
+      this.replace(pathNode, instruction);
+    });
   }
 
   /**
@@ -1117,47 +1182,51 @@ export class VizPath {
         queue.forEach(({ type, index, instruction }) => {
           // 如果需要修复指令
           if (index === 0 && instruction[0] !== InstructionType.START) {
-            instruction[0] = InstructionType.START;
-            instruction[1] = instruction[instruction.length - 2] as number;
-            instruction[2] = instruction[instruction.length - 1] as number;
-            instruction.length = 3;
+            this._toStartInstruction(instruction);
           }
           if (index !== 0) this._repairInstruction(instruction);
 
           // 添加指令
           if (type === 'add') {
             if (index === 0 && segment.length) {
-              instructions.splice(0, 1, [
-                InstructionType.LINE,
-                segment[0]!.node!.x,
-                segment[0]!.node!.y,
-              ]);
+              instructions[0][0] = InstructionType.LINE;
             }
             instructions.splice(index, 0, instruction);
           }
 
           // 更新指令
           if (type === 'update') {
-            instructions.splice(index, 1, instruction);
+            instructions[index].splice(0, instructions[index].length, ...instruction);
+            // instructions.splice(index, 1, instruction);
           }
         });
       }
 
       return instructions;
     });
+
     this.setInstructions(newInstructions);
   }
 
   /**
    * 路径片段拼接
    */
-  joinSegment(startNode: PathNode, endNode: PathNode) {
+  joinSegment(
+    startNode: PathNode,
+    endNode: PathNode,
+  ): {
+    action: 'close' | 'join' | 'none';
+    node?: PathNode;
+  } {
+    if (startNode === endNode || !this.isTerminalNode(startNode) || !this.isTerminalNode(endNode))
+      return { action: 'none' };
+
     const startSegment = startNode.segment;
     const endSegment = endNode.segment;
 
     if (startSegment === endSegment) {
       this.closeSegment(startSegment);
-      return;
+      return { action: 'close', node: endNode };
     }
 
     let start = this.getInstructions((segment) =>
@@ -1188,43 +1257,45 @@ export class VizPath {
 
     const mergePath = start.concat(end);
     this.setInstructions(mergePath);
+
+    return { action: 'join', node: this.instructionNodeMap.get(end[0]) };
   }
 
   /**
    * 闭合路径片段
    */
   closeSegment(segment: PathSegment) {
-    // 自闭合的路径无需再做闭合处理
-    if (this.isClosedSegment(segment)) return;
+    // 未闭合的路径做闭合处理
+    if (!this.isClosedSegment(segment)) {
+      const updateCommands: {
+        type: 'add' | 'update';
+        index: number;
+        instruction: Instruction;
+      }[] = [];
 
-    // 少于2个节点时无法实现闭合
-    if (segment.length < 2) return;
+      const startNode = segment[0].node!;
+      const endNode = segment[segment.length - 1].node!;
 
-    const updateCommands: {
-      type: 'add' | 'update';
-      index: number;
-      instruction: Instruction;
-    }[] = [];
+      // 需要考虑添加闭合重叠点
+      if (startNode.x !== endNode.x || startNode.y !== endNode.y) {
+        updateCommands.push({
+          type: 'add',
+          index: segment.length,
+          instruction: [InstructionType.LINE, startNode.x, startNode.y],
+        });
+      }
 
-    const startNode = segment[0].node!;
-    const endNode = segment[segment.length - 1].node!;
-
-    // 需要考虑添加闭合重叠点
-    if (startNode.x !== endNode.x || startNode.y !== endNode.y) {
       updateCommands.push({
         type: 'add',
-        index: segment.length,
-        instruction: [InstructionType.LINE, startNode.x, startNode.y],
+        index: segment.length + updateCommands.length,
+        instruction: [InstructionType.CLOSE],
       });
+
+      this._executeUpdateCommands(segment, updateCommands);
     }
 
-    updateCommands.push({
-      type: 'add',
-      index: segment.length + updateCommands.length,
-      instruction: [InstructionType.CLOSE],
-    });
-
-    this._executeUpdateCommands(segment, updateCommands);
+    // 返回起始路径节点
+    return this.instructionNodeMap.get(segment[0].instruction);
   }
 
   /**
@@ -1262,6 +1333,7 @@ export class VizPath {
     );
 
     this.setInstructions(instructions);
+    return this.segments[this.segments.length - 1];
   }
 
   /**

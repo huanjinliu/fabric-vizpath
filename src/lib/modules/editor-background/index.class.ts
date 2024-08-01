@@ -4,26 +4,19 @@ import type VizPathEditor from '../../vizpath-editor.class';
 import VizPathModule from '../../vizpath-module.class';
 
 type EditorBackgroundOptions = {
-  grid?: boolean;
-  gridSize?: number;
-  gridStyle?: Partial<{
-    stroke: string;
-    strokeWidth: number;
-    strokeDashArray: number[];
-  }>;
+  image?: string;
+  repeat?: 'repeat' | 'repeat-x' | 'repeat-y' | 'no-repeat';
+  noScaling?: boolean;
 };
 
 class EditorBackground extends VizPathModule {
   static ID = 'editor-background';
 
   options: Required<EditorBackgroundOptions> = {
-    grid: true,
-    gridSize: 50,
-    gridStyle: {
-      stroke: 'rgba(0, 0, 0, 0.08)',
-      strokeWidth: 1,
-      strokeDashArray: [4, 2],
-    },
+    image:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADMAAAAzCAYAAAA6oTAqAAAAAXNSR0IArs4c6QAAAK9JREFUaEPtljEKw0AMBOUijWv//5mpg0MK11ssyjCGq4ws5FkNdwznOQ/OLHM5zFKaklkKZlACGJIAUGQUwFYBSGYrGZQAVPPWmCkAyRT+ACpmqrmQmKgFigxqZxwmCnShCEUGJQBvzYX4Ry1QO+MwUQYKRSgyqrmQmKgFigxqZxwmCnShCEUGJQBvzYX4Ry1QO+MwUQYKRSgyqrmQmKjFl8z5O88vvGfmPv/07vUBoQcRCbiL/70AAAAASUVORK5CYII=',
+    repeat: 'repeat',
+    noScaling: false,
   };
 
   constructor(options: EditorBackgroundOptions = {}) {
@@ -70,30 +63,28 @@ class EditorBackground extends VizPathModule {
     const canvas = editor.canvas;
     if (!canvas) return;
 
-    const { grid, gridSize, gridStyle } = this.options;
-    if (grid && gridSize > 0) {
-      const pattern = new fabric.Group([
-        new fabric.Line([0, 0, gridSize, 0], gridStyle),
-        new fabric.Line([0, 0, 0, gridSize], gridStyle),
-      ]);
-
+    const { image: imageURL, repeat, noScaling } = this.options;
+    if (imageURL) {
       await new Promise<void>((resolve) => {
         const image = new Image();
         image.onload = () => {
-          canvas.setBackgroundColor(
-            new fabric.Pattern({
-              source: image,
-              repeat: 'repeat',
-              // offsetX: -(canvas.getWidth() % gridSize) / 2,
-              // offsetY: -(canvas.getHeight() % gridSize) / 2,
-            }),
-            () => {
-              canvas.requestRenderAll();
-              resolve();
-            },
-          );
+          const pattern = new fabric.Pattern({
+            source: image,
+            repeat: repeat,
+            // offsetX: -(canvas.getWidth() % gridSize) / 2,
+            // offsetY: -(canvas.getHeight() % gridSize) / 2,
+          });
+          if (noScaling) {
+            canvas.on('before:render', () => {
+              pattern.patternTransform = fabric.util.invertTransform(canvas.viewportTransform!);
+            });
+          }
+          canvas.setBackgroundColor(pattern, () => {
+            canvas.requestRenderAll();
+            resolve();
+          });
         };
-        image.src = pattern.toDataURL({});
+        image.src = imageURL;
       });
     }
 

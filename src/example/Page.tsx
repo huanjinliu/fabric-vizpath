@@ -24,6 +24,7 @@ import Demo06 from './06-theme-settings';
 import Demo07 from './07-module-applications';
 import Demo08 from './08-how-to-develop-modules';
 import Demo09 from './09-api';
+import paths from './paths.json';
 import styles from './style.less';
 
 export enum Instruction {
@@ -131,6 +132,7 @@ const Page = () => {
   return (
     <PageContext.Provider value={{ canvas, currentDemo, editor, setEditor }}>
       <div className={styles.page}>
+        {/* LOGO & Documents */}
         <div
           className={classnames(styles.instruction, {
             [styles.half]: view === 'both',
@@ -160,6 +162,18 @@ const Page = () => {
           style={{ display: view === 'only-docs' ? 'none' : 'block' }}
         >
           <canvas ref={_canvasEl}></canvas>
+          {/* Tools */}
+          {/* <footer className={styles.toolBar}>
+            {Object.entries(paths).map(([key, path]) => {
+              return (
+                <svg key={key} xmlns="http://www.w3.org/2000/svg">
+                  <path d={path} fill="none" stroke="#333"></path>
+                </svg>
+              );
+            })}
+            <span>形状</span>
+          </footer> */}
+          {/* Other Tools */}
           <aside className={styles.buttons}>
             <IconButton
               name="github"

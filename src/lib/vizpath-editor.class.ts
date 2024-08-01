@@ -4,13 +4,15 @@ import type VizPathModule from './vizpath-module.class';
 import VizPathTheme from './vizpath-theme.class';
 import { fabric } from 'fabric';
 import { InstructionType, type Instruction, type PathNode, type RCoord } from './vizpath.class';
-import type { VizPath } from './vizpath.class';
+import type { PathSegment, VizPath } from './vizpath.class';
 import {
+  calcCanvasCoord,
   calcCoordsAngle,
   calcCoordsDistance,
   deepIterateGroup,
   fabricOnceRender,
   fireFabricMouseUp,
+  fireMouseUpAndSelect,
   observe,
   parsePathJSON,
   transform,
@@ -102,9 +104,6 @@ class VizPathEditor {
 
   events = new VizPathDOMEvent<{
     set: (setting: Partial<EditorSetting>) => void;
-    added: (node: fabric.Object) => void;
-    closed: (node: fabric.Object) => void;
-    removed: (nodes: fabric.Object[]) => void;
     selected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
     deselected: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => void;
   }>();
@@ -194,6 +193,8 @@ class VizPathEditor {
 
   /* ---------------------------- 其他内部属性 ---------------------------- */
 
+  /** 由于focus方法内部也有对元素聚焦失焦的操作，锁定避免循环执行事件监听造成死循环 */
+  private _lockFocus = false;
   /** 记录当前活跃对象观察者 */
   private _observer: { target: fabric.Object; unobserve: () => void } | null = null;
 
@@ -275,7 +276,7 @@ class VizPathEditor {
     this.vizpath = vizpath;
 
     // 初始路径对象事件
-    this._initVizpathEvents();
+    // this._initVizpathEvents();
 
     // 绘制路径
     this._renderVizPath();
@@ -316,6 +317,7 @@ class VizPathEditor {
 
     this.dotSymmetricAutoMode = 'none';
     this.currentConvertNodeObject = null;
+    this._lockFocus = false;
     this._abandonedPool = {
       nodes: [],
       points: [],
@@ -336,32 +338,23 @@ class VizPathEditor {
   /**
    * 初始路径对象事件
    */
-  private _initVizpathEvents() {
-    const vizPath = this.vizpath;
-    if (!vizPath) return;
+  rerender<T>(callback: (activeNodes: fabric.Object[], activePoint: fabric.Object | null) => T) {
+    const storeActiveNodes = this.activeNodes;
+    const storeActivePoint = this.activePoint;
+    this.blur();
 
-    let storeActiveNodes: fabric.Object[] = [];
-    let storeActivePoint: fabric.Object | null = null;
-    vizPath.events.on('before:update', () => {
-      storeActiveNodes = this.activeNodes;
-      storeActivePoint = this.activePoint;
-      this.blur();
-    });
+    const result = callback(storeActiveNodes, storeActivePoint);
 
-    vizPath.events.on('after:update', () => {
-      this._renderPathNodes();
-      this._renderDeformers();
-      const activeObjects: fabric.Object[] = [];
-      storeActiveNodes.forEach((object) => {
-        if (this.objectNodeMap.has(object)) {
-          activeObjects.push(object);
-        }
-      });
-      if (storeActivePoint) activeObjects.push(storeActivePoint);
-      if (activeObjects.length) this.focus(...activeObjects);
-      storeActiveNodes.length = 0;
-      storeActivePoint = null;
-    });
+    this._renderPathNodes();
+    this._renderDeformers();
+
+    const activeObjects = [...storeActiveNodes, storeActivePoint].filter(
+      Boolean,
+    ) as fabric.Object[];
+    if (activeObjects.every((object) => object.canvas === this.canvas))
+      this.focus(...activeObjects);
+
+    return result;
   }
 
   /**
@@ -715,19 +708,14 @@ class VizPathEditor {
   private _initSelectEvents() {
     const canvas = this.canvas;
     if (!canvas) return;
-
-    // 由于focus方法内部也有对元素聚焦失焦的操作，锁定避免循环执行事件监听造成死循环
-    let focusing = false;
-    const handler = () => {
-      if (focusing) return;
-      focusing = true;
+    const handler = (eventName: string) => (e: MouseEvent) => {
+      // console.log(eventName, e);
       this.focus(...canvas.getActiveObjects());
-      focusing = false;
     };
 
-    this.events.canvas.on('selection:created', handler);
-    this.events.canvas.on('selection:updated', handler);
-    this.events.canvas.on('selection:cleared', handler);
+    this.events.canvas.on('selection:created', handler('selection:created'));
+    this.events.canvas.on('selection:updated', handler('selection:updated'));
+    this.events.canvas.on('selection:cleared', handler('selection:cleared'));
 
     // 选中路径段时自动选中路线段内的所有指令路径节点
     // this.events.canvas.on('mouse:dblclick', (e) => {
@@ -748,6 +736,150 @@ class VizPathEditor {
     //     );
     //   }
     // });
+  }
+
+  /**
+   * 初始路径点添加事件
+   */
+  private _initAddEvents() {
+    const canvas = this.canvas;
+    if (!canvas) return;
+
+    this.events.canvas.on('mouse:down:before', (event) => {
+      const vizpath = this.vizpath;
+      if (!vizpath) return;
+
+      if (this.get('mode') !== Mode.ADD) return;
+
+      let newNodeObject: fabric.Object | undefined;
+
+      // 路径拼接
+      if (event.target && event.target[VizPathEditor.symbol]) {
+        if (
+          this.activeNodes.length === 1 &&
+          event.target[VizPathEditor.symbol] === EditorObjectID.NODE
+        ) {
+          newNodeObject = this.link(this.activeNodes[0], event.target);
+        }
+      }
+      // 新增节点
+      else {
+        const pointer = calcCanvasCoord(canvas, event.pointer);
+        newNodeObject = this.add({ left: pointer.x, top: pointer.y });
+      }
+
+      // 新增成功，设置当前点为变换中
+      if (newNodeObject) {
+        this.currentConvertNodeObject = newNodeObject;
+      }
+    });
+  }
+
+  /**
+   * 初始路径节点删除事件
+   */
+  private _initDeleteEvents() {
+    this.events.canvas.on('mouse:down', (event) => {
+      if (this.get('mode') !== Mode.DELETE) return;
+
+      if (
+        event.target?.[VizPathEditor.symbol] === EditorObjectID.NODE ||
+        event.target?.[VizPathEditor.symbol] === EditorObjectID.CURVE_DOT
+      ) {
+        this.remove(event.target);
+      }
+    });
+  }
+
+  /**
+   * 初始路径指令转换事件
+   */
+  private _initConvertEvents() {
+    const canvas = this.canvas;
+    if (!canvas) return;
+
+    this.events.canvas.on('mouse:down', (event) => {
+      const vizpath = this.vizpath;
+      if (!vizpath) return;
+
+      if (this.currentConvertNodeObject) {
+        fireMouseUpAndSelect(this.currentConvertNodeObject);
+        this.currentConvertNodeObject.set({ lockMovementX: true, lockMovementY: true });
+        canvas.selection = false;
+      } else {
+        if (this.get('mode') !== Mode.CONVERT) return;
+        if (event.target?.[VizPathEditor.symbol] !== EditorObjectID.NODE) return;
+        this.currentConvertNodeObject = event.target as fabric.Object;
+      }
+    });
+
+    this.events.canvas.on('mouse:move', (event) => {
+      const vizpath = this.vizpath;
+      if (!vizpath) return;
+
+      const target = this.currentConvertNodeObject;
+      if (!target) return;
+
+      // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+      if (target.containsPoint(event.pointer)) return;
+
+      const pointer = calcCanvasCoord(canvas, event.pointer);
+
+      const targetNode = this.objectNodeMap.get(target)!;
+      const neighboringNodes = vizpath.getNeighboringNodes(targetNode, true);
+
+      // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
+      let convertibleNodes = vizpath.getConvertibleNodes(targetNode);
+      if (convertibleNodes.length === 0) {
+        vizpath.degrade(targetNode, 'both', true);
+        convertibleNodes = vizpath.getConvertibleNodes(targetNode);
+      }
+
+      const position = vizpath.calcRelativeCoord({ left: pointer.x, top: pointer.y });
+      const oppositePosition = vizpath.calcRelativeCoord({
+        left: target.left! - (pointer.x - target.left!),
+        top: target.top! - (pointer.y - target.top!),
+      });
+
+      // 根据夹角大小排序，夹角越小意味鼠标越接近
+      if (convertibleNodes.length > 1) {
+        convertibleNodes.sort((a, b) => {
+          return (
+            calcCoordsAngle(position, targetNode.node!, neighboringNodes[a[0]]!.node!) -
+            calcCoordsAngle(position, targetNode.node!, neighboringNodes[b[0]]!.node!)
+          );
+        });
+      }
+
+      this.rerender(() => {
+        convertibleNodes.forEach((item, index) => {
+          const newCoord = [position, oppositePosition][index];
+          const newInstruction = [...item[1].instruction] as Instruction;
+          newInstruction[0] = {
+            [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
+            [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
+          }[newInstruction[0]];
+          newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCoord.x, newCoord.y);
+          vizpath.replace(item[1], newInstruction);
+        });
+      });
+
+      const targetCurveDot = this.deformers.find((i) => {
+        return i.node === targetNode && i.type === convertibleNodes[0]?.[0];
+      });
+
+      if (targetCurveDot) {
+        fireMouseUpAndSelect(targetCurveDot.curveDot);
+      }
+    });
+
+    this.events.canvas.on('mouse:up', () => {
+      if (this.currentConvertNodeObject) {
+        this.currentConvertNodeObject.set({ lockMovementX: false, lockMovementY: false });
+        this.currentConvertNodeObject = null;
+        canvas.selection = true;
+      }
+    });
   }
 
   /**
@@ -832,6 +964,7 @@ class VizPathEditor {
       unobserve: observe(object, ['left', 'top'], ({ left, top }) => {
         const followCurveDots: RCoord[] = [];
         const pathNode = this.objectNodeMap.get(object)!;
+
         const deformers = this.vizpath?.getNeighboringCurveDots(pathNode) ?? [];
         deformers?.forEach(({ position, direction, from }) => {
           const coord = from.deformers?.[direction];
@@ -988,6 +1121,9 @@ class VizPathEditor {
     const canvas = this.canvas;
     if (!canvas) return;
 
+    if (this._lockFocus) return;
+    this._lockFocus = true;
+
     // 提取有效活跃元素
     const focusNodes: fabric.Object[] = [];
     const focusCurveDotPoints: fabric.Object[] = [];
@@ -1006,22 +1142,20 @@ class VizPathEditor {
       }
     });
 
-    // 先触发失焦事件
+    // 取消当前元素选中态
+    canvas.discardActiveObject();
     if (this.activePoint || this.activeNodes.length) {
       this.events.fire('deselected', this.activeNodes, this.activePoint);
     }
 
     // 只要包含路径节点则只处理聚焦路径节点逻辑
     if (focusNodes.length) {
-      // 取消画布选中重新构造只包含路径节点的选中框对象
-      canvas.discardActiveObject();
       this.activeNodes = focusNodes;
       this.activePoint = null;
       // 是否只选中单一路径节点
       if (focusNodes.length === 1) {
         const focusNode = focusNodes[0];
         canvas.setActiveObject(focusNode);
-        // this._addActivePointObserve(focusNode);
       }
       // 多选则成组选择
       else if (focusNodes.length > 1) {
@@ -1035,7 +1169,6 @@ class VizPathEditor {
           activeSelection.setControlVisible('mtr', false);
         }
         canvas.setActiveObject(activeSelection);
-        // this._addActiveSelectionObserve(activeSelection);
       }
     }
     // 考虑是否只有一个曲线变换点聚焦情况，不允许多曲线变换点同时聚焦
@@ -1049,7 +1182,6 @@ class VizPathEditor {
     else {
       this.activeNodes = [];
       this.activePoint = null;
-      canvas.discardActiveObject();
     }
 
     // 绘制曲线变换点及其控制杆
@@ -1083,6 +1215,8 @@ class VizPathEditor {
     } else {
       this.dotSymmetricAutoMode = 'none';
     }
+
+    this._lockFocus = false;
   }
 
   /**
@@ -1090,6 +1224,55 @@ class VizPathEditor {
    */
   blur() {
     this.focus();
+  }
+
+  /**
+   * 添加新的路径节点
+   *
+   * @note
+   *
+   * 1）在选中单一路径节点后，将在该点后添加新的路径节点
+   *
+   * 2）在未选中节点/选中多个节点时，将直接以该参数位置创建新的起始点以开启一段新的路径
+   *
+   * @param position 新节点的画布绝对位置
+   */
+  add(position: { left: number; top: number }) {
+    const vizpath = this.vizpath;
+    if (!vizpath) return;
+
+    const coord = vizpath.calcRelativeCoord(position);
+    const node = this.rerender((activeNodes) => {
+      if (activeNodes.length === 1) {
+        const node = activeNodes[0];
+
+        const pathNode = this.objectNodeMap.get(node);
+        if (!pathNode) return;
+
+        const { segment } = pathNode;
+
+        // 如果当前节点已闭合或非端点，无法实现节点添加
+        if (vizpath.isClosedSegment(segment)) return;
+
+        // 如果是起始点
+        if (pathNode === segment[0]) {
+          // 添加新的起始
+          return vizpath.insertBefore(pathNode, [InstructionType.START, coord.x, coord.y]);
+        }
+        // 如果是末尾端点
+        else if (pathNode === segment[segment.length - 1]) {
+          return vizpath.insertAfter(pathNode, [InstructionType.LINE, coord.x, coord.y]);
+        }
+      } else {
+        return vizpath.addSegment(`M ${coord.x} ${coord.y}`)[0];
+      }
+    });
+    if (!node) return;
+
+    const object = this.nodeObjectMap.get(node);
+    if (!object) return;
+
+    return object;
   }
 
   /**
@@ -1121,8 +1304,8 @@ class VizPathEditor {
     // 触发鼠标举起事件，避免后续拖动操作生效
     fireFabricMouseUp(canvas);
 
-    const removeQueue: { node: PathNode; object: fabric.Object }[] = [];
-    const degradeQueue: { node: PathNode; direction?: 'pre' | 'next' }[] = [];
+    const removeQueue: { object: fabric.Object; node: PathNode }[] = [];
+    const degradeQueue: { object: fabric.Object; direction?: 'pre' | 'next' }[] = [];
 
     const collect = (object: fabric.Object) => {
       if (object[VizPathEditor.symbol] === EditorObjectID.NODE) {
@@ -1130,7 +1313,7 @@ class VizPathEditor {
         if (node) removeQueue.push({ node, object });
       } else if (object[VizPathEditor.symbol] === EditorObjectID.CURVE_DOT) {
         const deformer = this.deformers.find((i) => i.curveDot === object)!;
-        if (deformer) degradeQueue.push({ node: deformer.node, direction: deformer.type });
+        if (deformer) degradeQueue.push({ object: deformer.curveDot, direction: deformer.type });
       }
     };
 
@@ -1141,14 +1324,15 @@ class VizPathEditor {
       } else collect(object);
     });
 
-    if (removeQueue.length) {
-      vizPath.remove(...removeQueue.map((i) => i.node));
+    if (degradeQueue.length) {
+      degradeQueue.forEach(({ object, direction }) => {
+        this.degrade(object, direction);
+      });
     }
 
-    if (degradeQueue.length) {
-      degradeQueue.forEach(({ node, direction }) => {
-        const object = this.nodeObjectMap.get(node);
-        if (object) this.degrade(object, direction);
+    if (removeQueue.length) {
+      this.rerender(() => {
+        vizPath.remove(...removeQueue.map((i) => i.node));
       });
     }
   }
@@ -1167,37 +1351,8 @@ class VizPathEditor {
     const pathNode = this.objectNodeMap.get(object);
     if (!pathNode) return;
 
-    const { instruction, node } = pathNode;
-
-    const { pre, next } = vizpath.getNeighboringInstructions(pathNode, true);
-
-    const directionNodeMap = {
-      pre: instruction[0] === InstructionType.START ? pre : pathNode,
-      next,
-    };
-
-    const targets: [direction: 'pre' | 'next', pathNode: PathNode][] = [];
-
-    if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
-      targets.push(['pre', directionNodeMap.pre]);
-    }
-
-    if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
-      targets.push(['next', directionNodeMap.next]);
-    }
-
-    targets.forEach(([direction, pathNode]) => {
-      const oldInstruction = pathNode.instruction;
-      if (oldInstruction[0] === InstructionType.BEZIER_CURVE) return;
-
-      const newInstruction = [...oldInstruction] as Instruction;
-      newInstruction[0] = {
-        [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
-        [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
-      }[newInstruction[0]];
-      newInstruction.splice({ pre: -2, next: 1 }[direction], 0, node!.x, node!.y);
-
-      vizpath.replace(pathNode, newInstruction);
+    this.rerender(() => {
+      vizpath.upgrade(pathNode, direction);
     });
   }
 
@@ -1219,40 +1374,31 @@ class VizPathEditor {
     const pathNode = this.objectNodeMap.get(object);
     if (!pathNode) return;
 
-    const { pre, next } = vizpath.getNeighboringInstructions(pathNode, true);
-
-    const directionNodeMap = {
-      pre: pathNode.instruction[0] === InstructionType.START ? pre : pathNode,
-      next,
-    };
-
-    const targets: [direction: 'pre' | 'next', pathNode: PathNode][] = [];
-
-    if ((direction === 'both' || direction === 'pre') && directionNodeMap.pre) {
-      targets.push(['pre', directionNodeMap.pre]);
-    }
-
-    if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
-      targets.push(['next', directionNodeMap.next]);
-    }
-
-    targets.forEach(([direction, pathNode]) => {
-      const instruction = pathNode.instruction;
-      if (['M', 'L'].includes(instruction[0])) return;
-
-      if (lowest) {
-        instruction[0] = InstructionType.LINE;
-        instruction.splice(1, instruction.length - 3);
-      } else {
-        instruction[0] = {
-          [InstructionType.QUADRATIC_CURCE]: InstructionType.LINE,
-          [InstructionType.BEZIER_CURVE]: InstructionType.QUADRATIC_CURCE,
-        }[instruction[0]];
-        instruction.splice({ pre: -4, next: 1 }[direction], 2);
-      }
-
-      vizpath.replace(pathNode, instruction);
+    this.rerender(() => {
+      vizpath.degrade(pathNode, direction, lowest);
     });
+  }
+
+  /**
+   * 节点连线
+   * @returns 拼接点
+   */
+  link(object1: fabric.Object, object2: fabric.Object) {
+    const vizpath = this.vizpath;
+    if (!vizpath) return;
+
+    const startNode = this.objectNodeMap.get(object1);
+    const endNode = this.objectNodeMap.get(object2);
+    if (!startNode || !endNode) return;
+
+    const { action, node } = this.rerender(() => vizpath.joinSegment(startNode, endNode));
+    if (!node) return;
+
+    const object = this.nodeObjectMap.get(node);
+    if (!object) return;
+
+    this.events.fire({ close: 'closed', join: 'joined' }[action], object);
+    return object;
   }
 
   /**
@@ -1368,13 +1514,17 @@ class VizPathEditor {
     this.canvas = canvas;
     this.events.mount(this.canvas);
 
-    // 初始事件
+    // 初始节点选择事件
     this._initSelectEvents();
 
-    // this._initClearNodeEvents();
-    // this._initAddNodeEvents();
-    // this._initConvertNodeEvents();
-    // this._initDeleteNodeEvents();
+    // 初始节点添加事件
+    this._initAddEvents();
+
+    // 初始节点删除事件
+    this._initDeleteEvents();
+
+    // 初始节点变换事件
+    this._initConvertEvents();
 
     // 加载其他增强模块
     await new Promise<void>((resolve) => {
