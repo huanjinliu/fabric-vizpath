@@ -802,14 +802,16 @@ class VizPathEditor {
       const vizpath = this.vizpath;
       if (!vizpath) return;
 
+      if (!this.currentConvertNodeObject) {
+        if (this.get('mode') !== Mode.CONVERT) return;
+        if (event.target?.[VizPathEditor.symbol] !== EditorObjectID.NODE) return;
+        this.currentConvertNodeObject = event.target as fabric.Object;
+      }
+
       if (this.currentConvertNodeObject) {
         fireMouseUpAndSelect(this.currentConvertNodeObject);
         this.currentConvertNodeObject.set({ lockMovementX: true, lockMovementY: true });
         canvas.selection = false;
-      } else {
-        if (this.get('mode') !== Mode.CONVERT) return;
-        if (event.target?.[VizPathEditor.symbol] !== EditorObjectID.NODE) return;
-        this.currentConvertNodeObject = event.target as fabric.Object;
       }
     });
 
@@ -853,7 +855,8 @@ class VizPathEditor {
 
       this.rerender(() => {
         convertibleNodes.forEach((item, index) => {
-          const newCoord = [position, oppositePosition][index];
+          const newCoord =
+            convertibleNodes.length === 1 ? oppositePosition : [position, oppositePosition][index];
           const newInstruction = [...item[1].instruction] as Instruction;
           newInstruction[0] = {
             [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
@@ -861,12 +864,44 @@ class VizPathEditor {
           }[newInstruction[0]];
           newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCoord.x, newCoord.y);
           vizpath.replace(item[1], newInstruction);
+
+          // 非闭合路径给端点添加虚拟变换点
+          if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
+            if (
+              targetNode === targetNode.segment[0] &&
+              !targetNode.deformers.pre &&
+              targetNode.deformers.next
+            ) {
+              vizpath.addNodeDeformer(targetNode, 'pre', {
+                x: targetNode.node!.x - (targetNode.deformers.next.x - targetNode.node!.x),
+                y: targetNode.node!.y - (targetNode.deformers.next.y - targetNode.node!.y),
+              });
+            }
+
+            if (
+              targetNode === targetNode.segment[targetNode.segment.length - 1] &&
+              !targetNode.deformers.next &&
+              targetNode.deformers.pre
+            ) {
+              vizpath.addNodeDeformer(targetNode, 'next', {
+                x: targetNode.node!.x - (targetNode.deformers.pre.x - targetNode.node!.x),
+                y: targetNode.node!.y - (targetNode.deformers.pre.y - targetNode.node!.y),
+              });
+            }
+          }
         });
       });
 
-      const targetCurveDot = this.deformers.find((i) => {
-        return i.node === targetNode && i.type === convertibleNodes[0]?.[0];
-      });
+      let targetCurveDot: EditorDeformer | undefined;
+      console.log(this.deformers);
+      const nodeDeformers = this.deformers.filter((i) => i.node === targetNode);
+      if (nodeDeformers.length === 1) {
+        targetCurveDot = nodeDeformers[0];
+      } else {
+        targetCurveDot = this.deformers.find((i) => {
+          return i.type !== convertibleNodes[0]?.[0];
+        });
+      }
 
       if (targetCurveDot) {
         fireMouseUpAndSelect(targetCurveDot.curveDot);
@@ -1256,12 +1291,33 @@ class VizPathEditor {
 
         // 如果是起始点
         if (pathNode === segment[0]) {
-          // 添加新的起始
-          return vizpath.insertBefore(pathNode, [InstructionType.START, coord.x, coord.y]);
+          const preDeformer = pathNode.deformers?.pre;
+          const newNode = vizpath.insertBefore(pathNode, [InstructionType.START, coord.x, coord.y]);
+          if (preDeformer) {
+            vizpath.replace(pathNode, [
+              InstructionType.QUADRATIC_CURCE,
+              preDeformer.x,
+              preDeformer.y,
+              pathNode.node!.x,
+              pathNode.node!.y,
+            ]);
+          }
+          return newNode;
         }
         // 如果是末尾端点
         else if (pathNode === segment[segment.length - 1]) {
-          return vizpath.insertAfter(pathNode, [InstructionType.LINE, coord.x, coord.y]);
+          const nextDeformer = pathNode.deformers?.next;
+          if (nextDeformer) {
+            return vizpath.insertAfter(pathNode, [
+              InstructionType.QUADRATIC_CURCE,
+              nextDeformer.x,
+              nextDeformer.y,
+              coord.x,
+              coord.y,
+            ]);
+          } else {
+            return vizpath.insertAfter(pathNode, [InstructionType.LINE, coord.x, coord.y]);
+          }
         }
       } else {
         return vizpath.addSegment(`M ${coord.x} ${coord.y}`)[0];

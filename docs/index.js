@@ -4499,6 +4499,11 @@
 	        var _a;
 	        var vizpath = _this14.vizpath;
 	        if (!vizpath) return;
+	        if (!_this14.currentConvertNodeObject) {
+	          if (_this14.get('mode') !== Mode.CONVERT) return;
+	          if (((_a = event.target) === null || _a === void 0 ? void 0 : _a[VizPathEditor.symbol]) !== EditorObjectID.NODE) return;
+	          _this14.currentConvertNodeObject = event.target;
+	        }
 	        if (_this14.currentConvertNodeObject) {
 	          fireMouseUpAndSelect(_this14.currentConvertNodeObject);
 	          _this14.currentConvertNodeObject.set({
@@ -4506,10 +4511,6 @@
 	            lockMovementY: true
 	          });
 	          canvas.selection = false;
-	        } else {
-	          if (_this14.get('mode') !== Mode.CONVERT) return;
-	          if (((_a = event.target) === null || _a === void 0 ? void 0 : _a[VizPathEditor.symbol]) !== EditorObjectID.NODE) return;
-	          _this14.currentConvertNodeObject = event.target;
 	        }
 	      });
 	      this.events.canvas.on('mouse:move', function (event) {
@@ -4544,17 +4545,41 @@
 	        }
 	        _this14.rerender(function () {
 	          convertibleNodes.forEach(function (item, index) {
-	            var newCoord = [position, oppositePosition][index];
+	            var newCoord = convertibleNodes.length === 1 ? oppositePosition : [position, oppositePosition][index];
 	            var newInstruction = _toConsumableArray(item[1].instruction);
 	            newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[newInstruction[0]];
 	            newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCoord.x, newCoord.y);
 	            vizpath.replace(item[1], newInstruction);
+	            // 非闭合路径给端点添加虚拟变换点
+	            if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
+	              if (targetNode === targetNode.segment[0] && !targetNode.deformers.pre && targetNode.deformers.next) {
+	                vizpath.addNodeDeformer(targetNode, 'pre', {
+	                  x: targetNode.node.x - (targetNode.deformers.next.x - targetNode.node.x),
+	                  y: targetNode.node.y - (targetNode.deformers.next.y - targetNode.node.y)
+	                });
+	              }
+	              if (targetNode === targetNode.segment[targetNode.segment.length - 1] && !targetNode.deformers.next && targetNode.deformers.pre) {
+	                vizpath.addNodeDeformer(targetNode, 'next', {
+	                  x: targetNode.node.x - (targetNode.deformers.pre.x - targetNode.node.x),
+	                  y: targetNode.node.y - (targetNode.deformers.pre.y - targetNode.node.y)
+	                });
+	              }
+	            }
 	          });
 	        });
-	        var targetCurveDot = _this14.deformers.find(function (i) {
-	          var _a;
-	          return i.node === targetNode && i.type === ((_a = convertibleNodes[0]) === null || _a === void 0 ? void 0 : _a[0]);
+	        var targetCurveDot;
+	        console.log(_this14.deformers);
+	        var nodeDeformers = _this14.deformers.filter(function (i) {
+	          return i.node === targetNode;
 	        });
+	        if (nodeDeformers.length === 1) {
+	          targetCurveDot = nodeDeformers[0];
+	        } else {
+	          targetCurveDot = _this14.deformers.find(function (i) {
+	            var _a;
+	            return i.type !== ((_a = convertibleNodes[0]) === null || _a === void 0 ? void 0 : _a[0]);
+	          });
+	        }
 	        if (targetCurveDot) {
 	          fireMouseUpAndSelect(targetCurveDot.curveDot);
 	        }
@@ -4953,6 +4978,7 @@
 	      if (!vizpath) return;
 	      var coord = vizpath.calcRelativeCoord(position);
 	      var node = this.rerender(function (activeNodes) {
+	        var _a, _b;
 	        if (activeNodes.length === 1) {
 	          var _node = activeNodes[0];
 	          var pathNode = _this20.objectNodeMap.get(_node);
@@ -4962,12 +4988,21 @@
 	          if (vizpath.isClosedSegment(segment)) return;
 	          // 如果是起始点
 	          if (pathNode === segment[0]) {
-	            // 添加新的起始
-	            return vizpath.insertBefore(pathNode, [InstructionType.START, coord.x, coord.y]);
+	            var preDeformer = (_a = pathNode.deformers) === null || _a === void 0 ? void 0 : _a.pre;
+	            var newNode = vizpath.insertBefore(pathNode, [InstructionType.START, coord.x, coord.y]);
+	            if (preDeformer) {
+	              vizpath.replace(pathNode, [InstructionType.QUADRATIC_CURCE, preDeformer.x, preDeformer.y, pathNode.node.x, pathNode.node.y]);
+	            }
+	            return newNode;
 	          }
 	          // 如果是末尾端点
 	          else if (pathNode === segment[segment.length - 1]) {
-	            return vizpath.insertAfter(pathNode, [InstructionType.LINE, coord.x, coord.y]);
+	            var nextDeformer = (_b = pathNode.deformers) === null || _b === void 0 ? void 0 : _b.next;
+	            if (nextDeformer) {
+	              return vizpath.insertAfter(pathNode, [InstructionType.QUADRATIC_CURCE, nextDeformer.x, nextDeformer.y, coord.x, coord.y]);
+	            } else {
+	              return vizpath.insertAfter(pathNode, [InstructionType.LINE, coord.x, coord.y]);
+	            }
 	          }
 	        } else {
 	          return vizpath.addSegment("M ".concat(coord.x, " ").concat(coord.y))[0];
@@ -5767,12 +5802,14 @@
 	    value: function _toResponsiveNode(pathNodes, node, index) {
 	      var _a, _b, _c, _e;
 	      var instruction = node.instruction;
+	      // 是否是闭合路径
+	      this.isClosedSegment(pathNodes);
 	      // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换点也会被起始点占用
-	      var isStartSyncPoint = ((_a = pathNodes[index + 1]) === null || _a === void 0 ? void 0 : _a.instruction[0]) === InstructionType.CLOSE;
+	      var isCoincideNode = ((_a = pathNodes[index + 1]) === null || _a === void 0 ? void 0 : _a.instruction[0]) === InstructionType.CLOSE;
 	      // 路径节点
 	      var coord = this.getInstructionCoord(instruction);
 	      if (coord) {
-	        if (isStartSyncPoint) {
+	        if (isCoincideNode) {
 	          (_b = pathNodes[0].node) === null || _b === void 0 ? void 0 : _b.observe(function (x, y) {
 	            instruction[instruction.length - 2] = x;
 	            instruction[instruction.length - 1] = y;
@@ -5792,7 +5829,7 @@
 	        pre = _this$getNeighboringI.pre,
 	        next = _this$getNeighboringI.next;
 	      // 前曲线变换点
-	      if (isStartSyncPoint) {
+	      if (isCoincideNode) {
 	        if ((node === null || node === void 0 ? void 0 : node.instruction[0]) === InstructionType.BEZIER_CURVE) {
 	          var curveDot = this._toResponsiveCoord({
 	            x: node.instruction[3],
@@ -5854,6 +5891,21 @@
 	        delete node.deformers;
 	      }
 	      return node;
+	    }
+	    /**
+	     * 添加变换点
+	     */
+	  }, {
+	    key: "addNodeDeformer",
+	    value: function addNodeDeformer(node, type, coord) {
+	      var _a;
+	      node.deformers = (_a = node.deformers) !== null && _a !== void 0 ? _a : {};
+	      if (node.deformers[type]) {
+	        node.deformers[type].set(coord.x, coord.y);
+	        return;
+	      }
+	      node.deformers[type] = this._toResponsiveCoord(coord);
+	      node.deformers[type].set(coord.x, coord.y);
 	    }
 	    /**
 	     * 将画布坐标转化为特定路径的相对指令坐标位置
@@ -16827,7 +16879,7 @@
 
 	var content$8 = "#### Installation\n\n```shell\n$ npm install fabric-vizpath --save\n// or\n$ pnpm add fabric-vizpath\n```\n\n#### Quick Start\n\n> Attention: You must make sure you had installed [fabric.js](https://github.com/fabricjs/fabric.js) before using this library!\n\n```typescript\nimport { VizPath } from 'fabric-vizpath';\n\nconst vizpath = new VizPath('');\n```\n";
 
-	var arc = "M 88.827 199.088 Q 258.533 199.088 258.533 368.794";
+	var arc = "M 101 94 Q 103 -59 -52 -58 Q -204 -58 -206 93";
 	var arch = "M0.5 53.8667C0.5 24.3763 23.5738 0.5 52 0.5C80.4262 0.5 103.5 24.3763 103.5 53.8667V143.5H0.5V53.8667Z";
 	var banana = "M 8,223 c 0,0 143,3 185,-181 c 2,-11 -1,-20 1,-33 h 16 c 0,0 -3,17 1,30 c 21,68 -4,242 -204,196 L 8,223 z M 8,230 c 0,0 188,40 196,-160";
 	var bubble = "M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z";
@@ -16842,7 +16894,7 @@
 	var pentagon = "M 100 0 L 190 50 L 160 140 L 40 140 L 10 50 z";
 	var point = "M 100 100 z";
 	var polyline = "M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160";
-	var shapes = "M-188.7846 -47L-100.923 97H-256.3538 z M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z";
+	var shapes = "M -61.1077 -171 L 26.7539 -27 L -128.6769 -27 L -61.1077 -171 Z M 218.6769 -97.5 C 218.6769 -61.8777 189.7992 -33 154.1769 -33 C 118.5546 -33 89.6769 -61.8777 89.6769 -97.5 C 89.6769 -133.1223 118.5546 -162 154.1769 -162 C 189.7992 -162 218.6769 -133.1223 218.6769 -97.5 Z M -124.3231 181 L 28.6769 180 L 28.6769 28 L -124.3231 28 L -124.3231 181 Z M 230.6769 180 L 79.6769 177 L 230.6769 27 L 79.6769 28";
 	var spiral = "M85.7639 135.505C85.7639 135.505 85.7496 135.509 85.7438 135.511C81.8568 136.497 77.6534 137.475 73.2314 137.944C67.5574 138.549 61.6383 138.342 55.6328 137.328C44.6718 135.481 34.7338 131.085 26.0907 124.27C15.2863 115.748 7.77844 104.811 3.78356 91.7677L3.71981 91.5592C-1.6158 73.6286 -0.194072 56.0381 7.9484 39.2738C12.0117 30.9068 17.7201 23.4838 24.9102 17.2098C29.8374 12.9103 35.4839 9.29955 41.6925 6.47953C52.3821 1.61793 64.1597 -0.517597 76.6933 0.126985C84.7958 0.543356 92.9129 2.38332 100.82 5.59858C110.005 9.33143 118.366 14.8208 125.674 21.9111C130.611 26.7023 134.948 32.3393 138.559 38.6666C141.123 43.1579 143.352 48.2517 145.374 54.248C145.454 54.4866 145.328 54.7435 145.091 54.8222C144.86 54.9058 144.599 54.7732 144.52 54.5346C142.516 48.5962 140.311 43.5519 137.776 39.1149C134.207 32.8635 129.926 27.2951 125.047 22.5619C117.823 15.5534 109.559 10.1298 100.483 6.43923C92.6707 3.26484 84.651 1.44574 76.6472 1.034C64.2628 0.394478 52.6255 2.50611 42.0675 7.3053C35.9395 10.0912 30.3663 13.6541 25.506 17.8952C18.4042 24.0883 12.774 31.4178 8.76162 39.6743C0.718869 56.2307 -0.686431 73.5977 4.58209 91.2987L4.64496 91.5043C8.58405 104.365 15.9889 115.15 26.6456 123.559C35.1663 130.282 44.9679 134.611 55.7773 136.436C61.6996 137.433 67.5398 137.639 73.1319 137.044C77.4892 136.579 81.6523 135.613 85.4983 134.636L85.62 134.593C95.4785 131.736 104.188 126.274 111.528 118.352C118.272 111.071 122.955 102.391 125.447 92.5603C127.078 86.1276 127.632 79.7237 127.091 73.5212C126.747 69.5733 126.117 65.9601 125.166 62.4827C123.463 56.2558 121.024 50.8366 117.713 45.9217C113.675 39.9273 108.646 34.9077 102.759 30.9987C96.2268 26.6603 89.1157 23.8287 81.625 22.5793C75.5671 21.5693 70.0219 21.5583 64.6691 22.5461L64.0153 22.6669C61.9489 23.0455 59.8138 23.4356 57.7696 24.0512C43.1548 28.6344 32.7493 38.3677 26.8413 52.9826C23.6236 60.9423 22.7312 69.4416 24.1864 78.2457C26.3941 91.5948 33.0422 101.958 43.9415 109.046C50.7525 113.473 58.4261 115.804 66.7529 115.968C71.1538 116.056 75.4058 115.453 79.385 114.173C79.3994 114.168 79.4166 114.163 79.431 114.159C89.0504 110.859 96.3017 104.95 100.99 96.5941C105.587 88.3997 107.006 79.6 105.213 70.44C103.377 61.0713 98.5646 53.7625 90.9103 48.7127C85.6079 45.2141 80.0918 43.44 74.0479 43.287C64.7248 43.0476 57.3688 45.9557 51.5687 52.175C45.9897 58.1526 43.5832 65.3354 44.4163 73.5223C45.5927 85.0905 53.1729 92.978 64.1995 94.1055C71.9883 94.9028 77.8729 92.2452 81.6966 86.2059C84.9508 81.0659 84.731 73.4165 81.21 69.1515C78.5375 65.9157 75.6196 64.7213 71.7498 65.2809C69.9512 65.5396 68.3157 66.4957 67.3751 67.8346C66.5081 69.0655 66.2353 70.5453 66.5653 72.2303C66.6121 72.4756 66.4527 72.7143 66.2102 72.7632C65.9668 72.8091 65.729 72.6475 65.6793 72.403C65.305 70.491 65.6364 68.7304 66.6369 67.3099C67.7179 65.7729 69.578 64.6785 71.6169 64.3843C75.8329 63.7758 79.0034 65.0671 81.9007 68.5761C85.6549 73.1213 85.9057 81.252 82.4565 86.6987C78.4356 93.0484 72.2637 95.8445 64.1117 95.0095C58.4168 94.4268 53.4785 92.0675 49.8321 88.1828C46.2858 84.41 44.1035 79.3682 43.5171 73.6105C42.6568 65.15 45.1447 57.7302 50.9068 51.551C56.8121 45.2235 64.6027 42.135 74.0655 42.3792C80.1957 42.5374 86.028 44.4112 91.4007 47.9548C99.2667 53.1425 104.21 60.652 106.097 70.271C107.934 79.6485 106.482 88.6578 101.775 97.0445C96.9693 105.613 89.5303 111.669 79.6716 115.038C79.6487 115.045 79.6286 115.051 79.6085 115.057C75.546 116.363 71.2189 116.968 66.7391 116.878C58.2442 116.708 50.4091 114.332 43.4558 109.809C32.3297 102.575 25.5493 92.0051 23.2982 78.3907C21.8135 69.4182 22.7239 60.7519 26.0069 52.6362C31.9793 37.8623 42.4735 27.9878 57.1947 23.2802C57.212 23.2749 57.2226 23.2685 57.2427 23.2624C57.3173 23.2396 57.392 23.2167 57.4666 23.1939L57.5241 23.1763C57.5241 23.1763 57.5355 23.1728 57.5442 23.1702C59.6208 22.5478 61.7645 22.1551 63.8433 21.7759L64.4943 21.656C69.9511 20.6491 75.5999 20.66 81.7601 21.6862C89.3758 22.9544 96.6056 25.8352 103.247 30.2416C109.231 34.2156 114.347 39.3199 118.452 45.4138C121.818 50.4134 124.296 55.9189 126.029 62.2442C126.996 65.7766 127.635 69.4379 127.985 73.4443C128.531 79.7494 127.971 86.2566 126.313 92.7861C123.783 102.768 119.029 111.577 112.182 118.972C104.732 127.016 95.8773 132.558 85.8905 135.457L85.7745 135.498C85.7745 135.498 85.7631 135.502 85.7573 135.504L85.7639 135.505Z";
 	var test = "M -150 50 z M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100";
 	var paths = {
@@ -16965,7 +17017,7 @@
 	            return;
 	        if (currentDemo !== Instruction._01_INSTALL_AND_START)
 	            return;
-	        const path = new Path(paths.circle);
+	        const path = new Path(paths.arc);
 	        const vizpath = path.visualize();
 	        // console.log(vizpath.joinSegment(vizpath.segments[0][0], vizpath.segments[0][5]));
 	        const editor = new VizPathEditor();
@@ -16988,6 +17040,15 @@
 	                key: 'P',
 	                onActivate: () => {
 	                    return editor.set('mode', 'add');
+	                },
+	                onDeactivate: (e, reset) => {
+	                    reset();
+	                },
+	            },
+	            {
+	                key: 'V',
+	                onActivate: () => {
+	                    return editor.set('mode', 'convert');
 	                },
 	                onDeactivate: (e, reset) => {
 	                    reset();
@@ -17021,7 +17082,7 @@
 	        }))
 	            .mount(canvas);
 	        await editor.enterEditing(vizpath);
-	        // editor.focus(editor.nodes[0]);
+	        editor.focus(editor.nodes[0]);
 	        // editor.remove(editor.nodes[0], editor.nodes[2]);
 	        setEditor(editor);
 	    }, [currentDemo, canvas, setEditor]);

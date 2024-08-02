@@ -562,13 +562,15 @@ export class VizPath {
   private _toResponsiveNode(pathNodes: PathNode[], node: PathNode, index: number) {
     const instruction = node.instruction;
 
+    // 是否是闭合路径
+    const isClosedSegment = this.isClosedSegment(pathNodes);
     // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换点也会被起始点占用
-    const isStartSyncPoint = pathNodes[index + 1]?.instruction[0] === InstructionType.CLOSE;
+    const isCoincideNode = pathNodes[index + 1]?.instruction[0] === InstructionType.CLOSE;
 
     // 路径节点
     const coord = this.getInstructionCoord(instruction);
     if (coord) {
-      if (isStartSyncPoint) {
+      if (isCoincideNode) {
         pathNodes[0].node?.observe((x, y) => {
           instruction[instruction.length - 2] = x;
           instruction[instruction.length - 1] = y;
@@ -589,7 +591,7 @@ export class VizPath {
     const { pre, next } = this.getNeighboringInstructions(node);
 
     // 前曲线变换点
-    if (isStartSyncPoint) {
+    if (isCoincideNode) {
       if (node?.instruction[0] === InstructionType.BEZIER_CURVE) {
         const curveDot = this._toResponsiveCoord({
           x: node.instruction[3],
@@ -657,6 +659,19 @@ export class VizPath {
     }
 
     return node;
+  }
+
+  /**
+   * 添加变换点
+   */
+  addNodeDeformer(node: PathNode, type: 'pre' | 'next', coord: Coord) {
+    node.deformers = node.deformers ?? {};
+    if (node.deformers[type]) {
+      node.deformers[type]!.set(coord.x, coord.y);
+      return;
+    }
+    node.deformers[type] = this._toResponsiveCoord(coord);
+    node.deformers[type]!.set(coord.x, coord.y);
   }
 
   /**
