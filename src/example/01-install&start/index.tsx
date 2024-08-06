@@ -24,7 +24,7 @@ function Demo01() {
     if (!canvas) return;
     if (currentDemo !== Instruction._01_INSTALL_AND_START) return;
 
-    const path = new Path(paths.arc);
+    const path = new Path(paths.curve2);
     const vizpath = path.visualize();
 
     // console.log(vizpath.joinSegment(vizpath.segments[0][0], vizpath.segments[0][5]));
@@ -69,7 +69,9 @@ function Demo01() {
               key: 'O',
               combinationKeys: ['ctrl'],
               onActivate: () => {
-                console.log(vizpath.getPathData(null, { withTransform: true }));
+                console.log(
+                  vizpath.getPathData(null, { withTransform: true, withTranslate: true }),
+                );
               },
             },
             {
@@ -97,7 +99,7 @@ function Demo01() {
 
     await editor.enterEditing(vizpath);
 
-    editor.focus(editor.nodes[0]);
+    // editor.focus(editor.nodes[0]);
 
     // editor.remove(editor.nodes[0], editor.nodes[2]);
 

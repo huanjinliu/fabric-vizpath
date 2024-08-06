@@ -161,11 +161,10 @@ class Path extends fabric.Path {
       withTransform = false,
       withTranslate = false,
     } = outputOptions;
-    const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
     const segment = Path.mapInstructionCoord(instructions, (x, y) => {
       let point = new fabric.Point(x, y);
       if (withTransform) {
-        point = fabric.util.transformPoint(point, withTranslate ? matrix : matrixWithoutTranslate);
+        point = fabric.util.transformPoint(point, matrix, !withTranslate);
       }
       return {
         x: round(point.x, precision),
@@ -402,7 +401,8 @@ class Path extends fabric.Path {
         path.pathOffset.x - (path.width! - oldInfo.width) / 2 - oldInfo.pathOffset.x,
         path.pathOffset.y - (path.height! - oldInfo.height) / 2 - oldInfo.pathOffset.y,
       ),
-      [...path.calcOwnMatrix().slice(0, 4), 0, 0],
+      path.calcOwnMatrix(),
+      true,
     );
 
     // 设置回正确的偏移位置
@@ -514,7 +514,7 @@ class Path extends fabric.Path {
       instruction,
     };
 
-    // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换点也会被起始点占用
+    // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换器也会被起始点占用
     const isStartSyncPoint = instructions[index + 1]?.[0] === InstructionType.CLOSE;
 
     // 路径节点
@@ -536,12 +536,12 @@ class Path extends fabric.Path {
       }
     }
 
-    // 指令曲线变换点
+    // 指令曲线变换器
     const curveDots = {} as NonNullable<PathNode['curveDots']>;
 
     const { pre, next } = this.getNeighboringInstructions(pnode);
 
-    // 前曲线变换点
+    // 前曲线变换器
     if (isStartSyncPoint) {
       if (pnode?.instruction[0] === InstructionType.BEZIER_CURVE) {
         const curveDot = this._toResponsiveCoord({
@@ -586,7 +586,7 @@ class Path extends fabric.Path {
       }
     }
 
-    // 后曲线变换点
+    // 后曲线变换器
     if (next && ['C', 'Q'].includes(next.instruction[0])) {
       curveDots.next = this._toResponsiveCoord({
         x: next.instruction[1],
@@ -620,11 +620,7 @@ class Path extends fabric.Path {
 
     // 路径如果带有偏移则需要移除偏移带来的影响
     if (object.type === 'path') {
-      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, [
-        ...matrix.slice(0, 4),
-        0,
-        0,
-      ]);
+      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, matrix, true);
 
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
@@ -642,11 +638,7 @@ class Path extends fabric.Path {
     const matrix = [...object.calcOwnMatrix()];
 
     if (object.type === 'path') {
-      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, [
-        ...matrix.slice(0, 4),
-        0,
-        0,
-      ]);
+      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, matrix, true);
 
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
@@ -688,8 +680,7 @@ class Path extends fabric.Path {
       (segment ?? this.segments.flat(1)).map((node) => node.instruction),
     );
     const matrix = [...this.calcOwnMatrix()] as Matrix;
-    const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
-    const offset = fabric.util.transformPoint(this.pathOffset, matrixWithoutTranslate);
+    const offset = fabric.util.transformPoint(this.pathOffset, matrix, true);
     matrix[4] -= offset.x;
     matrix[5] -= offset.y;
     return Path.toPathData(instructions, { ...outputOptions, matrix });
@@ -1191,8 +1182,7 @@ class Path extends fabric.Path {
     const instructions = this.getInstructions();
     const path = typeof source === 'string' ? new fabric.Path(source) : source;
     const matrix = path.calcOwnMatrix() as Matrix;
-    const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
-    const offset = fabric.util.transformPoint(path.pathOffset, matrixWithoutTranslate);
+    const offset = fabric.util.transformPoint(path.pathOffset, matrix, true);
     matrix[4] -= offset.x;
     matrix[5] -= offset.y;
     instructions.push(...Path.transformInstructions(path.path as unknown as Instruction[], matrix));

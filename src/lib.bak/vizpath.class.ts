@@ -191,7 +191,6 @@ class VizPath {
   getPathInfo(path: Path, precision = 3) {
     const { segments } = path;
     const matrix = [...path.calcOwnMatrix()] as Matrix;
-    const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
     const instructions = segments.flat(1).map((item) => {
       const instruction = [...item.instruction];
       for (let i = 0; i < instruction.length - 1; i += 2) {
@@ -199,7 +198,7 @@ class VizPath {
           new fabric.Point(instruction[i + 1] as number, instruction[i + 2] as number),
           matrix,
         );
-        const offset = fabric.util.transformPoint(path.pathOffset, matrixWithoutTranslate);
+        const offset = fabric.util.transformPoint(path.pathOffset, matrix, true);
         point.x -= offset.x;
         point.y -= offset.y;
         instruction[i + 1] = round(point.x, precision);
@@ -313,7 +312,7 @@ class VizPath {
   }
 
   /**
-   * 获取周围的曲线变换点信息（前、后、上一路径节点后、下一路径节点前），默认循环查找
+   * 获取周围的曲线变换器信息（前、后、上一路径节点后、下一路径节点前），默认循环查找
    */
   getNeighboringCurveDots(node: PathNode) {
     const curveDots: {
@@ -374,7 +373,7 @@ class VizPath {
       segment.forEach((pathNode, index) => {
         const { instruction } = pathNode;
 
-        // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换点也会被起始点占用
+        // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换器也会被起始点占用
         const isStartSyncPoint = segment[index + 1]?.instruction?.[0] === InstructionType.CLOSE;
 
         // 路径节点
@@ -398,12 +397,12 @@ class VizPath {
           }
         }
 
-        // 指令曲线变换点
+        // 指令曲线变换器
         const curveDots = {} as NonNullable<PathNode['curveDots']>;
 
         const { pre, next } = this.getNeighboringInstructions(pathNode);
 
-        // 前曲线变换点
+        // 前曲线变换器
         if (isStartSyncPoint) {
           if (pathNode?.instruction[0] === InstructionType.BEZIER_CURVE) {
             const curveDot = this._toResponsive({
@@ -460,7 +459,7 @@ class VizPath {
           }
         }
 
-        // 后曲线变换点
+        // 后曲线变换器
         if (next && ['Q', 'C'].includes(next.instruction[0])) {
           curveDots.next = this._toResponsive({
             x: next.instruction[1],
@@ -505,7 +504,7 @@ class VizPath {
    *
    * @note
    *
-   * 闭合点和起始点的闭合重叠点均无路径节点和曲线变换点
+   * 闭合点和起始点的闭合重叠点均无路径节点和曲线变换器
    *
    * @param path 路径信息
    */

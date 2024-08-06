@@ -35,7 +35,8 @@ const repairPath = (path: fabric.Path) => {
       path.pathOffset.x - (path.width! - oldInfo.width) / 2 - oldInfo.pathOffset.x,
       path.pathOffset.y - (path.height! - oldInfo.height) / 2 - oldInfo.pathOffset.y,
     ),
-    [...path.calcOwnMatrix().slice(0, 4), 0, 0],
+    path.calcOwnMatrix(),
+    true,
   );
 
   // 设置回正确的偏移位置

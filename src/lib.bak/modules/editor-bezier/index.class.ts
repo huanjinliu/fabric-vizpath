@@ -483,7 +483,7 @@ class EditorBezier extends VizPathModule {
    * 寻找新添加的节点是否与原路径节点构成曲线路径
    * @param originNode 原路径节点
    * @param newNodePoint 新添加的节点
-   * @returns 构成曲线路径的变换点
+   * @returns 构成曲线路径的变换器
    */
   private _findQuadraticCurvePoint(originNode: PathNode, newNodePoint: Coord): Coord | undefined {
     const editor = this.vizpath?.editor;

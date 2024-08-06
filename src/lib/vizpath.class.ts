@@ -145,11 +145,10 @@ export class VizPath {
       withTransform = false,
       withTranslate = false,
     } = outputOptions;
-    const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
     const segment = VizPath.mapInstructionCoord(instructions, (x, y) => {
       let point = new fabric.Point(x, y);
       if (withTransform) {
-        point = fabric.util.transformPoint(point, withTranslate ? matrix : matrixWithoutTranslate);
+        point = fabric.util.transformPoint(point, matrix, !withTranslate);
       }
       return {
         x: round(point.x, precision),
@@ -336,9 +335,13 @@ export class VizPath {
    * 获取路径指令信息
    */
   getInstructions(
-    callback = (segment: PathSegment) => segment.map((node) => node.instruction),
+    callback = (segment: PathSegment, index: number) => segment.map((node) => node.instruction),
   ): Instruction[] {
-    return this.segments.map(callback).flat(1);
+    const segments: Instruction[][] = [];
+    this.segments.forEach((segment, index) => {
+      segments.push(callback(segment, index));
+    });
+    return segments.flat(1);
   }
 
   /**
@@ -347,9 +350,6 @@ export class VizPath {
    */
   setInstructions(instructions: Instruction[]) {
     this.events.fire('before:update');
-
-    // 释放旧节点数据
-    this._revokeAllRCoords();
 
     // 构建新的路径段数据
     const newSegments = [] as PathSegment[];
@@ -378,11 +378,17 @@ export class VizPath {
       segment.forEach((node, index) => {
         this._toResponsiveNode(segment, node, index);
       });
+      this._initSegmentDeformers(segment);
     });
+
+    const oldSegments = this.segments;
 
     this.segments = newSegments;
     this.path.path = instructions as unknown as fabric.Point[];
     this.requestRepair();
+
+    // 释放旧节点数据
+    this._revokeDisusedRCoords(oldSegments);
 
     this.events.fire('after:update');
   }
@@ -402,8 +408,7 @@ export class VizPath {
       (segment ?? this.segments.flat(1)).map((node) => node.instruction),
     );
     const matrix = [...this.path.calcOwnMatrix()] as Matrix;
-    const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
-    const offset = fabric.util.transformPoint(this.path.pathOffset, matrixWithoutTranslate);
+    const offset = fabric.util.transformPoint(this.path.pathOffset, matrix, true);
     matrix[4] -= offset.x;
     matrix[5] -= offset.y;
     return VizPath.toPathData(instructions, { ...outputOptions, matrix });
@@ -457,7 +462,8 @@ export class VizPath {
           inverse(path.height! - oldInfo.height, path.flipY) / 2 -
           oldInfo.pathOffset.y,
       ),
-      [...path.calcOwnMatrix().slice(0, 4), 0, 0],
+      path.calcOwnMatrix(),
+      true,
     );
 
     // 设置回正确的偏移位置
@@ -562,12 +568,9 @@ export class VizPath {
   private _toResponsiveNode(pathNodes: PathNode[], node: PathNode, index: number) {
     const instruction = node.instruction;
 
-    // 是否是闭合路径
-    const isClosedSegment = this.isClosedSegment(pathNodes);
-    // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换点也会被起始点占用
+    // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换器也会被起始点占用
     const isCoincideNode = pathNodes[index + 1]?.instruction[0] === InstructionType.CLOSE;
 
-    // 路径节点
     const coord = this.getInstructionCoord(instruction);
     if (coord) {
       if (isCoincideNode) {
@@ -576,93 +579,96 @@ export class VizPath {
           instruction[instruction.length - 1] = y;
         });
       } else {
-        const rcoord = this._toResponsiveCoord(coord);
-        rcoord.observe((x, y) => {
+        node.node = node.node ?? this._toResponsiveCoord(coord);
+        node.node.unobserve();
+        node.node.observe((x, y) => {
           instruction[instruction.length - 2] = x;
           instruction[instruction.length - 1] = y;
         });
-        node.node = rcoord;
+        node.node.set(coord.x, coord.y);
       }
-    }
-
-    // 指令曲线变换点
-    const deformers = {} as NonNullable<PathNode['deformers']>;
-
-    const { pre, next } = this.getNeighboringInstructions(node);
-
-    // 前曲线变换点
-    if (isCoincideNode) {
-      if (node?.instruction[0] === InstructionType.BEZIER_CURVE) {
-        const curveDot = this._toResponsiveCoord({
-          x: node.instruction[3],
-          y: node.instruction[4],
-        });
-        curveDot.observe((x, y) => {
-          node.instruction[3] = x;
-          node.instruction[4] = y;
-        });
-        pathNodes[0].deformers = pathNodes[0].deformers ?? {};
-        pathNodes[0].deformers.pre = curveDot;
-      }
-
-      if (node?.instruction[0] === InstructionType.QUADRATIC_CURCE && pre && pre.instruction[0]) {
-        const curveDot = pre.deformers!.next! as RCoord;
-        curveDot.observe((x, y) => {
-          node.instruction[1] = x;
-          node.instruction[2] = y;
-        });
-        pathNodes[0].deformers = pathNodes[0].deformers ?? {};
-        pathNodes[0].deformers.pre = curveDot;
-      }
-    } else {
-      if (node?.instruction[0] === InstructionType.BEZIER_CURVE) {
-        deformers.pre = this._toResponsiveCoord({
-          x: node.instruction[3],
-          y: node.instruction[4],
-        });
-        deformers.pre.observe((x, y) => {
-          node.instruction[3] = x;
-          node.instruction[4] = y;
-        });
-      }
-
-      if (node?.instruction[0] === InstructionType.QUADRATIC_CURCE && pre && pre.instruction[0]) {
-        deformers.pre = pre.deformers!.next! as RCoord;
-        deformers.pre.observe((x, y) => {
-          node.instruction[1] = x;
-          node.instruction[2] = y;
-        });
-      }
-    }
-
-    // 后曲线变换点
-    if (next && ['C', 'Q'].includes(next.instruction[0])) {
-      deformers.next = this._toResponsiveCoord({
-        x: next.instruction[1],
-        y: next.instruction[2],
-      });
-      deformers.next.observe((x, y) => {
-        next.instruction[1] = x;
-        next.instruction[2] = y;
-      });
-    }
-
-    if (node.deformers) {
-      if (node.deformers.pre) this._observers.delete(node.deformers.pre as RCoord);
-      if (node.deformers.next) this._observers.delete(node.deformers.next as RCoord);
-    }
-
-    if (Object.keys(deformers).length) {
-      node.deformers = deformers;
-    } else {
-      delete node.deformers;
     }
 
     return node;
   }
 
   /**
-   * 添加变换点
+   * 补充变换器
+   */
+  private _initSegmentDeformers(segment: PathSegment) {
+    const nodes = segment;
+
+    const isQuadraticCurve = (node: PathNode) =>
+      node.instruction[0] === InstructionType.QUADRATIC_CURCE;
+    let quadraticIndex = -1;
+
+    nodes.forEach((node, index) => {
+      if (isQuadraticCurve(node)) quadraticIndex = quadraticIndex === -1 ? 1 : quadraticIndex + 1;
+      else quadraticIndex = -1;
+
+      // 是否是起始点的闭合重叠点，其路径节点沿用起始点，而曲线变换器也会被起始点占用
+      const isCoincideNode = nodes[index + 1]?.instruction[0] === InstructionType.CLOSE;
+
+      // 旧的变换器
+      const oldDeformers = node.deformers ?? {};
+
+      // 指令曲线变换器
+      const deformers = {} as NonNullable<PathNode['deformers']>;
+
+      if (quadraticIndex === -1 || quadraticIndex % 2 !== 1) {
+        const { pre, next } = this.getNeighboringInstructions(node);
+
+        // 前曲线变换器
+        if (['Q', 'C'].includes(node?.instruction[0])) {
+          const length = node.instruction.length;
+          const coord = {
+            x: node.instruction[length - 4] as number,
+            y: node.instruction[length - 3] as number,
+          };
+          const curveDot = oldDeformers.pre ?? this._toResponsiveCoord(coord);
+          curveDot.unobserve();
+          curveDot.observe((x, y) => {
+            node.instruction[length - 4] = x;
+            node.instruction[length - 3] = y;
+          });
+          if (isCoincideNode) {
+            nodes[0].deformers = nodes[0].deformers ?? {};
+            nodes[0].deformers.pre = curveDot;
+          } else {
+            deformers.pre = curveDot;
+          }
+        }
+
+        // 后曲线变换器
+        if (next && ['C', 'Q'].includes(next.instruction[0])) {
+          const coord = {
+            x: next.instruction[1] as number,
+            y: next.instruction[2] as number,
+          };
+          const curveDot = oldDeformers.next ?? this._toResponsiveCoord(coord);
+          curveDot.unobserve();
+          curveDot.observe((x, y) => {
+            next.instruction[1] = x;
+            next.instruction[2] = y;
+          });
+          curveDot.set(coord.x, coord.y);
+          deformers.next = curveDot;
+        }
+      }
+
+      if (oldDeformers.pre && !deformers.pre) oldDeformers.pre.unobserve();
+      if (oldDeformers.next && !deformers.next) oldDeformers.next.unobserve();
+
+      if (Object.keys(deformers).length) {
+        node.deformers = deformers;
+      } else {
+        delete node.deformers;
+      }
+    });
+  }
+
+  /**
+   * 添加变换器
    */
   addNodeDeformer(node: PathNode, type: 'pre' | 'next', coord: Coord) {
     node.deformers = node.deformers ?? {};
@@ -682,11 +688,7 @@ export class VizPath {
 
     // 路径如果带有偏移则需要移除偏移带来的影响
     if (object.type === 'path') {
-      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, [
-        ...matrix.slice(0, 4),
-        0,
-        0,
-      ]);
+      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, matrix, true);
 
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
@@ -704,11 +706,7 @@ export class VizPath {
     const matrix = [...object.calcOwnMatrix()];
 
     if (object.type === 'path') {
-      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, [
-        ...matrix.slice(0, 4),
-        0,
-        0,
-      ]);
+      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, matrix, true);
 
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
@@ -810,7 +808,7 @@ export class VizPath {
   }
 
   /**
-   * 获取周围的曲线变换点信息（前、后、上一路径节点后、下一路径节点前），默认循环查找
+   * 获取周围的曲线变换器信息（前、后、上一路径节点后、下一路径节点前），默认循环查找
    */
   getNeighboringCurveDots(node: PathNode) {
     const deformers: {
@@ -1236,44 +1234,36 @@ export class VizPath {
     if (startNode === endNode || !this.isTerminalNode(startNode) || !this.isTerminalNode(endNode))
       return { action: 'none' };
 
-    const startSegment = startNode.segment;
-    const endSegment = endNode.segment;
+    const startSegmentIndex = this.segments.indexOf(startNode.segment);
+    const endSegmentIndex = this.segments.indexOf(endNode.segment);
 
-    if (startSegment === endSegment) {
-      this.closeSegment(startSegment);
+    if (startSegmentIndex === endSegmentIndex) {
+      this.closeSegment(startNode.segment);
       return { action: 'close', node: endNode };
     }
 
-    let start = this.getInstructions((segment) =>
-      segment === startSegment ? segment.map((i) => i.instruction) : [],
-    );
-    let end = this.getInstructions((segment) =>
-      segment === endSegment ? segment.map((i) => i.instruction) : [],
-    );
-
-    if (startNode === startSegment[0]) {
-      start = reversePath(start);
-    }
-    if (endNode === endSegment[endSegment.length - 1]) {
-      end = reversePath(end);
-    }
-    end.splice(0, 1, [InstructionType.LINE, end[0][1], end[0][2]]);
-    end.map((item) => {
-      const instruction = item;
-      for (let i = 0; i < instruction.length - 1; i += 2) {
-        const position = this.calcAbsolutePosition(
-          new fabric.Point(instruction[i + 1] as number, instruction[i + 2] as number),
-        );
-        const coord = this.calcRelativeCoord(position);
-        instruction[i + 1] = coord.x;
-        instruction[i + 2] = coord.y;
+    const segments = this.segments.map((segment, index) => {
+      let instructions = segment.map((i) => i.instruction);
+      if (index === startSegmentIndex && startNode === segment[0]) {
+        instructions = reversePath(instructions);
       }
+      if (index === endSegmentIndex && endNode === segment[segment.length - 1]) {
+        instructions = reversePath(instructions);
+      }
+      if (index === endSegmentIndex && instructions[0][0] === InstructionType.START) {
+        instructions[0][0] = InstructionType.LINE;
+      }
+      return instructions;
     });
 
-    const mergePath = start.concat(end);
-    this.setInstructions(mergePath);
+    const startSegment = segments[startSegmentIndex];
+    const endSegment = segments[endSegmentIndex];
+    segments[startSegmentIndex] = startSegment.concat(endSegment);
+    segments.splice(endSegmentIndex, 1)[0];
 
-    return { action: 'join', node: this.instructionNodeMap.get(end[0]) };
+    this.setInstructions(segments.flat(1));
+
+    return { action: 'join', node: this.instructionNodeMap.get(endSegment[0]) };
   }
 
   /**
@@ -1339,8 +1329,7 @@ export class VizPath {
     const instructions = this.getInstructions();
     const path = typeof source === 'string' ? new fabric.Path(source) : source;
     const matrix = path.calcOwnMatrix() as Matrix;
-    const matrixWithoutTranslate = [...matrix.slice(0, 4), 0, 0];
-    const offset = fabric.util.transformPoint(path.pathOffset, matrixWithoutTranslate);
+    const offset = fabric.util.transformPoint(path.pathOffset, matrix, true);
     matrix[4] -= offset.x;
     matrix[5] -= offset.y;
     instructions.push(
@@ -1384,30 +1373,34 @@ export class VizPath {
   /**
    * 释放所有节点的响应式
    */
-  private _revokeAllRCoords() {
-    this.segments.forEach((segment) => {
+  private _revokeDisusedRCoords(oldSegments: PathSegment[]) {
+    oldSegments.forEach((segment) => {
       segment.forEach((node) => {
-        // @ts-ignore
-        node.path = null;
-        node.node?.unobserve();
-        node.deformers?.pre?.unobserve();
-        node.deformers?.next?.unobserve();
-        delete node.node;
-        delete node.deformers;
+        if (!this.instructionNodeMap.has(node.instruction)) {
+          // @ts-ignore
+          node.path = null;
+          node.node?.unobserve();
+          node.deformers?.pre?.unobserve();
+          node.deformers?.next?.unobserve();
+          delete node.node;
+          delete node.deformers;
+        }
       });
     });
-    this._observers.clear();
   }
 
   /**
    * 结束可视化
    */
   destroy() {
+    const oldSegments = this.segments;
+
     this.path.vizpath = null;
     this.segments = [];
     this.instructionNodeMap = new WeakMap();
     this._requestRepair = undefined;
-    this._revokeAllRCoords();
+
+    this._revokeDisusedRCoords(oldSegments);
   }
 }
 

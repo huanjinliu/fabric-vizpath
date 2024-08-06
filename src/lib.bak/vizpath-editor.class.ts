@@ -40,7 +40,7 @@ type EditorSetting = {
    *
    * add 添加模式 - 鼠标点击外部区域会在区域位置上添加一个新的节点
    *
-   * delete 删除模式 - 鼠标点击节点、变换点将直接删除
+   * delete 删除模式 - 鼠标点击节点、变换器将直接删除
    *
    * convert 转换模式 - 鼠标点击节点无法移动，但可以通过拖拽实现节点转换
    *
@@ -48,7 +48,7 @@ type EditorSetting = {
    */
   mode: `${Mode}`;
   /**
-   * 是否开启强制曲线变换点对称
+   * 是否开启强制曲线变换器对称
    *
    * none - 单杆变换，不对称变换
    *
@@ -159,7 +159,7 @@ class VizPathEditor extends VizPathModule {
   /** 路径节点对象 */
   nodes: fabric.Object[] = [];
 
-  /** 路径曲线变换点列表 */
+  /** 路径曲线变换器列表 */
   curveDots: EditorCurveDot[] = [];
 
   /** 元素画布对象 与 路径节点对象 映射 */
@@ -171,7 +171,7 @@ class VizPathEditor extends VizPathModule {
   /** 当前活跃的路径节点画布对象列表 */
   activeNodes: fabric.Object[] = [];
 
-  /** 当前活跃的曲线变换点画布对象 */
+  /** 当前活跃的曲线变换器画布对象 */
   activePoint: fabric.Object | null = null;
 
   /** dotSymmetricMode为auto的情况下，会采用以下变换模式 */
@@ -269,11 +269,7 @@ class VizPathEditor extends VizPathModule {
 
     // 路径如果带有偏移则需要移除偏移带来的影响
     if (object.type === 'path') {
-      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, [
-        ...matrix.slice(0, 4),
-        0,
-        0,
-      ]);
+      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, matrix, true);
 
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
@@ -291,11 +287,7 @@ class VizPathEditor extends VizPathModule {
     const matrix = [...object.calcOwnMatrix()];
 
     if (object.type === 'path') {
-      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, [
-        ...matrix.slice(0, 4),
-        0,
-        0,
-      ]);
+      const offset = fabric.util.transformPoint((object as fabric.Path).pathOffset, matrix, true);
 
       matrix[4] -= offset.x;
       matrix[5] -= offset.y;
@@ -534,7 +526,7 @@ class VizPathEditor extends VizPathModule {
       // 失去当前选中状态
       if (storeActiveObjects.length) this.blur();
 
-      // 由于需要多次添加路径节点和曲线变换点，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
+      // 由于需要多次添加路径节点和曲线变换器，如果不设置该配置，每次添加和移除都会渲染一次画布，设置为false后可以控制为1次渲染
       canvas.renderOnAddRemove = false;
 
       // 移除旧对象
@@ -628,7 +620,7 @@ class VizPathEditor extends VizPathModule {
           curveDots?.forEach(({ position, direction, from }) => {
             const coord = from.curveDots?.[direction];
             if (position !== 'cur' || !coord) return;
-            // 避免重复的曲线变换点跟随更改
+            // 避免重复的曲线变换器跟随更改
             if (hadFollowedCoords.has(coord)) return;
             followCurveDots.push(coord);
             hadFollowedCoords.add(coord);
@@ -756,7 +748,7 @@ class VizPathEditor extends VizPathModule {
   }
 
   /**
-   * 获取相对变换点
+   * 获取相对变换器
    */
   getRelativeCurveDot(object: fabric.Object) {
     const curveDot = this.curveDots.find((dot) => dot.point === object);
@@ -771,7 +763,7 @@ class VizPathEditor extends VizPathModule {
   }
 
   /**
-   * 添加活跃节点的周围曲线变换点
+   * 添加活跃节点的周围曲线变换器
    */
   private _updateCurveDots() {
     const vizpath = this.vizpath;
@@ -794,7 +786,7 @@ class VizPathEditor extends VizPathModule {
       return;
     }
 
-    // 创建新的路径曲线变换点
+    // 创建新的路径曲线变换器
     const curveDots: EditorCurveDot[] = [];
     const curveDotSet = new WeakSet<RCoord>([]);
     const neighboringCurveDots = vizpath
@@ -819,14 +811,14 @@ class VizPathEditor extends VizPathModule {
           reuseCurveDot,
         };
       });
-    // 有复用元素的必须优先处理，避免新的变换点在废弃池中提前使用了复用元素
+    // 有复用元素的必须优先处理，避免新的变换器在废弃池中提前使用了复用元素
     neighboringCurveDots.sort((a, b) => (a.reuseCurveDot ? -1 : 1));
     neighboringCurveDots.forEach(({ direction, from, nodeObject, reuseCurveDot }) => {
       const node = from.node!;
       const curveDot = from.curveDots![direction]!;
 
       /**
-       * 创建指令曲线变换点
+       * 创建指令曲线变换器
        */
       let point = reuseCurveDot?.point as fabric.Object;
       if (!point) {
@@ -900,7 +892,7 @@ class VizPathEditor extends VizPathModule {
                 },
                 vizpath.coordNodeMap.get(node)!.path,
               );
-              // 曲线变换点对称操作
+              // 曲线变换器对称操作
               const symmetricMode =
                 this.get('dotSymmetricMode') === 'auto'
                   ? this.dotSymmetricAutoMode
@@ -909,9 +901,9 @@ class VizPathEditor extends VizPathModule {
                 const symmetricCurveDot = this.getRelativeCurveDot(point);
                 if (symmetricCurveDot) {
                   const { curveDot: _curveDot } = symmetricCurveDot;
-                  // 旧镜像曲线变换点到路径节点的距离
+                  // 旧镜像曲线变换器到路径节点的距离
                   const d = calcCoordsDistance(_curveDot, node);
-                  // 新镜像曲线变换点到路径节点的距离
+                  // 新镜像曲线变换器到路径节点的距离
                   const new_d = calcCoordsDistance(
                     {
                       x: node.x - (coord.x - node.x),
@@ -944,7 +936,7 @@ class VizPathEditor extends VizPathModule {
       point.on('removed', onRemovedPoint);
 
       /**
-       * 创建曲线变换点和节点的连线
+       * 创建曲线变换器和节点的连线
        */
 
       let line = reuseCurveDot?.line as fabric.Line;
@@ -1210,7 +1202,7 @@ class VizPathEditor extends VizPathModule {
    * 变换节点
    * @param object 路径节点
    * @param options 变换配置
-   * @param followCurveDots 跟随变换的曲线变换点
+   * @param followCurveDots 跟随变换的曲线变换器
    * @returns
    */
   private _transform(
@@ -1236,7 +1228,7 @@ class VizPathEditor extends VizPathModule {
       this.vizpath!.coordNodeMap.get(node!)!.path,
     );
 
-    // 需要跟随变化的曲线曲线变换点
+    // 需要跟随变化的曲线曲线变换器
     followCurveDots.forEach((curveDot) => {
       if (!curveDot) return;
       const relativeDiff = transform(
@@ -1364,7 +1356,7 @@ class VizPathEditor extends VizPathModule {
   }
 
   /**
-   * 删除节点或变换点
+   * 删除节点或变换器
    *
    * @note
    *
@@ -1378,9 +1370,9 @@ class VizPathEditor extends VizPathModule {
    *
    * ③ 删除的点包含路径上所有点时，直接删除整个路径
    *
-   * 2）删除1个变换点，实现曲线路径降级为直线路径
+   * 2）删除1个变换器，实现曲线路径降级为直线路径
    *
-   * @param objects 点对象(路径节点、变换点)列表
+   * @param objects 点对象(路径节点、变换器)列表
    */
   remove(...objects: fabric.Object[]) {
     if (this.disabledFunctionTokens.remove?.length) return;
@@ -1656,7 +1648,7 @@ class VizPathEditor extends VizPathModule {
       }
       this.events.fire('selected', focusNodes, null);
     }
-    // 考虑是否只有一个曲线变换点聚焦情况，不允许多曲线变换点同时聚焦
+    // 考虑是否只有一个曲线变换器聚焦情况，不允许多曲线变换器同时聚焦
     else if (focusCurveDotPoints.length === 1) {
       const { node, type } = this.curveDots.find((i) => i.point === focusCurveDotPoints[0])!;
       this.activeNodes = [node];
@@ -1677,7 +1669,7 @@ class VizPathEditor extends VizPathModule {
 
     this._deactivateSelectListeners = false;
 
-    // 如果当前选中的是变换点需要确定其自动变换的模式
+    // 如果当前选中的是变换器需要确定其自动变换的模式
     if (this.activePoint) {
       const dot = this.curveDots.find((i) => i.point === this.activePoint)!;
       const relativeDot = this.getRelativeCurveDot(this.activePoint)!;
