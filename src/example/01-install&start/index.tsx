@@ -24,7 +24,7 @@ function Demo01() {
     if (!canvas) return;
     if (currentDemo !== Instruction._01_INSTALL_AND_START) return;
 
-    const path = new Path(paths.diamond);
+    const path = new Path(paths.banana);
     const vizpath = path.visualize();
 
     // console.log(vizpath.joinSegment(vizpath.segments[0][0], vizpath.segments[0][5]));
@@ -38,6 +38,22 @@ function Demo01() {
       .use(
         new EditorShortcut(
           [
+            {
+              key: 'C',
+              combinationKeys: ['ctrl'],
+              onActivate: () => {
+                editor.draw(
+                  Path.transform(vizpath.getPathData(null), [{ translate: { x: 10, y: 10 } }]),
+                );
+              },
+            },
+            {
+              key: 'A',
+              combinationKeys: ['ctrl'],
+              onActivate: () => {
+                return editor.focus(...editor.nodes);
+              },
+            },
             {
               key: 'D',
               onActivate: () => {
@@ -98,8 +114,6 @@ function Demo01() {
       .mount(canvas);
 
     await editor.enterEditing(vizpath);
-
-    editor.focus(editor.nodes[0]);
 
     setEditor(editor);
   }, [currentDemo, canvas, setEditor]);

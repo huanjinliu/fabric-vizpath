@@ -11,6 +11,8 @@ export { default as fireMouseUpAndSelect } from './fire-mouse-up-and-select';
 export { default as calcCoordsAngle } from './calc-coords-angle';
 export { default as calcCoordsDistance } from './calc-coords-distance';
 export { default as calcCanvasCoord } from './calc-canvas-coord';
+export { default as calcMultiplyMatrix } from './calc-multiply-matrix';
+export { default as calcTransformMatrix } from './calc-transform-matrix';
 
 /**
  * 路径操作

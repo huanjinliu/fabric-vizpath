@@ -1,7 +1,13 @@
 import { fabric } from 'fabric';
 import cloneDeep from 'lodash-es/cloneDeep';
 import round from 'lodash-es/round';
-import { clearPathOffset, loadSVGToPathFromURL, parsePathJSON, reversePath } from '@utils';
+import {
+  clearPathOffset,
+  loadSVGToPathFromURL,
+  parsePathJSON,
+  reversePath,
+  transform,
+} from '@utils';
 import uniqueId from 'lodash-es/uniqueId';
 import VizPathEditor from './vizpath-editor.class';
 import VizPathEvent from './vizpath-event.class';
@@ -1097,7 +1103,7 @@ export class VizPath {
    *
    * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
    */
-  upgrade(node: PathNode, direction: 'pre' | 'next' | 'both' = 'both') {
+  upgrade(node: PathNode, direction: 'pre' | 'next' | 'both' = 'both', highest = false) {
     const { instruction, node: nodeCoord } = node;
 
     const { pre, next } = this.getNeighboringInstructions(node, true);
@@ -1117,8 +1123,8 @@ export class VizPath {
       targets.push(['next', directionNodeMap.next]);
     }
 
-    targets.forEach(([direction, pathNode]) => {
-      const instruction = pathNode.instruction;
+    const upgrade = (node: PathNode, direction: 'pre' | 'next') => {
+      const instruction = node.instruction;
       if (instruction[0] === InstructionType.BEZIER_CURVE) return;
 
       const coord = this.getInstructionCoord(instruction)!;
@@ -1129,25 +1135,30 @@ export class VizPath {
       }[instruction[0]];
 
       if (direction === 'pre') {
-        const { pre } = this.getNeighboringInstructions(pathNode);
-        const insertIndex = 1;
+        const { pre } = this.getNeighboringInstructions(node);
+        const insertIndex = -2;
         const insertCoord = {
           x: (coord.x + pre!.node!.x) / 2,
           y: (coord.y + pre!.node!.y) / 2,
         };
         instruction.splice(insertIndex, 0, insertCoord.x, insertCoord.y);
-        this.replace(pathNode, instruction);
+        this.replace(node, instruction);
       }
 
       if (direction === 'next') {
-        const insertIndex = instruction.length - 2;
+        const insertIndex = 1;
         const insertCoord = {
           x: (coord.x + nodeCoord!.x) / 2,
           y: (coord.y + nodeCoord!.y) / 2,
         };
         instruction.splice(insertIndex, 0, insertCoord.x, insertCoord.y);
-        this.replace(pathNode, instruction);
+        this.replace(node, instruction);
       }
+    };
+
+    targets.forEach(([direction, pathNode]) => {
+      upgrade(pathNode, direction);
+      if (highest) upgrade(pathNode, direction);
     });
   }
 
@@ -1443,6 +1454,28 @@ export class Path extends fabric.Path {
     path.visualize();
 
     return path as Path;
+  }
+
+  /**
+   * 路径变换
+   */
+  static transform(path: string, transformQueue: Split<Transform>[]) {
+    const instructions = new fabric.Path(path).path as unknown as Instruction[];
+    instructions.forEach((item, idx) => {
+      const [, ...coords] = item as unknown as [type: string, ...coords: number[]];
+      for (let i = 0; i < coords.length; i += 2) {
+        const { x, y } = transform(
+          {
+            x: instructions[idx][i + 1] as number,
+            y: instructions[idx][i + 2] as number,
+          },
+          transformQueue,
+        );
+        instructions[idx][i + 1] = x;
+        instructions[idx][i + 2] = y;
+      }
+    });
+    return instructions.flat(1).join(' ');
   }
 
   /**

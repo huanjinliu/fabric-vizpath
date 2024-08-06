@@ -9,8 +9,14 @@ declare type Constructor = abstract new (...args: any) => any;
 declare type Transform = {
   translate: { x: number; y: number };
   rotate: number;
-  scale: { x: number; y: number };
+  scale: number | { x: number; y: number };
+  skew: { x: number; y: number };
+  flip: { x: boolean; y: boolean };
 };
+
+declare type Split<T> = {
+  [K in keyof T]: { [P in K]: T[K] };
+}[keyof T];
 
 declare module '*.less' {
   const classes: { [key: string]: string };

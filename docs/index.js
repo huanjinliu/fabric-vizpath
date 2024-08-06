@@ -3107,35 +3107,67 @@
 	var round = createRound('round');
 
 	/**
+	 * 计算相乘矩阵
+	 */
+	var calcMultiplyMatrix = function calcMultiplyMatrix(a, b) {
+	  return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
+	};
+
+	/**
+	 * 变换
+	 * @param coord 路径
+	 * @param transformQueue 变换流程
+	 */
+	var calcTransformMatrix = function calcTransformMatrix(transformQueue) {
+	  return transformQueue.reduce(function (matrix, transfrom) {
+	    var translate = transfrom.translate,
+	      scale = transfrom.scale,
+	      rotate = transfrom.rotate,
+	      flip = transfrom.flip,
+	      skew = transfrom.skew;
+	    if (scale !== undefined) {
+	      return calcMultiplyMatrix(matrix, [typeof scale === 'number' ? scale : scale.x, 0, 0, typeof scale === 'number' ? scale : scale.y, 0, 0]);
+	    }
+	    if (rotate !== undefined) {
+	      var radians = rotate * Math.PI / 180;
+	      var cosAngle = Math.cos(radians);
+	      var sinAngle = Math.sin(radians);
+	      return calcMultiplyMatrix(matrix, [cosAngle, sinAngle, -sinAngle, cosAngle, 0, 0]);
+	    }
+	    if (skew !== undefined) {
+	      var skewX = Math.tan(skew.x * (Math.PI / 180));
+	      var skewY = Math.tan(skew.y * (Math.PI / 180));
+	      return calcMultiplyMatrix(matrix, [1, skewX, skewY, 1, 0, 0]);
+	    }
+	    if (translate !== undefined) {
+	      return calcMultiplyMatrix(matrix, [1, 0, 0, 1, translate.x, translate.y]);
+	    }
+	    if (flip !== undefined) {
+	      return calcMultiplyMatrix(matrix, [(flip === null || flip === void 0 ? void 0 : flip.x) ? -1 : 1, 0, 0, (flip === null || flip === void 0 ? void 0 : flip.y) ? -1 : 1, 0, 0]);
+	    }
+	    return matrix;
+	  }, [1, 0, 0, 1, 0, 0]);
+	};
+
+	/**
 	 * 变换
 	 * @param coord 路径
 	 * @param process 变换流程
 	 */
-	var transform = function transform(coord, process) {
+	var _transform2 = function transform(coord, process) {
 	  var x = coord.x,
 	    y = coord.y;
-	  process.forEach(function (item) {
-	    var translate = item.translate,
-	      scale = item.scale,
-	      rotate = item.rotate;
-	    if (scale !== undefined) {
-	      x *= typeof scale === 'number' ? scale : scale.x;
-	      y *= typeof scale === 'number' ? scale : scale.y;
-	    }
-	    if (rotate !== undefined) {
-	      var _x = x;
-	      var _y = y;
-	      x = Math.cos(rotate * Math.PI / 180) * _x - Math.sin(rotate * Math.PI / 180) * _y;
-	      y = Math.sin(rotate * Math.PI / 180) * _x + Math.cos(rotate * Math.PI / 180) * _y;
-	    }
-	    if (translate !== undefined) {
-	      x += translate.x;
-	      y += translate.y;
-	    }
-	  });
+	  var _calcTransformMatrix = calcTransformMatrix(process),
+	    _calcTransformMatrix2 = _slicedToArray(_calcTransformMatrix, 6),
+	    a = _calcTransformMatrix2[0],
+	    b = _calcTransformMatrix2[1],
+	    c = _calcTransformMatrix2[2],
+	    d = _calcTransformMatrix2[3],
+	    e = _calcTransformMatrix2[4],
+	    f = _calcTransformMatrix2[5];
 	  return {
-	    x: x,
-	    y: y
+	    x: a * x + c * y + e,
+	    y: b * x + d * y + f
 	  };
 	};
 
@@ -3408,15 +3440,15 @@
 	                    _b.type;
 	                    _b.visible;
 	                    var _b$x = _b.x,
-	                    _x3 = _b$x === void 0 ? 0 : _b$x,
+	                    _x2 = _b$x === void 0 ? 0 : _b$x,
 	                    _b$y = _b.y,
-	                    _y2 = _b$y === void 0 ? 0 : _b$y,
+	                    _y = _b$y === void 0 ? 0 : _b$y,
 	                    _b$radius = _b.radius,
 	                    r = _b$radius === void 0 ? 0 : _b$radius,
 	                    _rest = __rest$1(_b, ["type", "visible", "x", "y", "radius"]);
 	                  path = convertEllipsePath({
-	                    x: _x3,
-	                    y: _y2,
+	                    x: _x2,
+	                    y: _y,
 	                    rx: r,
 	                    ry: r
 	                  });
@@ -3429,17 +3461,17 @@
 	                    _c.type;
 	                    _c.visible;
 	                    var _c$x = _c.x,
-	                    _x4 = _c$x === void 0 ? 0 : _c$x,
+	                    _x3 = _c$x === void 0 ? 0 : _c$x,
 	                    _c$y = _c.y,
-	                    _y3 = _c$y === void 0 ? 0 : _c$y,
+	                    _y2 = _c$y === void 0 ? 0 : _c$y,
 	                    _c$rx = _c.rx,
 	                    _rx = _c$rx === void 0 ? 0 : _c$rx,
 	                    _c$ry = _c.ry,
 	                    _ry = _c$ry === void 0 ? 0 : _c$ry,
 	                    _rest2 = __rest$1(_c, ["type", "visible", "x", "y", "rx", "ry"]);
 	                  path = convertEllipsePath({
-	                    x: _x4,
-	                    y: _y3,
+	                    x: _x3,
+	                    y: _y2,
 	                    rx: _rx,
 	                    ry: _ry
 	                  });
@@ -3520,7 +3552,7 @@
 	      }
 	    }, _callee, null, [[1, 10]]);
 	  }));
-	  return function loadSVGToPathFromURL(_x2) {
+	  return function loadSVGToPathFromURL(_x) {
 	    return _ref.apply(this, arguments);
 	  };
 	}();
@@ -3558,7 +3590,7 @@
 	    var _item = _toArray(item),
 	      coords = _item.slice(1);
 	    for (var i = 0; i < coords.length; i += 2) {
-	      var _transform = transform({
+	      var _transform = _transform2({
 	          x: segment[pathIdx][i + 1],
 	          y: segment[pathIdx][i + 2]
 	        }, [{
@@ -3983,7 +4015,7 @@
 	          }
 	        }, _callee2, this);
 	      }));
-	      function enterEditing(_x5) {
+	      function enterEditing(_x4) {
 	        return _enterEditing.apply(this, arguments);
 	      }
 	      return enterEditing;
@@ -4072,10 +4104,11 @@
 	      var result = callback(storeActiveNodes, storeActivePoint);
 	      this._renderPathNodes();
 	      this._renderDeformers();
-	      var activeObjects = [].concat(_toConsumableArray(storeActiveNodes), [storeActivePoint]).filter(Boolean);
-	      if (activeObjects.every(function (object) {
+	      if ((storeActivePoint === null || storeActivePoint === void 0 ? void 0 : storeActivePoint.canvas) === this.canvas) this.focus(storeActivePoint);else if (storeActiveNodes.every(function (object) {
 	        return object.canvas === _this8.canvas;
-	      })) this.focus.apply(this, _toConsumableArray(activeObjects));
+	      })) {
+	        this.focus.apply(this, _toConsumableArray(storeActiveNodes));
+	      }
 	      return result;
 	    }
 	    /**
@@ -4594,28 +4627,29 @@
 	          });
 	        }
 	        _this15.rerender(function () {
-	          convertibleNodes.forEach(function (item, index) {
-	            var newCoord = convertibleNodes.length === 1 ? oppositePosition : [position, oppositePosition][index];
-	            var newInstruction = _toConsumableArray(item[1].instruction);
-	            newInstruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[newInstruction[0]];
-	            newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCoord.x, newCoord.y);
-	            vizpath.replace(item[1], newInstruction);
-	            // 非闭合路径给端点添加虚拟变换器
-	            if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
-	              if (targetNode === targetNode.segment[0] && !targetNode.deformers.pre && targetNode.deformers.next) {
-	                vizpath.addNodeDeformer(targetNode, 'pre', {
-	                  x: targetNode.node.x - (targetNode.deformers.next.x - targetNode.node.x),
-	                  y: targetNode.node.y - (targetNode.deformers.next.y - targetNode.node.y)
-	                });
-	              }
-	              if (targetNode === targetNode.segment[targetNode.segment.length - 1] && !targetNode.deformers.next && targetNode.deformers.pre) {
-	                vizpath.addNodeDeformer(targetNode, 'next', {
-	                  x: targetNode.node.x - (targetNode.deformers.pre.x - targetNode.node.x),
-	                  y: targetNode.node.y - (targetNode.deformers.pre.y - targetNode.node.y)
-	                });
-	              }
+	          vizpath.upgrade(targetNode, 'both', true);
+	          // 非闭合路径给端点添加虚拟变换器
+	          if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
+	            if (targetNode === targetNode.segment[0] && !targetNode.deformers.pre && targetNode.deformers.next) {
+	              vizpath.addNodeDeformer(targetNode, 'pre', {
+	                x: targetNode.node.x - (targetNode.deformers.next.x - targetNode.node.x),
+	                y: targetNode.node.y - (targetNode.deformers.next.y - targetNode.node.y)
+	              });
 	            }
-	          });
+	            if (targetNode === targetNode.segment[targetNode.segment.length - 1] && !targetNode.deformers.next && targetNode.deformers.pre) {
+	              vizpath.addNodeDeformer(targetNode, 'next', {
+	                x: targetNode.node.x - (targetNode.deformers.pre.x - targetNode.node.x),
+	                y: targetNode.node.y - (targetNode.deformers.pre.y - targetNode.node.y)
+	              });
+	            }
+	          }
+	          // 设置控制点的位置
+	          if (targetNode.deformers) {
+	            Object.keys(targetNode.deformers).forEach(function (direction, index) {
+	              var coord = (convertibleNodes.length === 1 ? [oppositePosition, position] : [position, oppositePosition])[index];
+	              targetNode.deformers[direction].set(coord.x, coord.y);
+	            });
+	          }
 	        });
 	        var targetCurveDot;
 	        var nodeDeformers = _this15.deformers.filter(function (i) {
@@ -4684,7 +4718,7 @@
 	      // 曲线变换器跟随变化
 	      followCurveDots.forEach(function (curveDot) {
 	        if (!curveDot) return;
-	        var relativeDiff = transform({
+	        var relativeDiff = _transform2({
 	          x: curveDot.x - newCoord.x,
 	          y: curveDot.y - newCoord.y
 	        }, [{
@@ -5009,6 +5043,26 @@
 	      this.focus();
 	    }
 	    /**
+	     * 在当前路径基础上绘制全新的路径片段
+	     * @param data 路径片段数据
+	     *
+	     * @example
+	     *
+	     * draw('M 100 100 L 200 200 Z');
+	     *
+	     * @note
+	     *
+	     * 注意：绘制的路径数据会受到路径当前的变换影响
+	     */
+	  }, {
+	    key: "draw",
+	    value: function draw(data) {
+	      var vizpath = this.vizpath;
+	      if (vizpath) this.rerender(function () {
+	        vizpath.addSegment(data);
+	      });
+	    }
+	    /**
 	     * 添加新的路径节点
 	     *
 	     * @note
@@ -5018,17 +5072,19 @@
 	     * 2）在未选中节点/选中多个节点时，将直接以该参数位置创建新的起始点以开启一段新的路径
 	     *
 	     * @param position 新节点的画布绝对位置
+	     * @param autoLink 是否自动与活跃元素连接，注意：仅当活跃元素只有1个且为端点节点有效
 	     */
 	  }, {
 	    key: "add",
 	    value: function add(position) {
 	      var _this21 = this;
+	      var autoLink = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
 	      var vizpath = this.vizpath;
 	      if (!vizpath) return;
 	      var coord = vizpath.calcRelativeCoord(position);
 	      var node = this.rerender(function (activeNodes) {
 	        var _a, _b;
-	        if (activeNodes.length === 1) {
+	        if (autoLink && activeNodes.length === 1) {
 	          var _node = activeNodes[0];
 	          var pathNode = _this21.objectNodeMap.get(_node);
 	          if (!pathNode) return;
@@ -5142,12 +5198,13 @@
 	    key: "upgrade",
 	    value: function upgrade(object) {
 	      var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
+	      var highest = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
 	      var vizpath = this.vizpath;
 	      if (!vizpath) return;
 	      var pathNode = this.objectNodeMap.get(object);
 	      if (!pathNode) return;
 	      this.rerender(function () {
-	        vizpath.upgrade(pathNode, direction);
+	        vizpath.upgrade(pathNode, direction, highest);
 	      });
 	    }
 	    /**
@@ -5385,7 +5442,7 @@
 	          }
 	        }, _callee5, this);
 	      }));
-	      function mount(_x6) {
+	      function mount(_x5) {
 	        return _mount.apply(this, arguments);
 	      }
 	      return mount;
@@ -6354,6 +6411,7 @@
 	    value: function upgrade(node) {
 	      var _this30 = this;
 	      var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
+	      var highest = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
 	      var instruction = node.instruction,
 	        nodeCoord = node.node;
 	      var _this$getNeighboringI2 = this.getNeighboringInstructions(node, true),
@@ -6370,34 +6428,38 @@
 	      if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
 	        targets.push(['next', directionNodeMap.next]);
 	      }
-	      targets.forEach(function (_ref14) {
-	        var _ref15 = _slicedToArray(_ref14, 2),
-	          direction = _ref15[0],
-	          pathNode = _ref15[1];
-	        var instruction = pathNode.instruction;
+	      var upgrade = function upgrade(node, direction) {
+	        var instruction = node.instruction;
 	        if (instruction[0] === InstructionType.BEZIER_CURVE) return;
 	        var coord = _this30.getInstructionCoord(instruction);
 	        instruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[instruction[0]];
 	        if (direction === 'pre') {
-	          var _this30$getNeighborin = _this30.getNeighboringInstructions(pathNode),
+	          var _this30$getNeighborin = _this30.getNeighboringInstructions(node),
 	            _pre = _this30$getNeighborin.pre;
-	          var insertIndex = 1;
+	          var insertIndex = -2;
 	          var insertCoord = {
 	            x: (coord.x + _pre.node.x) / 2,
 	            y: (coord.y + _pre.node.y) / 2
 	          };
 	          instruction.splice(insertIndex, 0, insertCoord.x, insertCoord.y);
-	          _this30.replace(pathNode, instruction);
+	          _this30.replace(node, instruction);
 	        }
 	        if (direction === 'next') {
-	          var _insertIndex = instruction.length - 2;
+	          var _insertIndex = 1;
 	          var _insertCoord = {
 	            x: (coord.x + nodeCoord.x) / 2,
 	            y: (coord.y + nodeCoord.y) / 2
 	          };
 	          instruction.splice(_insertIndex, 0, _insertCoord.x, _insertCoord.y);
-	          _this30.replace(pathNode, instruction);
+	          _this30.replace(node, instruction);
 	        }
+	      };
+	      targets.forEach(function (_ref14) {
+	        var _ref15 = _slicedToArray(_ref14, 2),
+	          direction = _ref15[0],
+	          pathNode = _ref15[1];
+	        upgrade(pathNode, direction);
+	        if (highest) upgrade(pathNode, direction);
 	      });
 	    }
 	    /**
@@ -6795,7 +6857,7 @@
 	          }
 	        }, _callee8);
 	      }));
-	      function loadFabricPathFromURL(_x7) {
+	      function loadFabricPathFromURL(_x6) {
 	        return _loadFabricPathFromURL.apply(this, arguments);
 	      }
 	      return loadFabricPathFromURL;
@@ -6898,6 +6960,29 @@
 	      path.visualize();
 	      return path;
 	    }
+	    /**
+	     * 路径变换
+	     */
+	  }, {
+	    key: "transform",
+	    value: function transform(path, transformQueue) {
+	      var instructions = new fabric.fabric.Path(path).path;
+	      instructions.forEach(function (item, idx) {
+	        var _item2 = _toArray(item),
+	          coords = _item2.slice(1);
+	        for (var i = 0; i < coords.length; i += 2) {
+	          var _transform3 = _transform2({
+	              x: instructions[idx][i + 1],
+	              y: instructions[idx][i + 2]
+	            }, transformQueue),
+	            x = _transform3.x,
+	            y = _transform3.y;
+	          instructions[idx][i + 1] = x;
+	          instructions[idx][i + 2] = y;
+	        }
+	      });
+	      return instructions.flat(1).join(' ');
+	    }
 	  }]);
 	}(fabric.fabric.Path);
 	var VizPathModule = /*#__PURE__*/function () {
@@ -6930,7 +7015,7 @@
 	          }
 	        }, _callee10, this);
 	      }));
-	      function __unload(_x8) {
+	      function __unload(_x7) {
 	        return _unload.apply(this, arguments);
 	      }
 	      return __unload;
@@ -6951,7 +7036,7 @@
 	          }
 	        }, _callee11, this);
 	      }));
-	      function __load(_x9) {
+	      function __load(_x8) {
 	        return _load.apply(this, arguments);
 	      }
 	      return __load;
@@ -7603,7 +7688,7 @@
 	          }
 	        }, _callee12);
 	      }));
-	      function unload(_x10) {
+	      function unload(_x9) {
 	        return _unload2.apply(this, arguments);
 	      }
 	      return unload;
@@ -7656,7 +7741,7 @@
 	          }
 	        }, _callee13, this);
 	      }));
-	      function load(_x11) {
+	      function load(_x10) {
 	        return _load2.apply(this, arguments);
 	      }
 	      return load;
@@ -16941,14 +17026,16 @@
 
 	var arc = "M 101 94 Q 103 -59 -52 -58 Q -204 -58 -206 93";
 	var arch = "M0.5 53.8667C0.5 24.3763 23.5738 0.5 52 0.5C80.4262 0.5 103.5 24.3763 103.5 53.8667V143.5H0.5V53.8667Z";
-	var banana = "M 8,223 c 0,0 143,3 185,-181 c 2,-11 -1,-20 1,-33 h 16 c 0,0 -3,17 1,30 c 21,68 -4,242 -204,196 L 8,223 z M 8,230 c 0,0 188,40 196,-160";
+	var banana = "M -105 111 C -105 111 38 114 80 -70 C 82 -81 79 -90 81 -103 L 97 -103 C 97 -103 94 -86 98 -73 C 119 -5 94 169 -106 123 L -105 111 Z M -105 118 C -105 118 83 158 91 -42";
 	var bubble = "M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z";
 	var circle = "M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z";
 	var diamond = "M 0 100 L 100 0 L 0 -100 L -100 0 Z";
 	var favicon = "M 295.233 250.642 L 390.393 281.854 C 391.402 282.189 392.1 283.112 392.145 284.174 C 392.191 285.236 391.575 286.216 390.598 286.636 L 346.157 305.682 L 326.998 350.39 C 326.586 351.364 325.619 351.985 324.562 351.953 C 323.506 351.921 322.578 351.243 322.226 350.247 L 288.823 257.237 C 288.163 255.397 288.609 253.342 289.971 251.94 C 291.334 250.539 293.375 250.035 295.233 250.642 L 295.233 250.642 Z M 346.72 156.24 C 362.4 156.244 375.375 168.438 376.351 184.088 C 377.327 199.738 365.967 213.449 350.408 215.401 C 334.85 217.353 320.456 206.872 317.536 191.465 C 278.386 195.181 245.902 223.319 236.64 261.538 C 249.18 267.502 255.91 281.363 252.842 294.906 C 249.773 308.449 237.726 318.055 223.84 318.032 C 208.938 318.053 196.329 307.026 194.362 292.256 C 192.396 277.485 201.68 263.543 216.068 259.664 C 226.553 210.348 269.336 172.951 321.232 170.678 C 326.595 161.716 336.275 156.232 346.72 156.24 Z M 223.84 277.072 C 219.816 277.072 216.097 279.219 214.085 282.704 C 212.073 286.189 212.073 290.483 214.085 293.968 C 216.097 297.453 219.816 299.6 223.84 299.6 C 230.061 299.6 235.104 294.557 235.104 288.336 C 235.104 282.115 230.061 277.072 223.84 277.072 Z M 346.72 174.672 C 342.696 174.672 338.977 176.819 336.965 180.304 C 334.953 183.789 334.953 188.083 336.965 191.568 C 338.977 195.053 342.696 197.2 346.72 197.2 C 352.941 197.2 357.984 192.157 357.984 185.936 C 357.984 179.715 352.941 174.672 346.72 174.672 L 346.72 174.672 Z";
 	var heart = "M -108.5 -211.5 C -175.5 -211.5 -228.5 -157.5 -228.5 -91.5 C -228.5 43.5 -92.5 78.5 -0.5 211.5 C 87.5 79.5 228.5 38.5 228.5 -91.5 C 228.5 -157.5 174.5 -211.5 108.5 -211.5 C 60.5 -211.5 18.5 -183.5 -0.5 -142.5 C -19.5 -183.5 -60.5 -211.5 -108.5 -211.5 z";
 	var hexagon = "M 50 0 L 150 0 L 200 86.6 L 150 173.2 L 50 173.2 L 0 86.6 Z";
-	var twoLines = "M 0 0 L 100 0 M 200 100 L 300 100";
+	var line = "M -150 0 L 150 0";
+	var closedLine = "M -150 0 L 150 0 z";
+	var twoLines = "M -150 -50 L -50 -50 M 50 50 L 150 50";
 	var lines = "M -45.5135 -136.3919 L 46.1892 -136.3919 M -70.2027 -113.4662 L 70.8784 -113.4662 M -94.8919 -90.5405 L 95.5676 -90.5405 M -94.8919 -67.6149 L 95.5676 -67.6149 M 42.6622 -44.6892 L 95.5676 -44.6892 M -94.8919 -44.6892 L -41.9865 -44.6892 M 42.6622 -21.7635 L 95.5676 -21.7635 M -94.8919 -21.7635 L -41.9865 -21.7635 M 42.6622 1.1622 L 95.5676 1.1622 M -94.8919 1.1622 L -41.9865 1.1622 M 42.6622 24.0878 L 95.5676 24.0878 M -94.8919 24.0878 L -41.9865 24.0878 M 42.6622 47.0135 L 95.5676 47.0135 M -94.8919 47.0135 L -41.9865 47.0135 M -94.8919 69.9392 L 95.5676 69.9392 M -94.8919 92.8649 L 95.5676 92.8649 M -70.2027 115.7905 L 70.8784 115.7905 M -45.5135 138.7162 L 46.1892 138.7162";
 	var logo = "M5.83 0L5.83 0Q4.54 0 3.64-0.90Q2.74-1.80 2.74-3.10L2.74-3.10L2.74-53.14Q2.74-54.50 3.60-55.37Q4.46-56.23 5.83-56.23L5.83-56.23L39.17-56.23Q40.54-56.23 41.40-55.40Q42.26-54.58 42.26-53.28L42.26-53.28Q42.26-52.06 41.40-51.23Q40.54-50.40 39.17-50.40L39.17-50.40L8.93-50.40L8.93-31.25L30.89-31.25Q32.26-31.25 33.08-30.38Q33.91-29.52 33.91-28.30L33.91-28.30Q33.91-27.00 33.08-26.17Q32.26-25.34 30.89-25.34L30.89-25.34L8.93-25.34L8.93-3.10Q8.93-1.80 8.03-0.90Q7.13 0 5.83 0ZM68.54 0.36L68.54 0.36Q63.07 0.36 58.75-2.27Q54.43-4.90 51.91-9.43Q49.39-13.97 49.39-19.66L49.39-19.66Q49.39-25.42 52.02-29.95Q54.65-34.49 59.18-37.12Q63.72-39.74 69.41-39.74L69.41-39.74Q75.02-39.74 79.52-37.12Q84.02-34.49 86.65-29.95Q89.28-25.42 89.35-19.66L89.35-19.66L86.90-18.43Q86.90-13.10 84.49-8.86Q82.08-4.61 77.94-2.12Q73.80 0.36 68.54 0.36ZM69.41-5.11L69.41-5.11Q73.44-5.11 76.57-7.02Q79.70-8.93 81.54-12.24Q83.38-15.55 83.38-19.66L83.38-19.66Q83.38-23.83 81.54-27.11Q79.70-30.38 76.57-32.33Q73.44-34.27 69.41-34.27L69.41-34.27Q65.45-34.27 62.24-32.33Q59.04-30.38 57.17-27.11Q55.30-23.83 55.30-19.66L55.30-19.66Q55.30-15.55 57.17-12.24Q59.04-8.93 62.24-7.02Q65.45-5.11 69.41-5.11ZM86.26 0L86.26 0Q84.96 0 84.06-0.83Q83.16-1.66 83.16-3.02L83.16-3.02L83.16-14.90L84.53-21.17L89.35-19.66L89.35-3.02Q89.35-1.66 88.49-0.83Q87.62 0 86.26 0ZM120.02 0.36L120.02 0.36Q114.41 0.36 109.94-2.27Q105.48-4.90 102.85-9.40Q100.22-13.90 100.15-19.51L100.15-19.51L100.15-53.14Q100.15-54.58 100.98-55.40Q101.81-56.23 103.25-56.23L103.25-56.23Q104.62-56.23 105.44-55.40Q106.27-54.58 106.27-53.14L106.27-53.14L106.27-32.54Q108.65-35.78 112.46-37.76Q116.28-39.74 120.96-39.74L120.96-39.74Q126.43-39.74 130.75-37.12Q135.07-34.49 137.56-29.95Q140.04-25.42 140.04-19.73L140.04-19.73Q140.04-13.97 137.41-9.43Q134.78-4.90 130.28-2.27Q125.78 0.36 120.02 0.36ZM120.02-5.11L120.02-5.11Q124.06-5.11 127.26-7.06Q130.46-9.00 132.30-12.28Q134.14-15.55 134.14-19.73L134.14-19.73Q134.14-23.83 132.30-27.14Q130.46-30.46 127.26-32.36Q124.06-34.27 120.02-34.27L120.02-34.27Q116.14-34.27 112.93-32.36Q109.73-30.46 107.93-27.14Q106.13-23.83 106.13-19.73L106.13-19.73Q106.13-15.55 107.93-12.28Q109.73-9.00 112.93-7.06Q116.14-5.11 120.02-5.11ZM156.96-24.41L153.65-24.41Q153.79-28.80 155.92-32.29Q158.04-35.78 161.53-37.80Q165.02-39.82 169.20-39.82L169.20-39.82Q172.87-39.82 174.78-38.74Q176.69-37.66 176.18-35.78L176.18-35.78Q175.97-34.78 175.28-34.34Q174.60-33.91 173.70-33.91Q172.80-33.91 171.65-34.06L171.65-34.06Q167.40-34.56 164.12-33.52Q160.85-32.47 158.90-30.10Q156.96-27.72 156.96-24.41L156.96-24.41ZM154.01 0L154.01 0Q152.57 0 151.78-0.79Q150.98-1.58 150.98-3.02L150.98-3.02L150.98-36.36Q150.98-37.80 151.78-38.59Q152.57-39.38 154.01-39.38L154.01-39.38Q155.45-39.38 156.20-38.59Q156.96-37.80 156.96-36.36L156.96-36.36L156.96-3.02Q156.96-1.58 156.20-0.79Q155.45 0 154.01 0ZM188.71 0L188.71 0Q187.34 0 186.48-0.83Q185.62-1.66 185.62-3.10L185.62-3.10L185.62-36.29Q185.62-37.73 186.48-38.56Q187.34-39.38 188.71-39.38L188.71-39.38Q190.08-39.38 190.91-38.56Q191.74-37.73 191.74-36.29L191.74-36.29L191.74-3.10Q191.74-1.66 190.91-0.83Q190.08 0 188.71 0ZM188.64-46.51L188.64-46.51Q186.91-46.51 185.69-47.77Q184.46-49.03 184.46-50.76L184.46-50.76Q184.46-52.56 185.72-53.71Q186.98-54.86 188.64-54.86L188.64-54.86Q190.30-54.86 191.56-53.71Q192.82-52.56 192.82-50.76L192.82-50.76Q192.82-49.03 191.59-47.77Q190.37-46.51 188.64-46.51ZM223.34 0.36L223.34 0.36Q217.66 0.36 213.19-2.27Q208.73-4.90 206.17-9.43Q203.62-13.97 203.62-19.66L203.62-19.66Q203.62-25.42 206.10-29.95Q208.58-34.49 212.87-37.12Q217.15-39.74 222.77-39.74L222.77-39.74Q227.09-39.74 230.76-38.05Q234.43-36.36 237.24-32.98L237.24-32.98Q238.10-31.97 237.85-30.92Q237.60-29.88 236.52-29.09L236.52-29.09Q235.66-28.51 234.61-28.69Q233.57-28.87 232.70-29.81L232.70-29.81Q228.74-34.27 222.77-34.27L222.77-34.27Q218.81-34.27 215.82-32.40Q212.83-30.53 211.18-27.25Q209.52-23.98 209.52-19.66L209.52-19.66Q209.52-15.48 211.28-12.20Q213.05-8.93 216.18-7.02Q219.31-5.11 223.34-5.11L223.34-5.11Q226.08-5.11 228.28-5.83Q230.47-6.55 232.20-8.06L232.20-8.06Q233.21-8.86 234.22-8.93Q235.22-9.00 236.09-8.35L236.09-8.35Q237.02-7.49 237.17-6.41Q237.31-5.33 236.45-4.46L236.45-4.46Q231.19 0.36 223.34 0.36ZM289.37 0L289.37 0Q287.42 0 286.49-1.94L286.49-1.94L265.25-51.48Q264.38-53.64 265.10-54.94Q265.82-56.23 267.70-56.23L267.70-56.23Q269.71-56.23 270.50-54.29L270.50-54.29L290.02-7.70L288.65-7.70L308.16-54.22Q308.66-55.37 309.35-55.80Q310.03-56.23 311.11-56.23L311.11-56.23Q312.98-56.23 313.63-54.90Q314.28-53.57 313.56-51.84L313.56-51.84L292.10-1.94Q291.67-0.94 290.99-0.47Q290.30 0 289.37 0ZM325.87 0L325.87 0Q324.50 0 323.64-0.83Q322.78-1.66 322.78-3.10L322.78-3.10L322.78-36.29Q322.78-37.73 323.64-38.56Q324.50-39.38 325.87-39.38L325.87-39.38Q327.24-39.38 328.07-38.56Q328.90-37.73 328.90-36.29L328.90-36.29L328.90-3.10Q328.90-1.66 328.07-0.83Q327.24 0 325.87 0ZM325.80-46.51L325.80-46.51Q324.07-46.51 322.85-47.77Q321.62-49.03 321.62-50.76L321.62-50.76Q321.62-52.56 322.88-53.71Q324.14-54.86 325.80-54.86L325.80-54.86Q327.46-54.86 328.72-53.71Q329.98-52.56 329.98-50.76L329.98-50.76Q329.98-49.03 328.75-47.77Q327.53-46.51 325.80-46.51ZM371.74-34.78L346.25-1.73L341.64-4.75L367.70-38.23L371.74-34.78ZM369.86 0L343.87 0Q341.06 0 341.06-2.81L341.06-2.81Q341.06-5.54 343.87-5.54L343.87-5.54L369.86-5.54Q372.67-5.54 372.67-2.81L372.67-2.81Q372.67 0 369.86 0L369.86 0ZM369.50-33.84L343.44-33.84Q340.63-33.84 340.63-36.58L340.63-36.58Q340.63-39.38 343.44-39.38L343.44-39.38L369.50-39.38Q372.24-39.38 372.24-36.58L372.24-36.58Q372.24-33.84 369.50-33.84L369.50-33.84ZM385.99 0L385.99 0Q384.62 0 383.76-0.86Q382.90-1.73 382.90-3.10L382.90-3.10L382.90-53.14Q382.90-54.50 383.76-55.37Q384.62-56.23 385.99-56.23L385.99-56.23L400.39-56.23Q405.72-56.23 409.86-53.89Q414-51.55 416.30-47.41Q418.61-43.27 418.61-37.80L418.61-37.80Q418.61-32.54 416.30-28.48Q414-24.41 409.86-22.07Q405.72-19.73 400.39-19.73L400.39-19.73L389.09-19.73L389.09-3.10Q389.09-1.73 388.22-0.86Q387.36 0 385.99 0ZM389.09-50.40L389.09-25.63L400.39-25.63Q403.92-25.63 406.69-27.18Q409.46-28.73 411.05-31.50Q412.63-34.27 412.63-37.80L412.63-37.80Q412.63-41.54 411.08-44.35Q409.54-47.16 406.73-48.78Q403.92-50.40 400.39-50.40L400.39-50.40L389.09-50.40ZM442.08 0.36L442.08 0.36Q436.61 0.36 432.29-2.27Q427.97-4.90 425.45-9.43Q422.93-13.97 422.93-19.66L422.93-19.66Q422.93-25.42 425.56-29.95Q428.18-34.49 432.72-37.12Q437.26-39.74 442.94-39.74L442.94-39.74Q448.56-39.74 453.06-37.12Q457.56-34.49 460.19-29.95Q462.82-25.42 462.89-19.66L462.89-19.66L460.44-18.43Q460.44-13.10 458.03-8.86Q455.62-4.61 451.48-2.12Q447.34 0.36 442.08 0.36ZM442.94-5.11L442.94-5.11Q446.98-5.11 450.11-7.02Q453.24-8.93 455.08-12.24Q456.91-15.55 456.91-19.66L456.91-19.66Q456.91-23.83 455.08-27.11Q453.24-30.38 450.11-32.33Q446.98-34.27 442.94-34.27L442.94-34.27Q438.98-34.27 435.78-32.33Q432.58-30.38 430.70-27.11Q428.83-23.83 428.83-19.66L428.83-19.66Q428.83-15.55 430.70-12.24Q432.58-8.93 435.78-7.02Q438.98-5.11 442.94-5.11ZM459.79 0L459.79 0Q458.50 0 457.60-0.83Q456.70-1.66 456.70-3.02L456.70-3.02L456.70-14.90L458.06-21.17L462.89-19.66L462.89-3.02Q462.89-1.66 462.02-0.83Q461.16 0 459.79 0ZM490.18 0L488.74 0Q484.99 0 482.04-1.80Q479.09-3.60 477.40-6.77Q475.70-9.94 475.70-13.90L475.70-13.90L475.70-48.89Q475.70-50.18 476.53-51.05Q477.36-51.91 478.73-51.91L478.73-51.91Q480.02-51.91 480.89-51.05Q481.75-50.18 481.75-48.89L481.75-48.89L481.75-13.90Q481.75-10.51 483.73-8.28Q485.71-6.05 488.74-6.05L488.74-6.05L490.90-6.05Q492.05-6.05 492.84-5.18Q493.63-4.32 493.63-3.02L493.63-3.02Q493.63-1.66 492.66-0.83Q491.69 0 490.18 0L490.18 0ZM489.24-32.69L471.46-32.69Q470.23-32.69 469.44-33.44Q468.65-34.20 468.65-35.28L468.65-35.28Q468.65-36.43 469.44-37.19Q470.23-37.94 471.46-37.94L471.46-37.94L489.24-37.94Q490.46-37.94 491.26-37.19Q492.05-36.43 492.05-35.28L492.05-35.28Q492.05-34.20 491.26-33.44Q490.46-32.69 489.24-32.69L489.24-32.69ZM505.73-15.55L505.73-15.55Q504.29-15.55 503.46-16.42Q502.63-17.28 502.63-18.58L502.63-18.58L502.63-53.14Q502.63-54.58 503.46-55.40Q504.29-56.23 505.73-56.23L505.73-56.23Q507.10-56.23 507.92-55.40Q508.75-54.58 508.75-53.14L508.75-53.14L508.75-18.58Q508.75-17.28 507.92-16.42Q507.10-15.55 505.73-15.55ZM536.26 0L536.26 0Q534.89 0 534.02-0.86Q533.16-1.73 533.16-3.02L533.16-3.02L533.16-21.38Q533.16-25.78 531.54-28.55Q529.92-31.32 527.11-32.72Q524.30-34.13 520.70-34.13L520.70-34.13Q517.32-34.13 514.62-32.80Q511.92-31.46 510.34-29.20Q508.75-26.93 508.75-23.98L508.75-23.98L504.58-23.98Q504.72-28.51 506.99-32.08Q509.26-35.64 513.07-37.73Q516.89-39.82 521.57-39.82L521.57-39.82Q526.61-39.82 530.60-37.69Q534.60-35.57 536.94-31.46Q539.28-27.36 539.28-21.38L539.28-21.38L539.28-3.02Q539.28-1.73 538.42-0.86Q537.55 0 536.26 0ZM505.73 0L505.73 0Q504.29 0 503.46-0.83Q502.63-1.66 502.63-3.02L502.63-3.02L502.63-36.29Q502.63-37.73 503.46-38.56Q504.29-39.38 505.73-39.38L505.73-39.38Q507.10-39.38 507.92-38.56Q508.75-37.73 508.75-36.29L508.75-36.29L508.75-3.02Q508.75-1.66 507.92-0.83Q507.10 0 505.73 0Z";
 	var pentagon = "M 100 0 L 190 50 L 160 140 L 40 140 L 10 50 z";
@@ -16969,6 +17056,8 @@
 		favicon: favicon,
 		heart: heart,
 		hexagon: hexagon,
+		line: line,
+		closedLine: closedLine,
 		twoLines: twoLines,
 		lines: lines,
 		logo: logo,
@@ -17081,7 +17170,7 @@
 	            return;
 	        if (currentDemo !== Instruction._01_INSTALL_AND_START)
 	            return;
-	        const path = new Path(paths.diamond);
+	        const path = new Path(paths.banana);
 	        const vizpath = path.visualize();
 	        // console.log(vizpath.joinSegment(vizpath.segments[0][0], vizpath.segments[0][5]));
 	        const editor = new VizPathEditor();
@@ -17091,6 +17180,20 @@
 	            .use(new EditorZoom())
 	            .use(new EditorResize())
 	            .use(new EditorShortcut([
+	            {
+	                key: 'C',
+	                combinationKeys: ['ctrl'],
+	                onActivate: () => {
+	                    editor.draw(Path.transform(vizpath.getPathData(null), [{ translate: { x: 10, y: 10 } }]));
+	                },
+	            },
+	            {
+	                key: 'A',
+	                combinationKeys: ['ctrl'],
+	                onActivate: () => {
+	                    return editor.focus(...editor.nodes);
+	                },
+	            },
 	            {
 	                key: 'D',
 	                onActivate: () => {
@@ -17146,7 +17249,6 @@
 	        }))
 	            .mount(canvas);
 	        await editor.enterEditing(vizpath);
-	        editor.focus(editor.nodes[0]);
 	        setEditor(editor);
 	    }, [currentDemo, canvas, setEditor]);
 	    React.useEffect(() => {

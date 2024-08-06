@@ -351,11 +351,10 @@ class VizPathEditor {
     this._renderPathNodes();
     this._renderDeformers();
 
-    const activeObjects = [...storeActiveNodes, storeActivePoint].filter(
-      Boolean,
-    ) as fabric.Object[];
-    if (activeObjects.every((object) => object.canvas === this.canvas))
-      this.focus(...activeObjects);
+    if (storeActivePoint?.canvas === this.canvas) this.focus(storeActivePoint);
+    else if (storeActiveNodes.every((object) => object.canvas === this.canvas)) {
+      this.focus(...storeActiveNodes);
+    }
 
     return result;
   }
@@ -901,42 +900,44 @@ class VizPathEditor {
       }
 
       this.rerender(() => {
-        convertibleNodes.forEach((item, index) => {
-          const newCoord =
-            convertibleNodes.length === 1 ? oppositePosition : [position, oppositePosition][index];
-          const newInstruction = [...item[1].instruction] as Instruction;
-          newInstruction[0] = {
-            [InstructionType.LINE]: InstructionType.QUADRATIC_CURCE,
-            [InstructionType.QUADRATIC_CURCE]: InstructionType.BEZIER_CURVE,
-          }[newInstruction[0]];
-          newInstruction.splice(item[0] === 'pre' ? -2 : 1, 0, newCoord.x, newCoord.y);
-          vizpath.replace(item[1], newInstruction);
+        vizpath.upgrade(targetNode, 'both', true);
 
-          // 非闭合路径给端点添加虚拟变换器
-          if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
-            if (
-              targetNode === targetNode.segment[0] &&
-              !targetNode.deformers.pre &&
-              targetNode.deformers.next
-            ) {
-              vizpath.addNodeDeformer(targetNode, 'pre', {
-                x: targetNode.node!.x - (targetNode.deformers.next.x - targetNode.node!.x),
-                y: targetNode.node!.y - (targetNode.deformers.next.y - targetNode.node!.y),
-              });
-            }
-
-            if (
-              targetNode === targetNode.segment[targetNode.segment.length - 1] &&
-              !targetNode.deformers.next &&
-              targetNode.deformers.pre
-            ) {
-              vizpath.addNodeDeformer(targetNode, 'next', {
-                x: targetNode.node!.x - (targetNode.deformers.pre.x - targetNode.node!.x),
-                y: targetNode.node!.y - (targetNode.deformers.pre.y - targetNode.node!.y),
-              });
-            }
+        // 非闭合路径给端点添加虚拟变换器
+        if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
+          if (
+            targetNode === targetNode.segment[0] &&
+            !targetNode.deformers.pre &&
+            targetNode.deformers.next
+          ) {
+            vizpath.addNodeDeformer(targetNode, 'pre', {
+              x: targetNode.node!.x - (targetNode.deformers.next.x - targetNode.node!.x),
+              y: targetNode.node!.y - (targetNode.deformers.next.y - targetNode.node!.y),
+            });
           }
-        });
+
+          if (
+            targetNode === targetNode.segment[targetNode.segment.length - 1] &&
+            !targetNode.deformers.next &&
+            targetNode.deformers.pre
+          ) {
+            vizpath.addNodeDeformer(targetNode, 'next', {
+              x: targetNode.node!.x - (targetNode.deformers.pre.x - targetNode.node!.x),
+              y: targetNode.node!.y - (targetNode.deformers.pre.y - targetNode.node!.y),
+            });
+          }
+        }
+
+        // 设置控制点的位置
+        if (targetNode.deformers) {
+          Object.keys(targetNode.deformers).forEach((direction, index) => {
+            const coord = (
+              convertibleNodes.length === 1
+                ? [oppositePosition, position]
+                : [position, oppositePosition]
+            )[index];
+            targetNode.deformers![direction].set(coord.x, coord.y);
+          });
+        }
       });
 
       let targetCurveDot: EditorDeformer | undefined;
@@ -1308,6 +1309,26 @@ class VizPathEditor {
   }
 
   /**
+   * 在当前路径基础上绘制全新的路径片段
+   * @param data 路径片段数据
+   *
+   * @example
+   *
+   * draw('M 100 100 L 200 200 Z');
+   *
+   * @note
+   *
+   * 注意：绘制的路径数据会受到路径当前的变换影响
+   */
+  draw(data: string) {
+    const vizpath = this.vizpath;
+    if (vizpath)
+      this.rerender(() => {
+        vizpath.addSegment(data);
+      });
+  }
+
+  /**
    * 添加新的路径节点
    *
    * @note
@@ -1317,14 +1338,15 @@ class VizPathEditor {
    * 2）在未选中节点/选中多个节点时，将直接以该参数位置创建新的起始点以开启一段新的路径
    *
    * @param position 新节点的画布绝对位置
+   * @param autoLink 是否自动与活跃元素连接，注意：仅当活跃元素只有1个且为端点节点有效
    */
-  add(position: { left: number; top: number }) {
+  add(position: { left: number; top: number }, autoLink = true) {
     const vizpath = this.vizpath;
     if (!vizpath) return;
 
     const coord = vizpath.calcRelativeCoord(position);
     const node = this.rerender((activeNodes) => {
-      if (activeNodes.length === 1) {
+      if (autoLink && activeNodes.length === 1) {
         const node = activeNodes[0];
 
         const pathNode = this.objectNodeMap.get(node);
@@ -1448,7 +1470,7 @@ class VizPathEditor {
    *
    * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
    */
-  upgrade(object: fabric.Object, direction: 'pre' | 'next' | 'both' = 'both') {
+  upgrade(object: fabric.Object, direction: 'pre' | 'next' | 'both' = 'both', highest = false) {
     const vizpath = this.vizpath;
     if (!vizpath) return;
 
@@ -1456,7 +1478,7 @@ class VizPathEditor {
     if (!pathNode) return;
 
     this.rerender(() => {
-      vizpath.upgrade(pathNode, direction);
+      vizpath.upgrade(pathNode, direction, highest);
     });
   }
 
