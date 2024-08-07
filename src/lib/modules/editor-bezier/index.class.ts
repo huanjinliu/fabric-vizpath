@@ -270,7 +270,7 @@ class EditorBezier extends VizPathModule {
   //   let splitCoord: Coord | undefined;
   //   let disableAddToken: string | undefined;
 
-  //   const clean = () => {
+  //   const clear = () => {
   //     if (pathNode) {
   //       if (this.splitDot) canvas.remove(this.splitDot);
   //       pathNode = undefined;
@@ -284,13 +284,13 @@ class EditorBezier extends VizPathModule {
   //   };
 
   //   editor.events.canvas.on('mouse:move', (e) => {
-  //     clean();
+  //     clear();
 
   //     if (editor.get('mode') !== Mode.ADD) return;
 
-  //     if (e.target && e.target[VizPathEditor.symbol]) return;
+  //     if (target && target[VizPathEditor.symbol]) return;
 
-  //     if (e.target && e.target.type === 'activeSelection') return;
+  //     if (target && target.type === 'activeSelection') return;
 
   //     const pointer = calcCanvasCoord(canvas, e.pointer);
 
@@ -400,7 +400,7 @@ class EditorBezier extends VizPathModule {
   //       editor.currentConvertNodeObject = insertObject ?? null;
   //     }
 
-  //     clean();
+  //     clear();
   //   });
   // }
 
@@ -478,7 +478,7 @@ class EditorBezier extends VizPathModule {
     let virtualNode: fabric.Object | undefined;
     let curvePoint: Coord | undefined;
 
-    const cleanVirtualObjects = () => {
+    const clearVirtualObjects = () => {
       fabricOnceRender(canvas, () => {
         if (virtualPath && canvas.contains(virtualPath)) canvas.remove(virtualPath);
         if (virtualNode && canvas.contains(virtualNode)) canvas.remove(virtualNode);
@@ -532,34 +532,37 @@ class EditorBezier extends VizPathModule {
         const vizpath = editor.vizpath;
         if (!vizpath) return false;
 
+        const { target, pointer } = e;
+        if (!pointer) return false;
+
         if (editor.get('mode') !== 'add') return false;
 
         const activeNode = editor.activeNodes.length === 1 ? editor.activeNodes[0] : undefined;
         if (!activeNode) return false;
 
-        if (e.target) {
+        if (target) {
           if (
-            e.target[VizPathEditor.symbol] === EditorObjectID.NODE &&
+            target[VizPathEditor.symbol] === EditorObjectID.NODE &&
             vizpath.isLinkableNodes(
               editor.objectNodeMap.get(activeNode)!,
-              editor.objectNodeMap.get(e.target)!,
+              editor.objectNodeMap.get(target)!,
             )
           ) {
-            return renderVirtualObjects(activeNode, { left: e.target.left, top: e.target.top });
+            return renderVirtualObjects(activeNode, { left: target.left!, top: target.top! });
           }
         } else {
-          const pointer = calcCanvasCoord(editor.canvas!, e.pointer);
-          return renderVirtualObjects(activeNode, { left: pointer.x, top: pointer.y });
+          const coord = calcCanvasCoord(editor.canvas!, pointer);
+          return renderVirtualObjects(activeNode, { left: coord.x, top: coord.y });
         }
 
         return false;
       };
-      if (!render()) cleanVirtualObjects();
+      if (!render()) clearVirtualObjects();
     });
 
     editor.events.on('set', () => {
       if (editor.get('mode') !== 'add') {
-        cleanVirtualObjects();
+        clearVirtualObjects();
       }
     });
   }

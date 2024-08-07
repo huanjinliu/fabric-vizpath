@@ -16,6 +16,7 @@ import {
   parsePathJSON,
   transform,
 } from '@utils';
+import uniqueId from 'lodash-es/uniqueId';
 
 export enum EditorObjectID {
   PATH = 'path',
@@ -183,8 +184,12 @@ class VizPathEditor {
 
   /** 由于focus方法内部也有对元素聚焦失焦的操作，锁定避免循环执行事件监听造成死循环 */
   private _lockFocus = false;
+
   /** 记录当前活跃对象观察者 */
   private _observer: { target: fabric.Object; unobserve: () => void } | null = null;
+
+  /** 功能禁用请求凭证 */
+  disabledFunctionTokens: Partial<Record<'add' | 'delete' | 'convert', string[]>> = {};
 
   /**
    * 获取编辑器配置
@@ -707,7 +712,7 @@ class VizPathEditor {
   private _initSelectEvents() {
     const canvas = this.canvas;
     if (!canvas) return;
-    const handler = (eventName: string) => (e: MouseEvent) => {
+    const handler = (eventName: string) => (e: fabric.IEvent) => {
       this.focus(...canvas.getActiveObjects());
     };
 
@@ -744,10 +749,13 @@ class VizPathEditor {
     if (!canvas) return;
 
     this.events.canvas.on('mouse:down:before', (event) => {
+      if (!this.isEnable('add')) return;
+
       const vizpath = this.vizpath;
       if (!vizpath) return;
 
-      if (this.get('mode') !== Mode.ADD) return;
+      const { pointer } = event;
+      if (!pointer) return;
 
       let newNodeObject: fabric.Object | undefined;
 
@@ -760,8 +768,8 @@ class VizPathEditor {
       }
       // 新增节点
       else {
-        const pointer = calcCanvasCoord(canvas, event.pointer);
-        newNodeObject = this.add({ left: pointer.x, top: pointer.y });
+        const coord = calcCanvasCoord(canvas, pointer);
+        newNodeObject = this.add({ left: coord.x, top: coord.y });
       }
 
       // 新增成功，设置当前点为变换中
@@ -776,7 +784,7 @@ class VizPathEditor {
    */
   private _initDeleteEvents() {
     this.events.canvas.on('mouse:down', (event) => {
-      if (this.get('mode') !== Mode.DELETE) return;
+      if (!this.isEnable('delete')) return;
 
       if (
         event.target?.[VizPathEditor.symbol] === EditorObjectID.NODE ||
@@ -799,7 +807,7 @@ class VizPathEditor {
       if (!vizpath) return;
 
       if (!this.currentConvertNodeObject) {
-        if (this.get('mode') !== Mode.CONVERT) return;
+        if (!this.isEnable('convert')) return;
         if (event.target?.[VizPathEditor.symbol] !== EditorObjectID.NODE) return;
         this.currentConvertNodeObject = event.target as fabric.Object;
       }
@@ -818,10 +826,13 @@ class VizPathEditor {
       const target = this.currentConvertNodeObject;
       if (!target) return;
 
-      // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-      if (target.containsPoint(event.pointer)) return;
+      const { pointer } = event;
+      if (!pointer) return;
 
-      const pointer = calcCanvasCoord(canvas, event.pointer);
+      // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
+      if (target.containsPoint(pointer)) return;
+
+      const coord = calcCanvasCoord(canvas, pointer);
 
       const targetNode = this.objectNodeMap.get(target)!;
       const neighboringNodes = vizpath.getNeighboringNodes(targetNode, true);
@@ -833,10 +844,10 @@ class VizPathEditor {
         convertibleNodes = vizpath.getConvertibleNodes(targetNode);
       }
 
-      const position = vizpath.calcRelativeCoord({ left: pointer.x, top: pointer.y });
+      const position = vizpath.calcRelativeCoord({ left: coord.x, top: coord.y });
       const oppositePosition = vizpath.calcRelativeCoord({
-        left: target.left! - (pointer.x - target.left!),
-        top: target.top! - (pointer.y - target.top!),
+        left: target.left! - (coord.x - target.left!),
+        top: target.top! - (coord.y - target.top!),
       });
 
       // 根据夹角大小排序，夹角越小意味鼠标越接近
@@ -1116,7 +1127,7 @@ class VizPathEditor {
    * 初始活跃对象变换观测者，当元素变换时同步响应路径变化
    */
   private _registerActiveObjectsObserver() {
-    // 重置旧的观察者
+    // 清除旧的观察者
     this._observer?.unobserve();
     this._observer = null;
 
@@ -1564,6 +1575,52 @@ class VizPathEditor {
     } else {
       observerTarget.set({ scaleX, scaleY });
     }
+  }
+
+  /**
+   * 请求对特定功能禁用
+   *
+   * @param functionName 禁用功能名称
+   *
+   * @example
+   *
+   * // 持有凭证用于重新启用功能
+   * const token = requestDisableFunction('add');
+   *
+   * // 重新启用功能
+   * requestEnableFunction(token);
+   */
+  requestDisableFunction(functionName: 'add' | 'delete' | 'convert') {
+    const token = `${functionName}-${uniqueId()}`;
+    const tokens = this.disabledFunctionTokens[functionName] ?? [];
+    tokens.push(token);
+    this.disabledFunctionTokens[functionName] = tokens;
+    return token;
+  }
+
+  /**
+   * 请求启用特定功能
+   */
+  requestEnableFunction(token: string) {
+    const functionName = token.split('-')[0];
+    const tokens = this.disabledFunctionTokens[functionName];
+    if (!tokens) return false;
+
+    const index = tokens.indexOf(token);
+    if (index === -1) return false;
+
+    tokens.splice(index, 1);
+
+    return true;
+  }
+
+  /**
+   * 判断功能是否生效
+   */
+  isEnable(functionName: 'add' | 'delete' | 'convert') {
+    if (this.get('mode') !== functionName) return false;
+    if (this.disabledFunctionTokens[functionName]?.length) return false;
+    return true;
   }
 
   /**

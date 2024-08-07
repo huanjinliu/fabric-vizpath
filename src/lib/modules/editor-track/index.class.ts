@@ -12,9 +12,9 @@ import { InstructionType } from '../../vizpath.class';
 class EditorTrack extends VizPathModule {
   static ID = 'editor-track';
 
-  virtualPath: fabric.Path | undefined;
+  virtualPath: fabric.Path | null = null;
 
-  virtualNode: fabric.Object | undefined;
+  virtualNode: fabric.Object | null = null;
 
   themes = new VizPathTheme({
     virtualNode: (decorator: ThemeDecorator<fabric.Object>) => {
@@ -104,7 +104,7 @@ class EditorTrack extends VizPathModule {
   }
 
   // 清除虚拟画布对象
-  private _cleanVirtualObjects = () => {
+  private _clearVirtualObjects = () => {
     const canvas = this.editor?.canvas;
     if (!canvas) return;
     fabricOnceRender(canvas, () => {
@@ -114,10 +114,10 @@ class EditorTrack extends VizPathModule {
   };
 
   unload() {
-    this._cleanVirtualObjects();
+    this._clearVirtualObjects();
 
-    this.virtualNode = undefined;
-    this.virtualPath = undefined;
+    this.virtualNode = null;
+    this.virtualPath = null;
   }
 
   load(editor: VizPathEditor) {
@@ -171,7 +171,7 @@ class EditorTrack extends VizPathModule {
     };
 
     const renderTrackHandler = (e: fabric.IEvent<MouseEvent>) => {
-      this._cleanVirtualObjects();
+      this._clearVirtualObjects();
 
       // 缓存事件对象，以应对编辑器模式变更
       cacheEvent = e;
@@ -204,7 +204,7 @@ class EditorTrack extends VizPathModule {
 
     editor.events.canvas.on('mouse:move', renderTrackHandler);
     editor.events.canvas.on('mouse:down', () => {
-      this._cleanVirtualObjects();
+      this._clearVirtualObjects();
     });
     editor.events.on('set', () => {
       cacheEvent && renderTrackHandler(cacheEvent);

@@ -7,6 +7,7 @@ import {
   EditorZoom,
   EditorTheme,
   EditorTrack,
+  EditorSplitDot,
   Path,
   VizPathEditor,
   EditorShortcut,
@@ -25,7 +26,7 @@ function Demo03() {
     if (!canvas) return;
     if (currentDemo !== Instruction._03_TRANSFORM_PATH) return;
 
-    const path = new Path(paths.line);
+    const path = new Path(paths.shapes);
     const vizpath = path.visualize();
 
     const editor = new VizPathEditor();
@@ -111,6 +112,7 @@ function Demo03() {
         }),
       )
       .use(new EditorTrack())
+      .use(new EditorSplitDot())
       .mount(canvas);
 
     editor.enterEditing(path);

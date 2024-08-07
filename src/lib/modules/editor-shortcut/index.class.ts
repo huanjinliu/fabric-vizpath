@@ -108,9 +108,9 @@ class EditorShortcut extends VizPathModule {
     return _shortcut;
   }
 
-  private _handlePageDeactivate(e: KeyboardEvent) {
+  private _handlePageDeactivate(e: FocusEvent) {
     if (this.activeShortcut) {
-      this.activeShortcut.shortcut.onDeactivate?.(e, this.activeShortcut.returnValue);
+      this.activeShortcut.shortcut.onDeactivate?.(e as any, this.activeShortcut.returnValue);
       this.activeShortcut = undefined;
     }
   }

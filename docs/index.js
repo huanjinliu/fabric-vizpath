@@ -3648,6 +3648,1946 @@
 	  return _path;
 	};
 
+	// math-inlining.
+	var abs$1 = Math.abs,
+	  cos$1 = Math.cos,
+	  sin$1 = Math.sin,
+	  acos$1 = Math.acos,
+	  atan2 = Math.atan2,
+	  sqrt$1 = Math.sqrt,
+	  pow = Math.pow;
+
+	// cube root function yielding real roots
+	function crt(v) {
+	  return v < 0 ? -pow(-v, 1 / 3) : pow(v, 1 / 3);
+	}
+
+	// trig constants
+	var pi$1 = Math.PI,
+	  tau = 2 * pi$1,
+	  quart = pi$1 / 2,
+	  // float precision significant decimal
+	  epsilon = 0.000001,
+	  // extremas used in bbox calculation and similar algorithms
+	  nMax = Number.MAX_SAFE_INTEGER || 9007199254740991,
+	  nMin = Number.MIN_SAFE_INTEGER || -9007199254740991,
+	  // a zero coordinate, which is surprisingly useful
+	  ZERO = {
+	    x: 0,
+	    y: 0,
+	    z: 0
+	  };
+
+	// Bezier utility functions
+	var utils$1 = {
+	  // Legendre-Gauss abscissae with n=24 (x_i values, defined at i=n as the roots of the nth order Legendre polynomial Pn(x))
+	  Tvalues: [-0.0640568928626056260850430826247450385909, 0.0640568928626056260850430826247450385909, -0.1911188674736163091586398207570696318404, 0.1911188674736163091586398207570696318404, -0.3150426796961633743867932913198102407864, 0.3150426796961633743867932913198102407864, -0.4337935076260451384870842319133497124524, 0.4337935076260451384870842319133497124524, -0.5454214713888395356583756172183723700107, 0.5454214713888395356583756172183723700107, -0.6480936519369755692524957869107476266696, 0.6480936519369755692524957869107476266696, -0.7401241915785543642438281030999784255232, 0.7401241915785543642438281030999784255232, -0.8200019859739029219539498726697452080761, 0.8200019859739029219539498726697452080761, -0.8864155270044010342131543419821967550873, 0.8864155270044010342131543419821967550873, -0.9382745520027327585236490017087214496548, 0.9382745520027327585236490017087214496548, -0.9747285559713094981983919930081690617411, 0.9747285559713094981983919930081690617411, -0.9951872199970213601799974097007368118745, 0.9951872199970213601799974097007368118745],
+	  // Legendre-Gauss weights with n=24 (w_i values, defined by a function linked to in the Bezier primer article)
+	  Cvalues: [0.1279381953467521569740561652246953718517, 0.1279381953467521569740561652246953718517, 0.1258374563468282961213753825111836887264, 0.1258374563468282961213753825111836887264, 0.121670472927803391204463153476262425607, 0.121670472927803391204463153476262425607, 0.1155056680537256013533444839067835598622, 0.1155056680537256013533444839067835598622, 0.1074442701159656347825773424466062227946, 0.1074442701159656347825773424466062227946, 0.0976186521041138882698806644642471544279, 0.0976186521041138882698806644642471544279, 0.086190161531953275917185202983742667185, 0.086190161531953275917185202983742667185, 0.0733464814110803057340336152531165181193, 0.0733464814110803057340336152531165181193, 0.0592985849154367807463677585001085845412, 0.0592985849154367807463677585001085845412, 0.0442774388174198061686027482113382288593, 0.0442774388174198061686027482113382288593, 0.0285313886289336631813078159518782864491, 0.0285313886289336631813078159518782864491, 0.0123412297999871995468056670700372915759, 0.0123412297999871995468056670700372915759],
+	  arcfn: function arcfn(t, derivativeFn) {
+	    var d = derivativeFn(t);
+	    var l = d.x * d.x + d.y * d.y;
+	    if (typeof d.z !== "undefined") {
+	      l += d.z * d.z;
+	    }
+	    return sqrt$1(l);
+	  },
+	  compute: function compute(t, points, _3d) {
+	    // shortcuts
+	    if (t === 0) {
+	      points[0].t = 0;
+	      return points[0];
+	    }
+	    var order = points.length - 1;
+	    if (t === 1) {
+	      points[order].t = 1;
+	      return points[order];
+	    }
+	    var mt = 1 - t;
+	    var p = points;
+
+	    // constant?
+	    if (order === 0) {
+	      points[0].t = t;
+	      return points[0];
+	    }
+
+	    // linear?
+	    if (order === 1) {
+	      var ret = {
+	        x: mt * p[0].x + t * p[1].x,
+	        y: mt * p[0].y + t * p[1].y,
+	        t: t
+	      };
+	      if (_3d) {
+	        ret.z = mt * p[0].z + t * p[1].z;
+	      }
+	      return ret;
+	    }
+
+	    // quadratic/cubic curve?
+	    if (order < 4) {
+	      var mt2 = mt * mt,
+	        t2 = t * t,
+	        a,
+	        b,
+	        c,
+	        d = 0;
+	      if (order === 2) {
+	        p = [p[0], p[1], p[2], ZERO];
+	        a = mt2;
+	        b = mt * t * 2;
+	        c = t2;
+	      } else if (order === 3) {
+	        a = mt2 * mt;
+	        b = mt2 * t * 3;
+	        c = mt * t2 * 3;
+	        d = t * t2;
+	      }
+	      var _ret = {
+	        x: a * p[0].x + b * p[1].x + c * p[2].x + d * p[3].x,
+	        y: a * p[0].y + b * p[1].y + c * p[2].y + d * p[3].y,
+	        t: t
+	      };
+	      if (_3d) {
+	        _ret.z = a * p[0].z + b * p[1].z + c * p[2].z + d * p[3].z;
+	      }
+	      return _ret;
+	    }
+
+	    // higher order curves: use de Casteljau's computation
+	    var dCpts = JSON.parse(JSON.stringify(points));
+	    while (dCpts.length > 1) {
+	      for (var i = 0; i < dCpts.length - 1; i++) {
+	        dCpts[i] = {
+	          x: dCpts[i].x + (dCpts[i + 1].x - dCpts[i].x) * t,
+	          y: dCpts[i].y + (dCpts[i + 1].y - dCpts[i].y) * t
+	        };
+	        if (typeof dCpts[i].z !== "undefined") {
+	          dCpts[i].z = dCpts[i].z + (dCpts[i + 1].z - dCpts[i].z) * t;
+	        }
+	      }
+	      dCpts.splice(dCpts.length - 1, 1);
+	    }
+	    dCpts[0].t = t;
+	    return dCpts[0];
+	  },
+	  computeWithRatios: function computeWithRatios(t, points, ratios, _3d) {
+	    var mt = 1 - t,
+	      r = ratios,
+	      p = points;
+	    var f1 = r[0],
+	      f2 = r[1],
+	      f3 = r[2],
+	      f4 = r[3],
+	      d;
+
+	    // spec for linear
+	    f1 *= mt;
+	    f2 *= t;
+	    if (p.length === 2) {
+	      d = f1 + f2;
+	      return {
+	        x: (f1 * p[0].x + f2 * p[1].x) / d,
+	        y: (f1 * p[0].y + f2 * p[1].y) / d,
+	        z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z) / d,
+	        t: t
+	      };
+	    }
+
+	    // upgrade to quadratic
+	    f1 *= mt;
+	    f2 *= 2 * mt;
+	    f3 *= t * t;
+	    if (p.length === 3) {
+	      d = f1 + f2 + f3;
+	      return {
+	        x: (f1 * p[0].x + f2 * p[1].x + f3 * p[2].x) / d,
+	        y: (f1 * p[0].y + f2 * p[1].y + f3 * p[2].y) / d,
+	        z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z + f3 * p[2].z) / d,
+	        t: t
+	      };
+	    }
+
+	    // upgrade to cubic
+	    f1 *= mt;
+	    f2 *= 1.5 * mt;
+	    f3 *= 3 * mt;
+	    f4 *= t * t * t;
+	    if (p.length === 4) {
+	      d = f1 + f2 + f3 + f4;
+	      return {
+	        x: (f1 * p[0].x + f2 * p[1].x + f3 * p[2].x + f4 * p[3].x) / d,
+	        y: (f1 * p[0].y + f2 * p[1].y + f3 * p[2].y + f4 * p[3].y) / d,
+	        z: !_3d ? false : (f1 * p[0].z + f2 * p[1].z + f3 * p[2].z + f4 * p[3].z) / d,
+	        t: t
+	      };
+	    }
+	  },
+	  derive: function derive(points, _3d) {
+	    var dpoints = [];
+	    for (var p = points, d = p.length, c = d - 1; d > 1; d--, c--) {
+	      var list = [];
+	      for (var j = 0, dpt; j < c; j++) {
+	        dpt = {
+	          x: c * (p[j + 1].x - p[j].x),
+	          y: c * (p[j + 1].y - p[j].y)
+	        };
+	        if (_3d) {
+	          dpt.z = c * (p[j + 1].z - p[j].z);
+	        }
+	        list.push(dpt);
+	      }
+	      dpoints.push(list);
+	      p = list;
+	    }
+	    return dpoints;
+	  },
+	  between: function between(v, m, M) {
+	    return m <= v && v <= M || utils$1.approximately(v, m) || utils$1.approximately(v, M);
+	  },
+	  approximately: function approximately(a, b, precision) {
+	    return abs$1(a - b) <= (precision || epsilon);
+	  },
+	  length: function length(derivativeFn) {
+	    var z = 0.5,
+	      len = utils$1.Tvalues.length;
+	    var sum = 0;
+	    for (var i = 0, _t; i < len; i++) {
+	      _t = z * utils$1.Tvalues[i] + z;
+	      sum += utils$1.Cvalues[i] * utils$1.arcfn(_t, derivativeFn);
+	    }
+	    return z * sum;
+	  },
+	  map: function map(v, ds, de, ts, te) {
+	    var d1 = de - ds,
+	      d2 = te - ts,
+	      v2 = v - ds,
+	      r = v2 / d1;
+	    return ts + d2 * r;
+	  },
+	  lerp: function lerp(r, v1, v2) {
+	    var ret = {
+	      x: v1.x + r * (v2.x - v1.x),
+	      y: v1.y + r * (v2.y - v1.y)
+	    };
+	    if (v1.z !== undefined && v2.z !== undefined) {
+	      ret.z = v1.z + r * (v2.z - v1.z);
+	    }
+	    return ret;
+	  },
+	  pointToString: function pointToString(p) {
+	    var s = p.x + "/" + p.y;
+	    if (typeof p.z !== "undefined") {
+	      s += "/" + p.z;
+	    }
+	    return s;
+	  },
+	  pointsToString: function pointsToString(points) {
+	    return "[" + points.map(utils$1.pointToString).join(", ") + "]";
+	  },
+	  copy: function copy(obj) {
+	    return JSON.parse(JSON.stringify(obj));
+	  },
+	  angle: function angle(o, v1, v2) {
+	    var dx1 = v1.x - o.x,
+	      dy1 = v1.y - o.y,
+	      dx2 = v2.x - o.x,
+	      dy2 = v2.y - o.y,
+	      cross = dx1 * dy2 - dy1 * dx2,
+	      dot = dx1 * dx2 + dy1 * dy2;
+	    return atan2(cross, dot);
+	  },
+	  // round as string, to avoid rounding errors
+	  round: function round(v, d) {
+	    var s = "" + v;
+	    var pos = s.indexOf(".");
+	    return parseFloat(s.substring(0, pos + 1 + d));
+	  },
+	  dist: function dist(p1, p2) {
+	    var dx = p1.x - p2.x,
+	      dy = p1.y - p2.y;
+	    return sqrt$1(dx * dx + dy * dy);
+	  },
+	  closest: function closest(LUT, point) {
+	    var mdist = pow(2, 63),
+	      mpos,
+	      d;
+	    LUT.forEach(function (p, idx) {
+	      d = utils$1.dist(point, p);
+	      if (d < mdist) {
+	        mdist = d;
+	        mpos = idx;
+	      }
+	    });
+	    return {
+	      mdist: mdist,
+	      mpos: mpos
+	    };
+	  },
+	  abcratio: function abcratio(t, n) {
+	    // see ratio(t) note on http://pomax.github.io/bezierinfo/#abc
+	    if (n !== 2 && n !== 3) {
+	      return false;
+	    }
+	    if (typeof t === "undefined") {
+	      t = 0.5;
+	    } else if (t === 0 || t === 1) {
+	      return t;
+	    }
+	    var bottom = pow(t, n) + pow(1 - t, n),
+	      top = bottom - 1;
+	    return abs$1(top / bottom);
+	  },
+	  projectionratio: function projectionratio(t, n) {
+	    // see u(t) note on http://pomax.github.io/bezierinfo/#abc
+	    if (n !== 2 && n !== 3) {
+	      return false;
+	    }
+	    if (typeof t === "undefined") {
+	      t = 0.5;
+	    } else if (t === 0 || t === 1) {
+	      return t;
+	    }
+	    var top = pow(1 - t, n),
+	      bottom = pow(t, n) + top;
+	    return top / bottom;
+	  },
+	  lli8: function lli8(x1, y1, x2, y2, x3, y3, x4, y4) {
+	    var nx = (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4),
+	      ny = (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4),
+	      d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+	    if (d == 0) {
+	      return false;
+	    }
+	    return {
+	      x: nx / d,
+	      y: ny / d
+	    };
+	  },
+	  lli4: function lli4(p1, p2, p3, p4) {
+	    var x1 = p1.x,
+	      y1 = p1.y,
+	      x2 = p2.x,
+	      y2 = p2.y,
+	      x3 = p3.x,
+	      y3 = p3.y,
+	      x4 = p4.x,
+	      y4 = p4.y;
+	    return utils$1.lli8(x1, y1, x2, y2, x3, y3, x4, y4);
+	  },
+	  lli: function lli(v1, v2) {
+	    return utils$1.lli4(v1, v1.c, v2, v2.c);
+	  },
+	  makeline: function makeline(p1, p2) {
+	    return new Bezier(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2, p2.x, p2.y);
+	  },
+	  findbbox: function findbbox(sections) {
+	    var mx = nMax,
+	      my = nMax,
+	      MX = nMin,
+	      MY = nMin;
+	    sections.forEach(function (s) {
+	      var bbox = s.bbox();
+	      if (mx > bbox.x.min) mx = bbox.x.min;
+	      if (my > bbox.y.min) my = bbox.y.min;
+	      if (MX < bbox.x.max) MX = bbox.x.max;
+	      if (MY < bbox.y.max) MY = bbox.y.max;
+	    });
+	    return {
+	      x: {
+	        min: mx,
+	        mid: (mx + MX) / 2,
+	        max: MX,
+	        size: MX - mx
+	      },
+	      y: {
+	        min: my,
+	        mid: (my + MY) / 2,
+	        max: MY,
+	        size: MY - my
+	      }
+	    };
+	  },
+	  shapeintersections: function shapeintersections(s1, bbox1, s2, bbox2, curveIntersectionThreshold) {
+	    if (!utils$1.bboxoverlap(bbox1, bbox2)) return [];
+	    var intersections = [];
+	    var a1 = [s1.startcap, s1.forward, s1.back, s1.endcap];
+	    var a2 = [s2.startcap, s2.forward, s2.back, s2.endcap];
+	    a1.forEach(function (l1) {
+	      if (l1.virtual) return;
+	      a2.forEach(function (l2) {
+	        if (l2.virtual) return;
+	        var iss = l1.intersects(l2, curveIntersectionThreshold);
+	        if (iss.length > 0) {
+	          iss.c1 = l1;
+	          iss.c2 = l2;
+	          iss.s1 = s1;
+	          iss.s2 = s2;
+	          intersections.push(iss);
+	        }
+	      });
+	    });
+	    return intersections;
+	  },
+	  makeshape: function makeshape(forward, back, curveIntersectionThreshold) {
+	    var bpl = back.points.length;
+	    var fpl = forward.points.length;
+	    var start = utils$1.makeline(back.points[bpl - 1], forward.points[0]);
+	    var end = utils$1.makeline(forward.points[fpl - 1], back.points[0]);
+	    var shape = {
+	      startcap: start,
+	      forward: forward,
+	      back: back,
+	      endcap: end,
+	      bbox: utils$1.findbbox([start, forward, back, end])
+	    };
+	    shape.intersections = function (s2) {
+	      return utils$1.shapeintersections(shape, shape.bbox, s2, s2.bbox, curveIntersectionThreshold);
+	    };
+	    return shape;
+	  },
+	  getminmax: function getminmax(curve, d, list) {
+	    if (!list) return {
+	      min: 0,
+	      max: 0
+	    };
+	    var min = nMax,
+	      max = nMin,
+	      t,
+	      c;
+	    if (list.indexOf(0) === -1) {
+	      list = [0].concat(list);
+	    }
+	    if (list.indexOf(1) === -1) {
+	      list.push(1);
+	    }
+	    for (var i = 0, len = list.length; i < len; i++) {
+	      t = list[i];
+	      c = curve.get(t);
+	      if (c[d] < min) {
+	        min = c[d];
+	      }
+	      if (c[d] > max) {
+	        max = c[d];
+	      }
+	    }
+	    return {
+	      min: min,
+	      mid: (min + max) / 2,
+	      max: max,
+	      size: max - min
+	    };
+	  },
+	  align: function align(points, line) {
+	    var tx = line.p1.x,
+	      ty = line.p1.y,
+	      a = -atan2(line.p2.y - ty, line.p2.x - tx),
+	      d = function d(v) {
+	        return {
+	          x: (v.x - tx) * cos$1(a) - (v.y - ty) * sin$1(a),
+	          y: (v.x - tx) * sin$1(a) + (v.y - ty) * cos$1(a)
+	        };
+	      };
+	    return points.map(d);
+	  },
+	  roots: function roots(points, line) {
+	    line = line || {
+	      p1: {
+	        x: 0,
+	        y: 0
+	      },
+	      p2: {
+	        x: 1,
+	        y: 0
+	      }
+	    };
+	    var order = points.length - 1;
+	    var aligned = utils$1.align(points, line);
+	    var reduce = function reduce(t) {
+	      return 0 <= t && t <= 1;
+	    };
+	    if (order === 2) {
+	      var _a2 = aligned[0].y,
+	        _b2 = aligned[1].y,
+	        _c2 = aligned[2].y,
+	        _d2 = _a2 - 2 * _b2 + _c2;
+	      if (_d2 !== 0) {
+	        var m1 = -sqrt$1(_b2 * _b2 - _a2 * _c2),
+	          m2 = -_a2 + _b2,
+	          _v = -(m1 + m2) / _d2,
+	          v2 = -(-m1 + m2) / _d2;
+	        return [_v, v2].filter(reduce);
+	      } else if (_b2 !== _c2 && _d2 === 0) {
+	        return [(2 * _b2 - _c2) / (2 * _b2 - 2 * _c2)].filter(reduce);
+	      }
+	      return [];
+	    }
+
+	    // see http://www.trans4mind.com/personal_development/mathematics/polynomials/cubicAlgebra.htm
+	    var pa = aligned[0].y,
+	      pb = aligned[1].y,
+	      pc = aligned[2].y,
+	      pd = aligned[3].y;
+	    var d = -pa + 3 * pb - 3 * pc + pd,
+	      a = 3 * pa - 6 * pb + 3 * pc,
+	      b = -3 * pa + 3 * pb,
+	      c = pa;
+	    if (utils$1.approximately(d, 0)) {
+	      // this is not a cubic curve.
+	      if (utils$1.approximately(a, 0)) {
+	        // in fact, this is not a quadratic curve either.
+	        if (utils$1.approximately(b, 0)) {
+	          // in fact in fact, there are no solutions.
+	          return [];
+	        }
+	        // linear solution:
+	        return [-c / b].filter(reduce);
+	      }
+	      // quadratic solution:
+	      var _q = sqrt$1(b * b - 4 * a * c),
+	        a2 = 2 * a;
+	      return [(_q - b) / a2, (-b - _q) / a2].filter(reduce);
+	    }
+
+	    // at this point, we know we need a cubic solution:
+
+	    a /= d;
+	    b /= d;
+	    c /= d;
+	    var p = (3 * b - a * a) / 3,
+	      p3 = p / 3,
+	      q = (2 * a * a * a - 9 * a * b + 27 * c) / 27,
+	      q2 = q / 2,
+	      discriminant = q2 * q2 + p3 * p3 * p3;
+	    var u1, v1, x1, x2, x3;
+	    if (discriminant < 0) {
+	      var mp3 = -p / 3,
+	        mp33 = mp3 * mp3 * mp3,
+	        r = sqrt$1(mp33),
+	        _t2 = -q / (2 * r),
+	        cosphi = _t2 < -1 ? -1 : _t2 > 1 ? 1 : _t2,
+	        phi = acos$1(cosphi),
+	        crtr = crt(r),
+	        t1 = 2 * crtr;
+	      x1 = t1 * cos$1(phi / 3) - a / 3;
+	      x2 = t1 * cos$1((phi + tau) / 3) - a / 3;
+	      x3 = t1 * cos$1((phi + 2 * tau) / 3) - a / 3;
+	      return [x1, x2, x3].filter(reduce);
+	    } else if (discriminant === 0) {
+	      u1 = q2 < 0 ? crt(-q2) : -crt(q2);
+	      x1 = 2 * u1 - a / 3;
+	      x2 = -u1 - a / 3;
+	      return [x1, x2].filter(reduce);
+	    } else {
+	      var sd = sqrt$1(discriminant);
+	      u1 = crt(-q2 + sd);
+	      v1 = crt(q2 + sd);
+	      return [u1 - v1 - a / 3].filter(reduce);
+	    }
+	  },
+	  droots: function droots(p) {
+	    // quadratic roots are easy
+	    if (p.length === 3) {
+	      var a = p[0],
+	        b = p[1],
+	        c = p[2],
+	        d = a - 2 * b + c;
+	      if (d !== 0) {
+	        var m1 = -sqrt$1(b * b - a * c),
+	          m2 = -a + b,
+	          v1 = -(m1 + m2) / d,
+	          v2 = -(-m1 + m2) / d;
+	        return [v1, v2];
+	      } else if (b !== c && d === 0) {
+	        return [(2 * b - c) / (2 * (b - c))];
+	      }
+	      return [];
+	    }
+
+	    // linear roots are even easier
+	    if (p.length === 2) {
+	      var _a3 = p[0],
+	        _b3 = p[1];
+	      if (_a3 !== _b3) {
+	        return [_a3 / (_a3 - _b3)];
+	      }
+	      return [];
+	    }
+	    return [];
+	  },
+	  curvature: function curvature(t, d1, d2, _3d, kOnly) {
+	    var num,
+	      dnm,
+	      adk,
+	      dk,
+	      k = 0,
+	      r = 0;
+
+	    //
+	    // We're using the following formula for curvature:
+	    //
+	    //              x'y" - y'x"
+	    //   k(t) = ------------------
+	    //           (x'² + y'²)^(3/2)
+	    //
+	    // from https://en.wikipedia.org/wiki/Radius_of_curvature#Definition
+	    //
+	    // With it corresponding 3D counterpart:
+	    //
+	    //          sqrt( (y'z" - y"z')² + (z'x" - z"x')² + (x'y" - x"y')²)
+	    //   k(t) = -------------------------------------------------------
+	    //                     (x'² + y'² + z'²)^(3/2)
+	    //
+
+	    var d = utils$1.compute(t, d1);
+	    var dd = utils$1.compute(t, d2);
+	    var qdsum = d.x * d.x + d.y * d.y;
+	    if (_3d) {
+	      num = sqrt$1(pow(d.y * dd.z - dd.y * d.z, 2) + pow(d.z * dd.x - dd.z * d.x, 2) + pow(d.x * dd.y - dd.x * d.y, 2));
+	      dnm = pow(qdsum + d.z * d.z, 3 / 2);
+	    } else {
+	      num = d.x * dd.y - d.y * dd.x;
+	      dnm = pow(qdsum, 3 / 2);
+	    }
+	    if (num === 0 || dnm === 0) {
+	      return {
+	        k: 0,
+	        r: 0
+	      };
+	    }
+	    k = num / dnm;
+	    r = dnm / num;
+
+	    // We're also computing the derivative of kappa, because
+	    // there is value in knowing the rate of change for the
+	    // curvature along the curve. And we're just going to
+	    // ballpark it based on an epsilon.
+	    if (!kOnly) {
+	      // compute k'(t) based on the interval before, and after it,
+	      // to at least try to not introduce forward/backward pass bias.
+	      var pk = utils$1.curvature(t - 0.001, d1, d2, _3d, true).k;
+	      var nk = utils$1.curvature(t + 0.001, d1, d2, _3d, true).k;
+	      dk = (nk - k + (k - pk)) / 2;
+	      adk = (abs$1(nk - k) + abs$1(k - pk)) / 2;
+	    }
+	    return {
+	      k: k,
+	      r: r,
+	      dk: dk,
+	      adk: adk
+	    };
+	  },
+	  inflections: function inflections(points) {
+	    if (points.length < 4) return [];
+
+	    // FIXME: TODO: add in inflection abstraction for quartic+ curves?
+
+	    var p = utils$1.align(points, {
+	        p1: points[0],
+	        p2: points.slice(-1)[0]
+	      }),
+	      a = p[2].x * p[1].y,
+	      b = p[3].x * p[1].y,
+	      c = p[1].x * p[2].y,
+	      d = p[3].x * p[2].y,
+	      v1 = 18 * (-3 * a + 2 * b + 3 * c - d),
+	      v2 = 18 * (3 * a - b - 3 * c),
+	      v3 = 18 * (c - a);
+	    if (utils$1.approximately(v1, 0)) {
+	      if (!utils$1.approximately(v2, 0)) {
+	        var _t3 = -v3 / v2;
+	        if (0 <= _t3 && _t3 <= 1) return [_t3];
+	      }
+	      return [];
+	    }
+	    var d2 = 2 * v1;
+	    if (utils$1.approximately(d2, 0)) return [];
+	    var trm = v2 * v2 - 4 * v1 * v3;
+	    if (trm < 0) return [];
+	    var sq = Math.sqrt(trm);
+	    return [(sq - v2) / d2, -(v2 + sq) / d2].filter(function (r) {
+	      return 0 <= r && r <= 1;
+	    });
+	  },
+	  bboxoverlap: function bboxoverlap(b1, b2) {
+	    var dims = ["x", "y"],
+	      len = dims.length;
+	    for (var i = 0, dim, l, _t4, d; i < len; i++) {
+	      dim = dims[i];
+	      l = b1[dim].mid;
+	      _t4 = b2[dim].mid;
+	      d = (b1[dim].size + b2[dim].size) / 2;
+	      if (abs$1(l - _t4) >= d) return false;
+	    }
+	    return true;
+	  },
+	  expandbox: function expandbox(bbox, _bbox) {
+	    if (_bbox.x.min < bbox.x.min) {
+	      bbox.x.min = _bbox.x.min;
+	    }
+	    if (_bbox.y.min < bbox.y.min) {
+	      bbox.y.min = _bbox.y.min;
+	    }
+	    if (_bbox.z && _bbox.z.min < bbox.z.min) {
+	      bbox.z.min = _bbox.z.min;
+	    }
+	    if (_bbox.x.max > bbox.x.max) {
+	      bbox.x.max = _bbox.x.max;
+	    }
+	    if (_bbox.y.max > bbox.y.max) {
+	      bbox.y.max = _bbox.y.max;
+	    }
+	    if (_bbox.z && _bbox.z.max > bbox.z.max) {
+	      bbox.z.max = _bbox.z.max;
+	    }
+	    bbox.x.mid = (bbox.x.min + bbox.x.max) / 2;
+	    bbox.y.mid = (bbox.y.min + bbox.y.max) / 2;
+	    if (bbox.z) {
+	      bbox.z.mid = (bbox.z.min + bbox.z.max) / 2;
+	    }
+	    bbox.x.size = bbox.x.max - bbox.x.min;
+	    bbox.y.size = bbox.y.max - bbox.y.min;
+	    if (bbox.z) {
+	      bbox.z.size = bbox.z.max - bbox.z.min;
+	    }
+	  },
+	  pairiteration: function pairiteration(c1, c2, curveIntersectionThreshold) {
+	    var c1b = c1.bbox(),
+	      c2b = c2.bbox(),
+	      r = 100000,
+	      threshold = curveIntersectionThreshold || 0.5;
+	    if (c1b.x.size + c1b.y.size < threshold && c2b.x.size + c2b.y.size < threshold) {
+	      return [(r * (c1._t1 + c1._t2) / 2 | 0) / r + "/" + (r * (c2._t1 + c2._t2) / 2 | 0) / r];
+	    }
+	    var cc1 = c1.split(0.5),
+	      cc2 = c2.split(0.5),
+	      pairs = [{
+	        left: cc1.left,
+	        right: cc2.left
+	      }, {
+	        left: cc1.left,
+	        right: cc2.right
+	      }, {
+	        left: cc1.right,
+	        right: cc2.right
+	      }, {
+	        left: cc1.right,
+	        right: cc2.left
+	      }];
+	    pairs = pairs.filter(function (pair) {
+	      return utils$1.bboxoverlap(pair.left.bbox(), pair.right.bbox());
+	    });
+	    var results = [];
+	    if (pairs.length === 0) return results;
+	    pairs.forEach(function (pair) {
+	      results = results.concat(utils$1.pairiteration(pair.left, pair.right, threshold));
+	    });
+	    results = results.filter(function (v, i) {
+	      return results.indexOf(v) === i;
+	    });
+	    return results;
+	  },
+	  getccenter: function getccenter(p1, p2, p3) {
+	    var dx1 = p2.x - p1.x,
+	      dy1 = p2.y - p1.y,
+	      dx2 = p3.x - p2.x,
+	      dy2 = p3.y - p2.y,
+	      dx1p = dx1 * cos$1(quart) - dy1 * sin$1(quart),
+	      dy1p = dx1 * sin$1(quart) + dy1 * cos$1(quart),
+	      dx2p = dx2 * cos$1(quart) - dy2 * sin$1(quart),
+	      dy2p = dx2 * sin$1(quart) + dy2 * cos$1(quart),
+	      // chord midpoints
+	      mx1 = (p1.x + p2.x) / 2,
+	      my1 = (p1.y + p2.y) / 2,
+	      mx2 = (p2.x + p3.x) / 2,
+	      my2 = (p2.y + p3.y) / 2,
+	      // midpoint offsets
+	      mx1n = mx1 + dx1p,
+	      my1n = my1 + dy1p,
+	      mx2n = mx2 + dx2p,
+	      my2n = my2 + dy2p,
+	      // intersection of these lines:
+	      arc = utils$1.lli8(mx1, my1, mx1n, my1n, mx2, my2, mx2n, my2n),
+	      r = utils$1.dist(arc, p1);
+
+	    // arc start/end values, over mid point:
+	    var s = atan2(p1.y - arc.y, p1.x - arc.x),
+	      m = atan2(p2.y - arc.y, p2.x - arc.x),
+	      e = atan2(p3.y - arc.y, p3.x - arc.x),
+	      _;
+
+	    // determine arc direction (cw/ccw correction)
+	    if (s < e) {
+	      // if s<m<e, arc(s, e)
+	      // if m<s<e, arc(e, s + tau)
+	      // if s<e<m, arc(e, s + tau)
+	      if (s > m || m > e) {
+	        s += tau;
+	      }
+	      if (s > e) {
+	        _ = e;
+	        e = s;
+	        s = _;
+	      }
+	    } else {
+	      // if e<m<s, arc(e, s)
+	      // if m<e<s, arc(s, e + tau)
+	      // if e<s<m, arc(s, e + tau)
+	      if (e < m && m < s) {
+	        _ = e;
+	        e = s;
+	        s = _;
+	      } else {
+	        e += tau;
+	      }
+	    }
+	    // assign and done.
+	    arc.s = s;
+	    arc.e = e;
+	    arc.r = r;
+	    return arc;
+	  },
+	  numberSort: function numberSort(a, b) {
+	    return a - b;
+	  }
+	};
+
+	/**
+	 * Poly Bezier
+	 * @param {[type]} curves [description]
+	 */
+	var PolyBezier = /*#__PURE__*/function () {
+	  function PolyBezier(curves) {
+	    _classCallCheck(this, PolyBezier);
+	    this.curves = [];
+	    this._3d = false;
+	    if (!!curves) {
+	      this.curves = curves;
+	      this._3d = this.curves[0]._3d;
+	    }
+	  }
+	  return _createClass(PolyBezier, [{
+	    key: "valueOf",
+	    value: function valueOf() {
+	      return this.toString();
+	    }
+	  }, {
+	    key: "toString",
+	    value: function toString() {
+	      return "[" + this.curves.map(function (curve) {
+	        return utils$1.pointsToString(curve.points);
+	      }).join(", ") + "]";
+	    }
+	  }, {
+	    key: "addCurve",
+	    value: function addCurve(curve) {
+	      this.curves.push(curve);
+	      this._3d = this._3d || curve._3d;
+	    }
+	  }, {
+	    key: "length",
+	    value: function length() {
+	      return this.curves.map(function (v) {
+	        return v.length();
+	      }).reduce(function (a, b) {
+	        return a + b;
+	      });
+	    }
+	  }, {
+	    key: "curve",
+	    value: function curve(idx) {
+	      return this.curves[idx];
+	    }
+	  }, {
+	    key: "bbox",
+	    value: function bbox() {
+	      var c = this.curves;
+	      var bbox = c[0].bbox();
+	      for (var i = 1; i < c.length; i++) {
+	        utils$1.expandbox(bbox, c[i].bbox());
+	      }
+	      return bbox;
+	    }
+	  }, {
+	    key: "offset",
+	    value: function offset(d) {
+	      var offset = [];
+	      this.curves.forEach(function (v) {
+	        offset.push.apply(offset, _toConsumableArray(v.offset(d)));
+	      });
+	      return new PolyBezier(offset);
+	    }
+	  }]);
+	}();
+	/**
+	  A javascript Bezier curve library by Pomax.
+
+	  Based on http://pomax.github.io/bezierinfo
+
+	  This code is MIT licensed.
+	**/
+	// math-inlining.
+	var abs = Math.abs,
+	  min = Math.min,
+	  max = Math.max,
+	  cos = Math.cos,
+	  sin = Math.sin,
+	  acos = Math.acos,
+	  sqrt = Math.sqrt;
+	var pi = Math.PI;
+
+	/**
+	 * Bezier curve constructor.
+	 *
+	 * ...docs pending...
+	 */
+	var Bezier = /*#__PURE__*/function () {
+	  function Bezier(coords) {
+	    _classCallCheck(this, Bezier);
+	    var args = coords && coords.forEach ? coords : Array.from(arguments).slice();
+	    var coordlen = false;
+	    if (_typeof(args[0]) === "object") {
+	      coordlen = args.length;
+	      var newargs = [];
+	      args.forEach(function (point) {
+	        ["x", "y", "z"].forEach(function (d) {
+	          if (typeof point[d] !== "undefined") {
+	            newargs.push(point[d]);
+	          }
+	        });
+	      });
+	      args = newargs;
+	    }
+	    var higher = false;
+	    var len = args.length;
+	    if (coordlen) {
+	      if (coordlen > 4) {
+	        if (arguments.length !== 1) {
+	          throw new Error("Only new Bezier(point[]) is accepted for 4th and higher order curves");
+	        }
+	        higher = true;
+	      }
+	    } else {
+	      if (len !== 6 && len !== 8 && len !== 9 && len !== 12) {
+	        if (arguments.length !== 1) {
+	          throw new Error("Only new Bezier(point[]) is accepted for 4th and higher order curves");
+	        }
+	      }
+	    }
+	    var _3d = this._3d = !higher && (len === 9 || len === 12) || coords && coords[0] && typeof coords[0].z !== "undefined";
+	    var points = this.points = [];
+	    for (var idx = 0, step = _3d ? 3 : 2; idx < len; idx += step) {
+	      var point = {
+	        x: args[idx],
+	        y: args[idx + 1]
+	      };
+	      if (_3d) {
+	        point.z = args[idx + 2];
+	      }
+	      points.push(point);
+	    }
+	    var order = this.order = points.length - 1;
+	    var dims = this.dims = ["x", "y"];
+	    if (_3d) dims.push("z");
+	    this.dimlen = dims.length;
+
+	    // is this curve, practically speaking, a straight line?
+	    var aligned = utils$1.align(points, {
+	      p1: points[0],
+	      p2: points[order]
+	    });
+	    var baselength = utils$1.dist(points[0], points[order]);
+	    this._linear = aligned.reduce(function (t, p) {
+	      return t + abs(p.y);
+	    }, 0) < baselength / 50;
+	    this._lut = [];
+	    this._t1 = 0;
+	    this._t2 = 1;
+	    this.update();
+	  }
+	  return _createClass(Bezier, [{
+	    key: "getUtils",
+	    value: function getUtils() {
+	      return Bezier.getUtils();
+	    }
+	  }, {
+	    key: "valueOf",
+	    value: function valueOf() {
+	      return this.toString();
+	    }
+	  }, {
+	    key: "toString",
+	    value: function toString() {
+	      return utils$1.pointsToString(this.points);
+	    }
+	  }, {
+	    key: "toSVG",
+	    value: function toSVG() {
+	      if (this._3d) return false;
+	      var p = this.points,
+	        x = p[0].x,
+	        y = p[0].y,
+	        s = ["M", x, y, this.order === 2 ? "Q" : "C"];
+	      for (var i = 1, last = p.length; i < last; i++) {
+	        s.push(p[i].x);
+	        s.push(p[i].y);
+	      }
+	      return s.join(" ");
+	    }
+	  }, {
+	    key: "setRatios",
+	    value: function setRatios(ratios) {
+	      if (ratios.length !== this.points.length) {
+	        throw new Error("incorrect number of ratio values");
+	      }
+	      this.ratios = ratios;
+	      this._lut = []; //  invalidate any precomputed LUT
+	    }
+	  }, {
+	    key: "verify",
+	    value: function verify() {
+	      var print = this.coordDigest();
+	      if (print !== this._print) {
+	        this._print = print;
+	        this.update();
+	      }
+	    }
+	  }, {
+	    key: "coordDigest",
+	    value: function coordDigest() {
+	      return this.points.map(function (c, pos) {
+	        return "" + pos + c.x + c.y + (c.z ? c.z : 0);
+	      }).join("");
+	    }
+	  }, {
+	    key: "update",
+	    value: function update() {
+	      // invalidate any precomputed LUT
+	      this._lut = [];
+	      this.dpoints = utils$1.derive(this.points, this._3d);
+	      this.computedirection();
+	    }
+	  }, {
+	    key: "computedirection",
+	    value: function computedirection() {
+	      var points = this.points;
+	      var angle = utils$1.angle(points[0], points[this.order], points[1]);
+	      this.clockwise = angle > 0;
+	    }
+	  }, {
+	    key: "length",
+	    value: function length() {
+	      return utils$1.length(this.derivative.bind(this));
+	    }
+	  }, {
+	    key: "getABC",
+	    value: function getABC(t, B) {
+	      B = B || this.get(t);
+	      var S = this.points[0];
+	      var E = this.points[this.order];
+	      return Bezier.getABC(this.order, S, B, E, t);
+	    }
+	  }, {
+	    key: "getLUT",
+	    value: function getLUT(steps) {
+	      this.verify();
+	      steps = steps || 100;
+	      if (this._lut.length === steps + 1) {
+	        return this._lut;
+	      }
+	      this._lut = [];
+	      // n steps means n+1 points
+	      steps++;
+	      this._lut = [];
+	      for (var i = 0, p, _t5; i < steps; i++) {
+	        _t5 = i / (steps - 1);
+	        p = this.compute(_t5);
+	        p.t = _t5;
+	        this._lut.push(p);
+	      }
+	      return this._lut;
+	    }
+	  }, {
+	    key: "on",
+	    value: function on(point, error) {
+	      error = error || 5;
+	      var lut = this.getLUT(),
+	        hits = [];
+	      for (var i = 0, c, _t6 = 0; i < lut.length; i++) {
+	        c = lut[i];
+	        if (utils$1.dist(c, point) < error) {
+	          hits.push(c);
+	          _t6 += i / lut.length;
+	        }
+	      }
+	      if (!hits.length) return false;
+	      return t /= hits.length;
+	    }
+	  }, {
+	    key: "project",
+	    value: function project(point) {
+	      // step 1: coarse check
+	      var LUT = this.getLUT(),
+	        l = LUT.length - 1,
+	        closest = utils$1.closest(LUT, point),
+	        mpos = closest.mpos,
+	        t1 = (mpos - 1) / l,
+	        t2 = (mpos + 1) / l,
+	        step = 0.1 / l;
+
+	      // step 2: fine check
+	      var mdist = closest.mdist,
+	        t = t1,
+	        ft = t,
+	        p;
+	      mdist += 1;
+	      for (var d; t < t2 + step; t += step) {
+	        p = this.compute(t);
+	        d = utils$1.dist(point, p);
+	        if (d < mdist) {
+	          mdist = d;
+	          ft = t;
+	        }
+	      }
+	      ft = ft < 0 ? 0 : ft > 1 ? 1 : ft;
+	      p = this.compute(ft);
+	      p.t = ft;
+	      p.d = mdist;
+	      return p;
+	    }
+	  }, {
+	    key: "get",
+	    value: function get(t) {
+	      return this.compute(t);
+	    }
+	  }, {
+	    key: "point",
+	    value: function point(idx) {
+	      return this.points[idx];
+	    }
+	  }, {
+	    key: "compute",
+	    value: function compute(t) {
+	      if (this.ratios) {
+	        return utils$1.computeWithRatios(t, this.points, this.ratios, this._3d);
+	      }
+	      return utils$1.compute(t, this.points, this._3d, this.ratios);
+	    }
+	  }, {
+	    key: "raise",
+	    value: function raise() {
+	      var p = this.points,
+	        np = [p[0]],
+	        k = p.length;
+	      for (var i = 1, _pi, pim; i < k; i++) {
+	        _pi = p[i];
+	        pim = p[i - 1];
+	        np[i] = {
+	          x: (k - i) / k * _pi.x + i / k * pim.x,
+	          y: (k - i) / k * _pi.y + i / k * pim.y
+	        };
+	      }
+	      np[k] = p[k - 1];
+	      return new Bezier(np);
+	    }
+	  }, {
+	    key: "derivative",
+	    value: function derivative(t) {
+	      return utils$1.compute(t, this.dpoints[0], this._3d);
+	    }
+	  }, {
+	    key: "dderivative",
+	    value: function dderivative(t) {
+	      return utils$1.compute(t, this.dpoints[1], this._3d);
+	    }
+	  }, {
+	    key: "align",
+	    value: function align() {
+	      var p = this.points;
+	      return new Bezier(utils$1.align(p, {
+	        p1: p[0],
+	        p2: p[p.length - 1]
+	      }));
+	    }
+	  }, {
+	    key: "curvature",
+	    value: function curvature(t) {
+	      return utils$1.curvature(t, this.dpoints[0], this.dpoints[1], this._3d);
+	    }
+	  }, {
+	    key: "inflections",
+	    value: function inflections() {
+	      return utils$1.inflections(this.points);
+	    }
+	  }, {
+	    key: "normal",
+	    value: function normal(t) {
+	      return this._3d ? this.__normal3(t) : this.__normal2(t);
+	    }
+	  }, {
+	    key: "__normal2",
+	    value: function __normal2(t) {
+	      var d = this.derivative(t);
+	      var q = sqrt(d.x * d.x + d.y * d.y);
+	      return {
+	        t: t,
+	        x: -d.y / q,
+	        y: d.x / q
+	      };
+	    }
+	  }, {
+	    key: "__normal3",
+	    value: function __normal3(t) {
+	      // see http://stackoverflow.com/questions/25453159
+	      var r1 = this.derivative(t),
+	        r2 = this.derivative(t + 0.01),
+	        q1 = sqrt(r1.x * r1.x + r1.y * r1.y + r1.z * r1.z),
+	        q2 = sqrt(r2.x * r2.x + r2.y * r2.y + r2.z * r2.z);
+	      r1.x /= q1;
+	      r1.y /= q1;
+	      r1.z /= q1;
+	      r2.x /= q2;
+	      r2.y /= q2;
+	      r2.z /= q2;
+	      // cross product
+	      var c = {
+	        x: r2.y * r1.z - r2.z * r1.y,
+	        y: r2.z * r1.x - r2.x * r1.z,
+	        z: r2.x * r1.y - r2.y * r1.x
+	      };
+	      var m = sqrt(c.x * c.x + c.y * c.y + c.z * c.z);
+	      c.x /= m;
+	      c.y /= m;
+	      c.z /= m;
+	      // rotation matrix
+	      var R = [c.x * c.x, c.x * c.y - c.z, c.x * c.z + c.y, c.x * c.y + c.z, c.y * c.y, c.y * c.z - c.x, c.x * c.z - c.y, c.y * c.z + c.x, c.z * c.z];
+	      // normal vector:
+	      var n = {
+	        t: t,
+	        x: R[0] * r1.x + R[1] * r1.y + R[2] * r1.z,
+	        y: R[3] * r1.x + R[4] * r1.y + R[5] * r1.z,
+	        z: R[6] * r1.x + R[7] * r1.y + R[8] * r1.z
+	      };
+	      return n;
+	    }
+	  }, {
+	    key: "hull",
+	    value: function hull(t) {
+	      var p = this.points,
+	        _p = [],
+	        q = [],
+	        idx = 0;
+	      q[idx++] = p[0];
+	      q[idx++] = p[1];
+	      q[idx++] = p[2];
+	      if (this.order === 3) {
+	        q[idx++] = p[3];
+	      }
+	      // we lerp between all points at each iteration, until we have 1 point left.
+	      while (p.length > 1) {
+	        _p = [];
+	        for (var i = 0, pt, l = p.length - 1; i < l; i++) {
+	          pt = utils$1.lerp(t, p[i], p[i + 1]);
+	          q[idx++] = pt;
+	          _p.push(pt);
+	        }
+	        p = _p;
+	      }
+	      return q;
+	    }
+	  }, {
+	    key: "split",
+	    value: function split(t1, t2) {
+	      // shortcuts
+	      if (t1 === 0 && !!t2) {
+	        return this.split(t2).left;
+	      }
+	      if (t2 === 1) {
+	        return this.split(t1).right;
+	      }
+
+	      // no shortcut: use "de Casteljau" iteration.
+	      var q = this.hull(t1);
+	      var result = {
+	        left: this.order === 2 ? new Bezier([q[0], q[3], q[5]]) : new Bezier([q[0], q[4], q[7], q[9]]),
+	        right: this.order === 2 ? new Bezier([q[5], q[4], q[2]]) : new Bezier([q[9], q[8], q[6], q[3]]),
+	        span: q
+	      };
+
+	      // make sure we bind _t1/_t2 information!
+	      result.left._t1 = utils$1.map(0, 0, 1, this._t1, this._t2);
+	      result.left._t2 = utils$1.map(t1, 0, 1, this._t1, this._t2);
+	      result.right._t1 = utils$1.map(t1, 0, 1, this._t1, this._t2);
+	      result.right._t2 = utils$1.map(1, 0, 1, this._t1, this._t2);
+
+	      // if we have no t2, we're done
+	      if (!t2) {
+	        return result;
+	      }
+
+	      // if we have a t2, split again:
+	      t2 = utils$1.map(t2, t1, 1, 0, 1);
+	      return result.right.split(t2).left;
+	    }
+	  }, {
+	    key: "extrema",
+	    value: function extrema() {
+	      var result = {};
+	      var roots = [];
+	      this.dims.forEach(function (dim) {
+	        var mfn = function mfn(v) {
+	          return v[dim];
+	        };
+	        var p = this.dpoints[0].map(mfn);
+	        result[dim] = utils$1.droots(p);
+	        if (this.order === 3) {
+	          p = this.dpoints[1].map(mfn);
+	          result[dim] = result[dim].concat(utils$1.droots(p));
+	        }
+	        result[dim] = result[dim].filter(function (t) {
+	          return t >= 0 && t <= 1;
+	        });
+	        roots = roots.concat(result[dim].sort(utils$1.numberSort));
+	      }.bind(this));
+	      result.values = roots.sort(utils$1.numberSort).filter(function (v, idx) {
+	        return roots.indexOf(v) === idx;
+	      });
+	      return result;
+	    }
+	  }, {
+	    key: "bbox",
+	    value: function bbox() {
+	      var extrema = this.extrema(),
+	        result = {};
+	      this.dims.forEach(function (d) {
+	        result[d] = utils$1.getminmax(this, d, extrema[d]);
+	      }.bind(this));
+	      return result;
+	    }
+	  }, {
+	    key: "overlaps",
+	    value: function overlaps(curve) {
+	      var lbbox = this.bbox(),
+	        tbbox = curve.bbox();
+	      return utils$1.bboxoverlap(lbbox, tbbox);
+	    }
+	  }, {
+	    key: "offset",
+	    value: function offset(t, d) {
+	      if (typeof d !== "undefined") {
+	        var c = this.get(t),
+	          n = this.normal(t);
+	        var ret = {
+	          c: c,
+	          n: n,
+	          x: c.x + n.x * d,
+	          y: c.y + n.y * d
+	        };
+	        if (this._3d) {
+	          ret.z = c.z + n.z * d;
+	        }
+	        return ret;
+	      }
+	      if (this._linear) {
+	        var nv = this.normal(0),
+	          coords = this.points.map(function (p) {
+	            var ret = {
+	              x: p.x + t * nv.x,
+	              y: p.y + t * nv.y
+	            };
+	            if (p.z && nv.z) {
+	              ret.z = p.z + t * nv.z;
+	            }
+	            return ret;
+	          });
+	        return [new Bezier(coords)];
+	      }
+	      return this.reduce().map(function (s) {
+	        if (s._linear) {
+	          return s.offset(t)[0];
+	        }
+	        return s.scale(t);
+	      });
+	    }
+	  }, {
+	    key: "simple",
+	    value: function simple() {
+	      if (this.order === 3) {
+	        var a1 = utils$1.angle(this.points[0], this.points[3], this.points[1]);
+	        var a2 = utils$1.angle(this.points[0], this.points[3], this.points[2]);
+	        if (a1 > 0 && a2 < 0 || a1 < 0 && a2 > 0) return false;
+	      }
+	      var n1 = this.normal(0);
+	      var n2 = this.normal(1);
+	      var s = n1.x * n2.x + n1.y * n2.y;
+	      if (this._3d) {
+	        s += n1.z * n2.z;
+	      }
+	      return abs(acos(s)) < pi / 3;
+	    }
+	  }, {
+	    key: "reduce",
+	    value: function reduce() {
+	      // TODO: examine these var types in more detail...
+	      var i,
+	        t1 = 0,
+	        t2 = 0,
+	        step = 0.01,
+	        segment,
+	        pass1 = [],
+	        pass2 = [];
+	      // first pass: split on extrema
+	      var extrema = this.extrema().values;
+	      if (extrema.indexOf(0) === -1) {
+	        extrema = [0].concat(extrema);
+	      }
+	      if (extrema.indexOf(1) === -1) {
+	        extrema.push(1);
+	      }
+	      for (t1 = extrema[0], i = 1; i < extrema.length; i++) {
+	        t2 = extrema[i];
+	        segment = this.split(t1, t2);
+	        segment._t1 = t1;
+	        segment._t2 = t2;
+	        pass1.push(segment);
+	        t1 = t2;
+	      }
+
+	      // second pass: further reduce these segments to simple segments
+	      pass1.forEach(function (p1) {
+	        t1 = 0;
+	        t2 = 0;
+	        while (t2 <= 1) {
+	          for (t2 = t1 + step; t2 <= 1 + step; t2 += step) {
+	            segment = p1.split(t1, t2);
+	            if (!segment.simple()) {
+	              t2 -= step;
+	              if (abs(t1 - t2) < step) {
+	                // we can never form a reduction
+	                return [];
+	              }
+	              segment = p1.split(t1, t2);
+	              segment._t1 = utils$1.map(t1, 0, 1, p1._t1, p1._t2);
+	              segment._t2 = utils$1.map(t2, 0, 1, p1._t1, p1._t2);
+	              pass2.push(segment);
+	              t1 = t2;
+	              break;
+	            }
+	          }
+	        }
+	        if (t1 < 1) {
+	          segment = p1.split(t1, 1);
+	          segment._t1 = utils$1.map(t1, 0, 1, p1._t1, p1._t2);
+	          segment._t2 = p1._t2;
+	          pass2.push(segment);
+	        }
+	      });
+	      return pass2;
+	    }
+	  }, {
+	    key: "translate",
+	    value: function translate(v, d1, d2) {
+	      d2 = typeof d2 === "number" ? d2 : d1;
+
+	      // TODO: make this take curves with control points outside
+	      //       of the start-end interval into account
+
+	      var o = this.order;
+	      var d = this.points.map(function (_, i) {
+	        return (1 - i / o) * d1 + i / o * d2;
+	      });
+	      return new Bezier(this.points.map(function (p, i) {
+	        return {
+	          x: p.x + v.x * d[i],
+	          y: p.y + v.y * d[i]
+	        };
+	      }));
+	    }
+	  }, {
+	    key: "scale",
+	    value: function scale(d) {
+	      var _this = this;
+	      var order = this.order;
+	      var distanceFn = false;
+	      if (typeof d === "function") {
+	        distanceFn = d;
+	      }
+	      if (distanceFn && order === 2) {
+	        return this.raise().scale(distanceFn);
+	      }
+
+	      // TODO: add special handling for non-linear degenerate curves.
+
+	      var clockwise = this.clockwise;
+	      var points = this.points;
+	      if (this._linear) {
+	        return this.translate(this.normal(0), distanceFn ? distanceFn(0) : d, distanceFn ? distanceFn(1) : d);
+	      }
+	      var r1 = distanceFn ? distanceFn(0) : d;
+	      var r2 = distanceFn ? distanceFn(1) : d;
+	      var v = [this.offset(0, 10), this.offset(1, 10)];
+	      var np = [];
+	      var o = utils$1.lli4(v[0], v[0].c, v[1], v[1].c);
+	      if (!o) {
+	        throw new Error("cannot scale this curve. Try reducing it first.");
+	      }
+
+	      // move all points by distance 'd' wrt the origin 'o',
+	      // and move end points by fixed distance along normal.
+	      [0, 1].forEach(function (t) {
+	        var p = np[t * order] = utils$1.copy(points[t * order]);
+	        p.x += (t ? r2 : r1) * v[t].n.x;
+	        p.y += (t ? r2 : r1) * v[t].n.y;
+	      });
+	      if (!distanceFn) {
+	        // move control points to lie on the intersection of the offset
+	        // derivative vector, and the origin-through-control vector
+	        [0, 1].forEach(function (t) {
+	          if (order === 2 && !!t) return;
+	          var p = np[t * order];
+	          var d = _this.derivative(t);
+	          var p2 = {
+	            x: p.x + d.x,
+	            y: p.y + d.y
+	          };
+	          np[t + 1] = utils$1.lli4(p, p2, o, points[t + 1]);
+	        });
+	        return new Bezier(np);
+	      }
+
+	      // move control points by "however much necessary to
+	      // ensure the correct tangent to endpoint".
+	      [0, 1].forEach(function (t) {
+	        if (order === 2 && !!t) return;
+	        var p = points[t + 1];
+	        var ov = {
+	          x: p.x - o.x,
+	          y: p.y - o.y
+	        };
+	        var rc = distanceFn ? distanceFn((t + 1) / order) : d;
+	        if (distanceFn && !clockwise) rc = -rc;
+	        var m = sqrt(ov.x * ov.x + ov.y * ov.y);
+	        ov.x /= m;
+	        ov.y /= m;
+	        np[t + 1] = {
+	          x: p.x + rc * ov.x,
+	          y: p.y + rc * ov.y
+	        };
+	      });
+	      return new Bezier(np);
+	    }
+	  }, {
+	    key: "outline",
+	    value: function outline(d1, d2, d3, d4) {
+	      d2 = d2 === undefined ? d1 : d2;
+	      if (this._linear) {
+	        // TODO: find the actual extrema, because they might
+	        //       be before the start, or past the end.
+
+	        var n = this.normal(0);
+	        var start = this.points[0];
+	        var end = this.points[this.points.length - 1];
+	        var s, mid, e;
+	        if (d3 === undefined) {
+	          d3 = d1;
+	          d4 = d2;
+	        }
+	        s = {
+	          x: start.x + n.x * d1,
+	          y: start.y + n.y * d1
+	        };
+	        e = {
+	          x: end.x + n.x * d3,
+	          y: end.y + n.y * d3
+	        };
+	        mid = {
+	          x: (s.x + e.x) / 2,
+	          y: (s.y + e.y) / 2
+	        };
+	        var fline = [s, mid, e];
+	        s = {
+	          x: start.x - n.x * d2,
+	          y: start.y - n.y * d2
+	        };
+	        e = {
+	          x: end.x - n.x * d4,
+	          y: end.y - n.y * d4
+	        };
+	        mid = {
+	          x: (s.x + e.x) / 2,
+	          y: (s.y + e.y) / 2
+	        };
+	        var bline = [e, mid, s];
+	        var _ls = utils$1.makeline(bline[2], fline[0]);
+	        var _le = utils$1.makeline(fline[2], bline[0]);
+	        var _segments = [_ls, new Bezier(fline), _le, new Bezier(bline)];
+	        return new PolyBezier(_segments);
+	      }
+	      var reduced = this.reduce(),
+	        len = reduced.length,
+	        fcurves = [];
+	      var bcurves = [],
+	        p,
+	        alen = 0,
+	        tlen = this.length();
+	      var graduated = typeof d3 !== "undefined" && typeof d4 !== "undefined";
+	      function linearDistanceFunction(s, e, tlen, alen, slen) {
+	        return function (v) {
+	          var f1 = alen / tlen,
+	            f2 = (alen + slen) / tlen,
+	            d = e - s;
+	          return utils$1.map(v, 0, 1, s + f1 * d, s + f2 * d);
+	        };
+	      }
+
+	      // form curve oulines
+	      reduced.forEach(function (segment) {
+	        var slen = segment.length();
+	        if (graduated) {
+	          fcurves.push(segment.scale(linearDistanceFunction(d1, d3, tlen, alen, slen)));
+	          bcurves.push(segment.scale(linearDistanceFunction(-d2, -d4, tlen, alen, slen)));
+	        } else {
+	          fcurves.push(segment.scale(d1));
+	          bcurves.push(segment.scale(-d2));
+	        }
+	        alen += slen;
+	      });
+
+	      // reverse the "return" outline
+	      bcurves = bcurves.map(function (s) {
+	        p = s.points;
+	        if (p[3]) {
+	          s.points = [p[3], p[2], p[1], p[0]];
+	        } else {
+	          s.points = [p[2], p[1], p[0]];
+	        }
+	        return s;
+	      }).reverse();
+
+	      // form the endcaps as lines
+	      var fs = fcurves[0].points[0],
+	        fe = fcurves[len - 1].points[fcurves[len - 1].points.length - 1],
+	        bs = bcurves[len - 1].points[bcurves[len - 1].points.length - 1],
+	        be = bcurves[0].points[0],
+	        ls = utils$1.makeline(bs, fs),
+	        le = utils$1.makeline(fe, be),
+	        segments = [ls].concat(fcurves).concat([le]).concat(bcurves);
+	      return new PolyBezier(segments);
+	    }
+	  }, {
+	    key: "outlineshapes",
+	    value: function outlineshapes(d1, d2, curveIntersectionThreshold) {
+	      d2 = d2 || d1;
+	      var outline = this.outline(d1, d2).curves;
+	      var shapes = [];
+	      for (var i = 1, len = outline.length; i < len / 2; i++) {
+	        var shape = utils$1.makeshape(outline[i], outline[len - i], curveIntersectionThreshold);
+	        shape.startcap.virtual = i > 1;
+	        shape.endcap.virtual = i < len / 2 - 1;
+	        shapes.push(shape);
+	      }
+	      return shapes;
+	    }
+	  }, {
+	    key: "intersects",
+	    value: function intersects(curve, curveIntersectionThreshold) {
+	      if (!curve) return this.selfintersects(curveIntersectionThreshold);
+	      if (curve.p1 && curve.p2) {
+	        return this.lineIntersects(curve);
+	      }
+	      if (curve instanceof Bezier) {
+	        curve = curve.reduce();
+	      }
+	      return this.curveintersects(this.reduce(), curve, curveIntersectionThreshold);
+	    }
+	  }, {
+	    key: "lineIntersects",
+	    value: function lineIntersects(line) {
+	      var _this2 = this;
+	      var mx = min(line.p1.x, line.p2.x),
+	        my = min(line.p1.y, line.p2.y),
+	        MX = max(line.p1.x, line.p2.x),
+	        MY = max(line.p1.y, line.p2.y);
+	      return utils$1.roots(this.points, line).filter(function (t) {
+	        var p = _this2.get(t);
+	        return utils$1.between(p.x, mx, MX) && utils$1.between(p.y, my, MY);
+	      });
+	    }
+	  }, {
+	    key: "selfintersects",
+	    value: function selfintersects(curveIntersectionThreshold) {
+	      // "simple" curves cannot intersect with their direct
+	      // neighbour, so for each segment X we check whether
+	      // it intersects [0:x-2][x+2:last].
+
+	      var reduced = this.reduce(),
+	        len = reduced.length - 2,
+	        results = [];
+	      for (var i = 0, result, left, right; i < len; i++) {
+	        left = reduced.slice(i, i + 1);
+	        right = reduced.slice(i + 2);
+	        result = this.curveintersects(left, right, curveIntersectionThreshold);
+	        results.push.apply(results, _toConsumableArray(result));
+	      }
+	      return results;
+	    }
+	  }, {
+	    key: "curveintersects",
+	    value: function curveintersects(c1, c2, curveIntersectionThreshold) {
+	      var pairs = [];
+	      // step 1: pair off any overlapping segments
+	      c1.forEach(function (l) {
+	        c2.forEach(function (r) {
+	          if (l.overlaps(r)) {
+	            pairs.push({
+	              left: l,
+	              right: r
+	            });
+	          }
+	        });
+	      });
+	      // step 2: for each pairing, run through the convergence algorithm.
+	      var intersections = [];
+	      pairs.forEach(function (pair) {
+	        var result = utils$1.pairiteration(pair.left, pair.right, curveIntersectionThreshold);
+	        if (result.length > 0) {
+	          intersections = intersections.concat(result);
+	        }
+	      });
+	      return intersections;
+	    }
+	  }, {
+	    key: "arcs",
+	    value: function arcs(errorThreshold) {
+	      errorThreshold = errorThreshold || 0.5;
+	      return this._iterate(errorThreshold, []);
+	    }
+	  }, {
+	    key: "_error",
+	    value: function _error(pc, np1, s, e) {
+	      var q = (e - s) / 4,
+	        c1 = this.get(s + q),
+	        c2 = this.get(e - q),
+	        ref = utils$1.dist(pc, np1),
+	        d1 = utils$1.dist(pc, c1),
+	        d2 = utils$1.dist(pc, c2);
+	      return abs(d1 - ref) + abs(d2 - ref);
+	    }
+	  }, {
+	    key: "_iterate",
+	    value: function _iterate(errorThreshold, circles) {
+	      var t_s = 0,
+	        t_e = 1,
+	        safety;
+	      // we do a binary search to find the "good `t` closest to no-longer-good"
+	      do {
+	        safety = 0;
+
+	        // step 1: start with the maximum possible arc
+	        t_e = 1;
+
+	        // points:
+	        var np1 = this.get(t_s),
+	          np2 = void 0,
+	          np3 = void 0,
+	          arc = void 0,
+	          prev_arc = void 0;
+
+	        // booleans:
+	        var curr_good = false,
+	          prev_good = false,
+	          done = void 0;
+
+	        // numbers:
+	        var t_m = t_e,
+	          prev_e = 1;
+
+	        // step 2: find the best possible arc
+	        do {
+	          prev_good = curr_good;
+	          prev_arc = arc;
+	          t_m = (t_s + t_e) / 2;
+	          np2 = this.get(t_m);
+	          np3 = this.get(t_e);
+	          arc = utils$1.getccenter(np1, np2, np3);
+
+	          //also save the t values
+	          arc.interval = {
+	            start: t_s,
+	            end: t_e
+	          };
+	          var error = this._error(arc, np1, t_s, t_e);
+	          curr_good = error <= errorThreshold;
+	          done = prev_good && !curr_good;
+	          if (!done) prev_e = t_e;
+
+	          // this arc is fine: we can move 'e' up to see if we can find a wider arc
+	          if (curr_good) {
+	            // if e is already at max, then we're done for this arc.
+	            if (t_e >= 1) {
+	              // make sure we cap at t=1
+	              arc.interval.end = prev_e = 1;
+	              prev_arc = arc;
+	              // if we capped the arc segment to t=1 we also need to make sure that
+	              // the arc's end angle is correct with respect to the bezier end point.
+	              if (t_e > 1) {
+	                var d = {
+	                  x: arc.x + arc.r * cos(arc.e),
+	                  y: arc.y + arc.r * sin(arc.e)
+	                };
+	                arc.e += utils$1.angle({
+	                  x: arc.x,
+	                  y: arc.y
+	                }, d, this.get(1));
+	              }
+	              break;
+	            }
+	            // if not, move it up by half the iteration distance
+	            t_e = t_e + (t_e - t_s) / 2;
+	          } else {
+	            // this is a bad arc: we need to move 'e' down to find a good arc
+	            t_e = t_m;
+	          }
+	        } while (!done && safety++ < 100);
+	        if (safety >= 100) {
+	          break;
+	        }
+
+	        // console.log("L835: [F] arc found", t_s, prev_e, prev_arc.x, prev_arc.y, prev_arc.s, prev_arc.e);
+
+	        prev_arc = prev_arc ? prev_arc : arc;
+	        circles.push(prev_arc);
+	        t_s = prev_e;
+	      } while (t_e < 1);
+	      return circles;
+	    }
+	  }], [{
+	    key: "quadraticFromPoints",
+	    value: function quadraticFromPoints(p1, p2, p3, t) {
+	      if (typeof t === "undefined") {
+	        t = 0.5;
+	      }
+	      // shortcuts, although they're really dumb
+	      if (t === 0) {
+	        return new Bezier(p2, p2, p3);
+	      }
+	      if (t === 1) {
+	        return new Bezier(p1, p2, p2);
+	      }
+	      // real fitting.
+	      var abc = Bezier.getABC(2, p1, p2, p3, t);
+	      return new Bezier(p1, abc.A, p3);
+	    }
+	  }, {
+	    key: "cubicFromPoints",
+	    value: function cubicFromPoints(S, B, E, t, d1) {
+	      if (typeof t === "undefined") {
+	        t = 0.5;
+	      }
+	      var abc = Bezier.getABC(3, S, B, E, t);
+	      if (typeof d1 === "undefined") {
+	        d1 = utils$1.dist(B, abc.C);
+	      }
+	      var d2 = d1 * (1 - t) / t;
+	      var selen = utils$1.dist(S, E),
+	        lx = (E.x - S.x) / selen,
+	        ly = (E.y - S.y) / selen,
+	        bx1 = d1 * lx,
+	        by1 = d1 * ly,
+	        bx2 = d2 * lx,
+	        by2 = d2 * ly;
+	      // derivation of new hull coordinates
+	      var e1 = {
+	          x: B.x - bx1,
+	          y: B.y - by1
+	        },
+	        e2 = {
+	          x: B.x + bx2,
+	          y: B.y + by2
+	        },
+	        A = abc.A,
+	        v1 = {
+	          x: A.x + (e1.x - A.x) / (1 - t),
+	          y: A.y + (e1.y - A.y) / (1 - t)
+	        },
+	        v2 = {
+	          x: A.x + (e2.x - A.x) / t,
+	          y: A.y + (e2.y - A.y) / t
+	        },
+	        nc1 = {
+	          x: S.x + (v1.x - S.x) / t,
+	          y: S.y + (v1.y - S.y) / t
+	        },
+	        nc2 = {
+	          x: E.x + (v2.x - E.x) / (1 - t),
+	          y: E.y + (v2.y - E.y) / (1 - t)
+	        };
+	      // ...done
+	      return new Bezier(S, nc1, nc2, E);
+	    }
+	  }, {
+	    key: "getUtils",
+	    value: function getUtils() {
+	      return utils$1;
+	    }
+	  }, {
+	    key: "PolyBezier",
+	    get: function get() {
+	      return PolyBezier;
+	    }
+	  }, {
+	    key: "getABC",
+	    value: function getABC() {
+	      var order = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 2;
+	      var S = arguments.length > 1 ? arguments[1] : undefined;
+	      var B = arguments.length > 2 ? arguments[2] : undefined;
+	      var E = arguments.length > 3 ? arguments[3] : undefined;
+	      var t = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 0.5;
+	      var u = utils$1.projectionratio(t, order),
+	        um = 1 - u,
+	        C = {
+	          x: u * S.x + um * E.x,
+	          y: u * S.y + um * E.y
+	        },
+	        s = utils$1.abcratio(t, order),
+	        A = {
+	          x: B.x + (B.x - C.x) / s,
+	          y: B.y + (B.y - C.y) / s
+	        };
+	      return {
+	        A: A,
+	        B: B,
+	        C: C,
+	        S: S,
+	        E: E
+	      };
+	    }
+	  }]);
+	}();
+
+	/**s
+	 * 根据路径指令上的一点拆分路径指令
+	 */
+	var splitInstruction = function splitInstruction(points, point) {
+	  if (points.length === 2) {
+	    return {
+	      pre: [InstructionType.LINE, point.x, point.y],
+	      next: [InstructionType.LINE, points[1].x, points[1].y]
+	    };
+	  } else {
+	    var curve = new Bezier(points);
+	    var _curve$project = curve.project(point),
+	      _t7 = _curve$project.t;
+	    var splitCurves = curve.split(_t7);
+	    var path = new fabric.fabric.Path(splitCurves.left.toSVG() + splitCurves.right.toSVG()).path;
+	    return {
+	      pre: path[1],
+	      next: path[3]
+	    };
+	  }
+	};
+
 	/** Used to generate unique IDs. */
 	var idCounter = 0;
 
@@ -3915,6 +5855,8 @@
 	    this._lockFocus = false;
 	    /** 记录当前活跃对象观察者 */
 	    this._observer = null;
+	    /** 功能禁用请求凭证 */
+	    this.disabledFunctionTokens = {};
 	  }
 	  /**
 	   * 获取编辑器配置
@@ -4440,9 +6382,11 @@
 	      var canvas = this.canvas;
 	      if (!canvas) return;
 	      this.events.canvas.on('mouse:down:before', function (event) {
+	        if (!_this13.isEnable('add')) return;
 	        var vizpath = _this13.vizpath;
 	        if (!vizpath) return;
-	        if (_this13.get('mode') !== Mode.ADD) return;
+	        var pointer = event.pointer;
+	        if (!pointer) return;
 	        var newNodeObject;
 	        // 路径拼接
 	        if (event.target && event.target[VizPathEditor.symbol]) {
@@ -4453,10 +6397,10 @@
 	        }
 	        // 新增节点
 	        else {
-	          var pointer = calcCanvasCoord(canvas, event.pointer);
+	          var coord = calcCanvasCoord(canvas, pointer);
 	          newNodeObject = _this13.add({
-	            left: pointer.x,
-	            top: pointer.y
+	            left: coord.x,
+	            top: coord.y
 	          });
 	        }
 	        // 新增成功，设置当前点为变换中
@@ -4474,7 +6418,7 @@
 	      var _this14 = this;
 	      this.events.canvas.on('mouse:down', function (event) {
 	        var _a, _b;
-	        if (_this14.get('mode') !== Mode.DELETE) return;
+	        if (!_this14.isEnable('delete')) return;
 	        if (((_a = event.target) === null || _a === void 0 ? void 0 : _a[VizPathEditor.symbol]) === EditorObjectID.NODE || ((_b = event.target) === null || _b === void 0 ? void 0 : _b[VizPathEditor.symbol]) === EditorObjectID.CURVE_DOT) {
 	          _this14.remove(event.target);
 	        }
@@ -4494,7 +6438,7 @@
 	        var vizpath = _this15.vizpath;
 	        if (!vizpath) return;
 	        if (!_this15.currentConvertNodeObject) {
-	          if (_this15.get('mode') !== Mode.CONVERT) return;
+	          if (!_this15.isEnable('convert')) return;
 	          if (((_a = event.target) === null || _a === void 0 ? void 0 : _a[VizPathEditor.symbol]) !== EditorObjectID.NODE) return;
 	          _this15.currentConvertNodeObject = event.target;
 	        }
@@ -4512,9 +6456,11 @@
 	        if (!vizpath) return;
 	        var target = _this15.currentConvertNodeObject;
 	        if (!target) return;
+	        var pointer = event.pointer;
+	        if (!pointer) return;
 	        // 如果鼠标还在点上不触发控制曲线作用，当移出后才触发，避免触发敏感
-	        if (target.containsPoint(event.pointer)) return;
-	        var pointer = calcCanvasCoord(canvas, event.pointer);
+	        if (target.containsPoint(pointer)) return;
+	        var coord = calcCanvasCoord(canvas, pointer);
 	        var targetNode = _this15.objectNodeMap.get(target);
 	        var neighboringNodes = vizpath.getNeighboringNodes(targetNode, true);
 	        // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
@@ -4524,12 +6470,12 @@
 	          convertibleNodes = vizpath.getConvertibleNodes(targetNode);
 	        }
 	        var position = vizpath.calcRelativeCoord({
-	          left: pointer.x,
-	          top: pointer.y
+	          left: coord.x,
+	          top: coord.y
 	        });
 	        var oppositePosition = vizpath.calcRelativeCoord({
-	          left: target.left - (pointer.x - target.left),
-	          top: target.top - (pointer.y - target.top)
+	          left: target.left - (coord.x - target.left),
+	          top: target.top - (coord.y - target.top)
 	        });
 	        // 根据夹角大小排序，夹角越小意味鼠标越接近
 	        if (convertibleNodes.length > 1) {
@@ -4815,7 +6761,7 @@
 	    key: "_registerActiveObjectsObserver",
 	    value: function _registerActiveObjectsObserver() {
 	      var _a, _b;
-	      // 重置旧的观察者
+	      // 清除旧的观察者
 	      (_a = this._observer) === null || _a === void 0 ? void 0 : _a.unobserve();
 	      this._observer = null;
 	      var activeObject = (_b = this.canvas) === null || _b === void 0 ? void 0 : _b.getActiveObject();
@@ -5266,6 +7212,54 @@
 	          scaleY: scaleY
 	        });
 	      }
+	    }
+	    /**
+	     * 请求对特定功能禁用
+	     *
+	     * @param functionName 禁用功能名称
+	     *
+	     * @example
+	     *
+	     * // 持有凭证用于重新启用功能
+	     * const token = requestDisableFunction('add');
+	     *
+	     * // 重新启用功能
+	     * requestEnableFunction(token);
+	     */
+	  }, {
+	    key: "requestDisableFunction",
+	    value: function requestDisableFunction(functionName) {
+	      var _a;
+	      var token = "".concat(functionName, "-").concat(uniqueId());
+	      var tokens = (_a = this.disabledFunctionTokens[functionName]) !== null && _a !== void 0 ? _a : [];
+	      tokens.push(token);
+	      this.disabledFunctionTokens[functionName] = tokens;
+	      return token;
+	    }
+	    /**
+	     * 请求启用特定功能
+	     */
+	  }, {
+	    key: "requestEnableFunction",
+	    value: function requestEnableFunction(token) {
+	      var functionName = token.split('-')[0];
+	      var tokens = this.disabledFunctionTokens[functionName];
+	      if (!tokens) return false;
+	      var index = tokens.indexOf(token);
+	      if (index === -1) return false;
+	      tokens.splice(index, 1);
+	      return true;
+	    }
+	    /**
+	     * 判断功能是否生效
+	     */
+	  }, {
+	    key: "isEnable",
+	    value: function isEnable(functionName) {
+	      var _a;
+	      if (this.get('mode') !== functionName) return false;
+	      if ((_a = this.disabledFunctionTokens[functionName]) === null || _a === void 0 ? void 0 : _a.length) return false;
+	      return true;
 	    }
 	    /**
 	     * 添加功能增强模块
@@ -9179,9 +11173,17 @@
 	    var _this49;
 	    _classCallCheck(this, EditorTrack);
 	    _this49 = _callSuper(this, EditorTrack, arguments);
+	    _this49.virtualPath = null;
+	    _this49.virtualNode = null;
 	    _this49.themes = new VizPathTheme({
 	      virtualNode: function virtualNode(decorator) {
-	        return new fabric.fabric.Object();
+	        var circle = new fabric.fabric.Circle({
+	          radius: 3,
+	          fill: '#ffffff',
+	          stroke: '#4b4b4b',
+	          strokeWidth: 1
+	        });
+	        return circle;
 	      },
 	      virtualPath: function virtualPath(decorator) {
 	        var path = new fabric.fabric.Path('M 0 0', {
@@ -9193,7 +11195,7 @@
 	      }
 	    });
 	    // 清除虚拟画布对象
-	    _this49._cleanVirtualObjects = function () {
+	    _this49._clearVirtualObjects = function () {
 	      var _a;
 	      var canvas = (_a = _this49.editor) === null || _a === void 0 ? void 0 : _a.canvas;
 	      if (!canvas) return;
@@ -9264,9 +11266,9 @@
 	  }, {
 	    key: "unload",
 	    value: function unload() {
-	      this._cleanVirtualObjects();
-	      this.virtualNode = undefined;
-	      this.virtualPath = undefined;
+	      this._clearVirtualObjects();
+	      this.virtualNode = null;
+	      this.virtualPath = null;
 	    }
 	  }, {
 	    key: "load",
@@ -9307,7 +11309,7 @@
 	        });
 	      };
 	      var renderTrackHandler = function renderTrackHandler(e) {
-	        _this50._cleanVirtualObjects();
+	        _this50._clearVirtualObjects();
 	        // 缓存事件对象，以应对编辑器模式变更
 	        cacheEvent = e;
 	        var vizpath = editor.vizpath;
@@ -9335,7 +11337,7 @@
 	      };
 	      editor.events.canvas.on('mouse:move', renderTrackHandler);
 	      editor.events.canvas.on('mouse:down', function () {
-	        _this50._cleanVirtualObjects();
+	        _this50._clearVirtualObjects();
 	      });
 	      editor.events.on('set', function () {
 	        cacheEvent && renderTrackHandler(cacheEvent);
@@ -9344,6 +11346,224 @@
 	  }]);
 	}(VizPathModule);
 	EditorTrack.ID = 'editor-track';
+	var DEFAULT_OPTIONS = {
+	  showMiddleSplitDotOnly: true
+	};
+	/**
+	 * 编辑器路径拆分点模块，当鼠标聚焦路径段时显示拆分点，点击拆分路径
+	 */
+	var EditorSplitDot = /*#__PURE__*/function (_VizPathModule8) {
+	  function EditorSplitDot() {
+	    var _this51;
+	    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+	    _classCallCheck(this, EditorSplitDot);
+	    _this51 = _callSuper(this, EditorSplitDot);
+	    _this51.splitDot = null;
+	    _this51.themes = new VizPathTheme({
+	      splitDot: function splitDot(decorator) {
+	        var circle = new fabric.fabric.Circle({
+	          radius: 5,
+	          fill: 'transparent',
+	          stroke: 'red',
+	          strokeWidth: 2
+	        });
+	        return circle;
+	      }
+	    });
+	    _this51.options = defaultsDeep(options, DEFAULT_OPTIONS);
+	    return _this51;
+	  }
+	  // 创建拆分点画布对象
+	  _inherits(EditorSplitDot, _VizPathModule8);
+	  return _createClass(EditorSplitDot, [{
+	    key: "_createDotObject",
+	    value: function _createDotObject() {
+	      var decorated = false;
+	      var decorator = function decorator(customObject, callback) {
+	        customObject.set({
+	          // 选中时不出现选中框
+	          hasBorders: false,
+	          hasControls: false,
+	          // 不允许选中
+	          // evented: false,
+	          selectable: false,
+	          // 保持居中
+	          originX: 'center',
+	          originY: 'center'
+	        });
+	        // 不做另外的画布缓存
+	        deepIterateGroup(customObject, function (object) {
+	          object.set({
+	            objectCaching: false
+	          });
+	        });
+	        decorated = true;
+	        return customObject;
+	      };
+	      var object = this.themes.create('splitDot')(decorator);
+	      if (!decorated) object = decorator(object);
+	      return object;
+	    }
+	  }, {
+	    key: "unload",
+	    value: function unload(editor) {
+	      var canvas = editor.canvas;
+	      if (this.splitDot && (canvas === null || canvas === void 0 ? void 0 : canvas.contains(this.splitDot))) {
+	        canvas.remove(this.splitDot);
+	      }
+	      this.splitDot = null;
+	    }
+	  }, {
+	    key: "load",
+	    value: function load(editor) {
+	      var _this52 = this;
+	      var canvas = editor.canvas;
+	      if (!canvas) return;
+	      var showMiddleSplitDotOnly = this.options.showMiddleSplitDotOnly;
+	      var pathNode;
+	      var splitCoord;
+	      var cacheEvent;
+	      var disableAddToken;
+	      var clear = function clear() {
+	        if (_this52.splitDot) canvas.remove(_this52.splitDot);
+	        pathNode = undefined;
+	        splitCoord = undefined;
+	        if (disableAddToken) editor.requestEnableFunction(disableAddToken);
+	      };
+	      var render = function render(e) {
+	        var _a, _b, _c;
+	        var vizpath = (_a = _this52.editor) === null || _a === void 0 ? void 0 : _a.vizpath;
+	        if (!vizpath) return;
+	        if (editor.get('mode') !== Mode.ADD) return;
+	        var target = e.target,
+	          pointer = e.pointer;
+	        if (!pointer) return;
+	        if (!vizpath.path.containsPoint(pointer)) return;
+	        if (target && target[VizPathEditor.symbol]) return;
+	        if (target && target.type === 'activeSelection') return;
+	        var minDistance = Infinity;
+	        var validDistance = Math.max(((_b = vizpath.path.strokeWidth) !== null && _b !== void 0 ? _b : 0) / 2 || 1, 1) + 1;
+	        // 找到最贴近路径上的拆分点
+	        vizpath.segments.forEach(function (segment) {
+	          var _iterator4 = _createForOfIteratorHelper(segment),
+	            _step4;
+	          try {
+	            for (_iterator4.s(); !(_step4 = _iterator4.n()).done;) {
+	              var item = _step4.value;
+	              var points = [];
+	              if (['M', 'Z'].includes(item.instruction[0])) continue;
+	              if (item.instruction[0] === InstructionType.LINE) {
+	                var _vizpath$getNeighbori2 = vizpath.getNeighboringNodes(item, true),
+	                  pre = _vizpath$getNeighbori2.pre;
+	                var start = pre.node;
+	                var end = {
+	                  x: item.instruction[1],
+	                  y: item.instruction[2]
+	                };
+	                points = [start, {
+	                  x: (start.x + end.x) / 2,
+	                  y: (start.y + end.y) / 2
+	                }, end];
+	              } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
+	                var _vizpath$getNeighbori3 = vizpath.getNeighboringNodes(item, true),
+	                  _pre2 = _vizpath$getNeighbori3.pre;
+	                points = [_pre2.node, {
+	                  x: item.instruction[1],
+	                  y: item.instruction[2]
+	                }, {
+	                  x: item.instruction[3],
+	                  y: item.instruction[4]
+	                }];
+	              } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
+	                var _vizpath$getNeighbori4 = vizpath.getNeighboringNodes(item, true),
+	                  _pre3 = _vizpath$getNeighbori4.pre;
+	                points = [_pre3.node, {
+	                  x: item.instruction[1],
+	                  y: item.instruction[2]
+	                }, {
+	                  x: item.instruction[3],
+	                  y: item.instruction[4]
+	                }, {
+	                  x: item.instruction[5],
+	                  y: item.instruction[6]
+	                }];
+	              }
+	              var bezier = new Bezier(points);
+	              var coord = calcCanvasCoord(canvas, pointer);
+	              var p = bezier.project(vizpath.calcRelativeCoord({
+	                left: coord.x,
+	                top: coord.y
+	              }));
+	              if (p.d && p.d < validDistance && p.d < minDistance) {
+	                minDistance = p.d;
+	                pathNode = item;
+	                splitCoord = showMiddleSplitDotOnly ? bezier.get(0.5) : p;
+	              }
+	            }
+	          } catch (err) {
+	            _iterator4.e(err);
+	          } finally {
+	            _iterator4.f();
+	          }
+	        });
+	        if (pathNode && splitCoord) {
+	          _this52.splitDot = (_c = _this52.splitDot) !== null && _c !== void 0 ? _c : _this52._createDotObject();
+	          _this52.splitDot.set(vizpath.calcAbsolutePosition(splitCoord));
+	          if (!canvas.contains(_this52.splitDot)) canvas.add(_this52.splitDot);
+	        }
+	      };
+	      var renderSplitDot = function renderSplitDot(e) {
+	        fabricOnceRender(canvas, function () {
+	          clear();
+	          render(e);
+	        });
+	        if (_this52.splitDot) {
+	          disableAddToken = editor.requestDisableFunction('add');
+	        }
+	      };
+	      editor.events.canvas.on('mouse:move', function (e) {
+	        // 缓存事件对象，以应对编辑器模式变更
+	        cacheEvent = e;
+	        renderSplitDot(e);
+	      });
+	      editor.events.canvas.on('mouse:down:before', function (e) {
+	        var _a;
+	        var vizpath = (_a = _this52.editor) === null || _a === void 0 ? void 0 : _a.vizpath;
+	        if (!vizpath) return;
+	        if (!_this52.splitDot || e.target && e.target !== _this52.splitDot) return;
+	        if (!_this52.splitDot.containsPoint(e.pointer)) return;
+	        editor.rerender(function () {
+	          if (!pathNode || !splitCoord) return;
+	          var _vizpath$getNeighbori5 = vizpath.getNeighboringInstructions(pathNode, true),
+	            pre = _vizpath$getNeighbori5.pre;
+	          if (!pre || !pre.node) return;
+	          var splitCurves = splitInstruction([pre.node].concat(_toConsumableArray(pathNode.instruction.slice(1).reduce(function (list, _, i, arr) {
+	            if (i % 2 === 0) {
+	              list.push({
+	                x: arr[i],
+	                y: arr[i + 1]
+	              });
+	            }
+	            return list;
+	          }, []))), splitCoord);
+	          var node = vizpath.replace(pathNode, splitCurves.pre);
+	          if (node) {
+	            var object = editor.nodeObjectMap.get(node);
+	            if (object) editor.focus(object);
+	            vizpath.insertAfter(node, splitCurves.next);
+	            var insertObject = editor.nodeObjectMap.get(node);
+	            editor.currentConvertNodeObject = insertObject !== null && insertObject !== void 0 ? insertObject : null;
+	          }
+	          clear();
+	        });
+	      });
+	      editor.events.on('set', function () {
+	        cacheEvent && renderSplitDot(cacheEvent);
+	      });
+	    }
+	  }]);
+	}(VizPathModule);
+	EditorSplitDot.ID = 'editor-split-dot';
 
 	function styleInject(css, ref) {
 	  if (ref === void 0) ref = {};
@@ -17046,7 +19266,7 @@
 	  return this.renderer.render(this.parseInline(src, env), this.options, env);
 	};
 
-	var css_248z$2 = ".style_markdown__85-3L{padding:12px}";
+	var css_248z$2 = ".style_markdown__85-3L{padding:16px 20px}";
 	var styles$2 = {"markdown":"style_markdown__85-3L"};
 	styleInject(css_248z$2);
 
@@ -17626,7 +19846,7 @@
 	            return;
 	        if (currentDemo !== Instruction._03_TRANSFORM_PATH)
 	            return;
-	        const path = new Path(paths.line);
+	        const path = new Path(paths.shapes);
 	        const vizpath = path.visualize();
 	        const editor = new VizPathEditor();
 	        await editor
@@ -17703,6 +19923,7 @@
 	            selectedLine: null,
 	        }))
 	            .use(new EditorTrack())
+	            .use(new EditorSplitDot())
 	            .mount(canvas);
 	        editor.enterEditing(path);
 	        await index_umdExports.wait(3000);
@@ -17835,7 +20056,7 @@
 	        React.createElement(Markdown$1, { content: content })));
 	}
 
-	var css_248z = "*{box-sizing:border-box;margin:0;padding:0}body,html{overflow:hidden}.style_page__0LoNd{align-items:stretch;display:flex;height:100vh;margin:0 auto}.style_page__0LoNd .style_instruction__22KM6{overflow:auto}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar{height:8px;width:8px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-track{background:transparent;border-radius:2px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb{background:#66666633;border-radius:8px;transition:all .1s}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb:hover{background:#66666666}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-corner{background:transparent}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0{background-color:#fff;display:none;padding:20px 32px 12px;position:sticky;top:0;z-index:1}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_title__fFbra{font-size:24px;line-height:32px}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_description__HJ2Pk{color:#666;font-size:14px;margin-top:12px}.style_page__0LoNd .style_instruction__22KM6 .style_content__t0e77{margin-bottom:12px}.style_page__0LoNd .style_instruction__22KM6>main{padding:0 32px}.style_page__0LoNd .style_instruction__22KM6.style_maximize__mTGAZ{flex:1}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx{pointer-events:none;position:absolute;user-select:none;z-index:0}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx .style_logo__3MEA0{background-color:unset}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx>main{display:none}.style_page__0LoNd .style_instruction__22KM6.style_half__Z-joI{box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);max-width:650px;z-index:999999}.style_page__0LoNd .style_container__y7Kec{flex:1;overflow:hidden;position:relative}.style_page__0LoNd .style_container__y7Kec>footer{background-color:#fff;border-radius:8px;bottom:32px;box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);display:flex;left:50%;max-width:80%;min-height:56px;overflow:auto;position:absolute;transform:translateX(-50%)}.style_page__0LoNd .style_container__y7Kec>footer svg{flex-shrink:0}.style_page__0LoNd .style_container__y7Kec>aside{bottom:20px;display:flex;display:none;flex-direction:column;gap:8px;position:absolute;right:20px}";
+	var css_248z = "*{box-sizing:border-box;margin:0;padding:0}body,html{overflow:hidden}.style_page__0LoNd{align-items:stretch;display:flex;height:100vh;margin:0 auto}.style_page__0LoNd .style_instruction__22KM6{overflow:auto}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar{height:8px;width:8px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-track{background:transparent;border-radius:2px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb{background:#66666633;border-radius:8px;transition:all .1s}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb:hover{background:#66666666}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-corner{background:transparent}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0{background-color:#fff;padding:20px 32px 12px;position:sticky;top:0;z-index:1}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_title__fFbra{font-size:24px;line-height:32px}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_description__HJ2Pk{color:#666;font-size:14px;margin-top:12px}.style_page__0LoNd .style_instruction__22KM6 .style_content__t0e77{margin-bottom:12px}.style_page__0LoNd .style_instruction__22KM6>main{padding:0 32px}.style_page__0LoNd .style_instruction__22KM6.style_maximize__mTGAZ{flex:1}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx{pointer-events:none;position:absolute;user-select:none;z-index:0}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx .style_logo__3MEA0{background-color:unset}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx>main{display:none}.style_page__0LoNd .style_instruction__22KM6.style_half__Z-joI{box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);max-width:650px;z-index:999999}.style_page__0LoNd .style_container__y7Kec{flex:1;overflow:hidden;position:relative}.style_page__0LoNd .style_container__y7Kec>footer{background-color:#fff;border-radius:8px;bottom:32px;box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);display:flex;left:50%;max-width:80%;min-height:56px;overflow:auto;position:absolute;transform:translateX(-50%)}.style_page__0LoNd .style_container__y7Kec>footer svg{flex-shrink:0}.style_page__0LoNd .style_container__y7Kec>aside{bottom:20px;display:flex;flex-direction:column;gap:8px;position:absolute;right:20px}";
 	var styles = {"page":"style_page__0LoNd","instruction":"style_instruction__22KM6","logo":"style_logo__3MEA0","title":"style_title__fFbra","description":"style_description__HJ2Pk","content":"style_content__t0e77","maximize":"style_maximize__mTGAZ","minimize":"style_minimize__ORKWx","half":"style_half__Z-joI","container":"style_container__y7Kec"};
 	styleInject(css_248z);
 
