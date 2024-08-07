@@ -97,7 +97,7 @@ const Page = () => {
 
   const [canvas, setCanvas] = useState<fabric.Canvas>();
   const [editor, setEditor] = useState<VizPathEditor>();
-  const [currentDemo, setCurrentDemo] = useState<string>(Instruction._01_INSTALL_AND_START);
+  const [currentDemo, setCurrentDemo] = useState<string>(Instruction._03_TRANSFORM_PATH);
 
   const initial = useCallback(async () => {
     if (!_canvasEl.current) return;

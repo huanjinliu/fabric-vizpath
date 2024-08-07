@@ -24,7 +24,7 @@ class EditorTheme<
   /**
    * 主题配置器
    */
-  private _configurators = new WeakMap<
+  private _configurators = new Map<
     VizPathEditor | VizPathModule,
     (editor: VizPathEditor, shareState: ShareState) => Partial<VizPathModule['themes']['__themes']>
   >();
@@ -92,6 +92,65 @@ class EditorTheme<
     }
   }
 
+  /**
+   * 注入配置
+   */
+  private _injectConfigurations() {
+    const editor = this.editor;
+    if (!editor) return;
+
+    this._stashConfigurators.forEach(({ module, configurator }) => {
+      this._configurators.set(module ?? editor, (editor, shareState) => {
+        const themes = configurator(editor, shareState);
+
+        for (const themeKey in themes) {
+          const theme = themes[themeKey] as any;
+          themes[themeKey] = ((decorator: ThemeDecorator<any>, ...args: any[]) => {
+            return theme(
+              (customObject, callback) => {
+                decorator(customObject);
+                if (callback) {
+                  const _added = () => {
+                    this._observeCallback(callback);
+                    customObject.canvas.requestRenderAll();
+                  };
+                  const _removed = () => {
+                    this._rerenderDependencies.forEach((set) => {
+                      set.delete(callback);
+                    });
+                  };
+                  customObject.on('added', _added);
+                  customObject.on('removed', _removed);
+                }
+                return customObject;
+              },
+              ...args,
+            );
+          }) as typeof theme;
+        }
+
+        return themes;
+      });
+    });
+    this._stashConfigurators.length = 0;
+
+    Array.from(this._configurators.entries()).forEach(([module, configurator]) => {
+      module.themes.__themes = {
+        ...module.themes.__themes,
+        ...configurator(editor, this.shareState),
+      } as typeof module.themes.__themes;
+    });
+  }
+
+  /**
+   * 配置模块内部主题
+   * @param module 模块
+   * @param configurator 模块主题配置回调
+   *
+   * @note
+   * 注意配置时机，建议在模块创建画布对象前配置，如时机不对，主题的变化不会达到预期；
+   * 更好的配置时机是编辑器挂载画布前进行统一配置。
+   */
   configure<Module extends VizPathModule>(
     module: Module,
     configurator: (
@@ -103,6 +162,10 @@ class EditorTheme<
       module,
       configurator,
     });
+    // 若已经挂载画布，则配置后直接注入配置
+    if (this.editor?.canvas) {
+      this._injectConfigurations();
+    }
   }
 
   unload() {
@@ -112,6 +175,7 @@ class EditorTheme<
       set.clear();
     });
     this._rerenderDependencies.clear();
+    this._configurators.clear();
   }
 
   load(editor: VizPathEditor) {
@@ -154,50 +218,7 @@ class EditorTheme<
       },
     });
 
-    this._stashConfigurators.forEach(({ module, configurator }) => {
-      this._configurators.set(module ?? editor, (editor, shareState) => {
-        const themes = configurator(editor, shareState);
-
-        for (const themeKey in themes) {
-          const theme = themes[themeKey] as any;
-          themes[themeKey] = ((decorator: ThemeDecorator<any>, ...args: any[]) => {
-            return theme(
-              (customObject, callback) => {
-                decorator(customObject);
-                if (callback) {
-                  const _added = () => {
-                    this._observeCallback(callback);
-                    customObject.canvas.requestRenderAll();
-                  };
-                  const _removed = () => {
-                    this._rerenderDependencies.forEach((set) => {
-                      set.delete(callback);
-                    });
-                  };
-                  customObject.on('added', _added);
-                  customObject.on('removed', _removed);
-                }
-                return customObject;
-              },
-              ...args,
-            );
-          }) as typeof theme;
-        }
-
-        return themes;
-      });
-    });
-    this._stashConfigurators.length = 0;
-
-    [editor, ...editor.modules].forEach((module) => {
-      const configurator = this._configurators.get(module);
-      if (!configurator) return;
-
-      module.themes.__themes = {
-        ...module.themes.__themes,
-        ...configurator(editor, this.shareState),
-      } as typeof module.themes.__themes;
-    });
+    this._injectConfigurations();
   }
 }
 

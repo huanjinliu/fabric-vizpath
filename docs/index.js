@@ -3226,9 +3226,10 @@
 	 */
 	var fabricOnceRender = function fabricOnceRender(canvas, callback) {
 	  canvas.renderOnAddRemove = false;
-	  callback(canvas);
+	  var result = callback(canvas);
 	  canvas.renderOnAddRemove = true;
 	  canvas.requestRenderAll();
+	  return result;
 	};
 
 	/**
@@ -3909,12 +3910,6 @@
 	    this.currentConvertNodeObject = null;
 	    /** 记录原路径对象配置，在退出编辑时重置路径对象配置 */
 	    this._originPathOptions = null;
-	    /** 废弃的画布对象池，可用于复用减少创建消耗 */
-	    this._abandonedPool = {
-	      nodes: [],
-	      points: [],
-	      lines: []
-	    };
 	    /* ---------------------------- 其他内部属性 ---------------------------- */
 	    /** 由于focus方法内部也有对元素聚焦失焦的操作，锁定避免循环执行事件监听造成死循环 */
 	    this._lockFocus = false;
@@ -3968,132 +3963,71 @@
 	     */
 	  }, {
 	    key: "enterEditing",
-	    value: (function () {
-	      var _enterEditing = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2(vizpath) {
-	        return _regeneratorRuntime().wrap(function _callee2$(_context2) {
-	          while (1) switch (_context2.prev = _context2.next) {
-	            case 0:
-	              if (!(!this.canvas && !vizpath.path.canvas)) {
-	                _context2.next = 4;
-	                break;
-	              }
-	              throw Error('(VizPath Error) You must mount the canvas or add a path to fabric.canvas before continuing!');
-	            case 4:
-	              if (!(this.canvas && vizpath.path.canvas && this.canvas !== vizpath.path.canvas)) {
-	                _context2.next = 8;
-	                break;
-	              }
-	              throw Error('(VizPath Error) The fabric.canvas editor must be mounted in an identical manner to the canvas where the path was added!');
-	            case 8:
-	              if (this.canvas) {
-	                _context2.next = 13;
-	                break;
-	              }
-	              _context2.next = 11;
-	              return this.mount(vizpath.path.canvas);
-	            case 11:
-	              _context2.next = 14;
-	              break;
-	            case 13:
-	              if (!vizpath.path.canvas) this.canvas.add(vizpath.path);
-	            case 14:
-	              _context2.next = 16;
-	              return this.leaveEditing();
-	            case 16:
-	              this.vizpath = vizpath;
-	              // 初始路径对象事件
-	              // this._initVizpathEvents();
-	              // 绘制路径
-	              this._renderVizPath();
-	              // 绘制节点操作对象
-	              this._renderPathNodes();
-	              // 绘制全部变换器
-	              // this._renderAllDeformers();
-	            case 19:
-	            case "end":
-	              return _context2.stop();
-	          }
-	        }, _callee2, this);
-	      }));
-	      function enterEditing(_x4) {
-	        return _enterEditing.apply(this, arguments);
+	    value: function enterEditing(path) {
+	      // 如果编辑器未挂载画布，抛出错误
+	      if (!this.canvas) {
+	        throw Error('(VizPath Error) You must mount the canvas before editing!');
 	      }
-	      return enterEditing;
-	    }()
+	      // fabric.canvas画布不匹配，抛出错误
+	      else if (path.canvas && this.canvas !== path.canvas) {
+	        throw Error('(VizPath Error) The fabric.canvas editor must be mounted in an identical manner to the canvas where the path was added!');
+	      }
+	      // 如果路径对象未加入画布则先加入当前编辑器挂载画布
+	      if (!path.canvas) this.canvas.add(path);
+	      this.leaveEditing();
+	      this.vizpath = path.visualize();
+	      // 初始路径对象事件
+	      // this._initVizpathEvents();
+	      // 绘制路径
+	      this._renderVizPath();
+	      // 绘制节点操作对象
+	      this._renderPathNodes();
+	      // 绘制全部变换器
+	      // this._renderAllDeformers();
+	    }
 	    /**
 	     * 退出路径编辑
 	     */
-	    )
 	  }, {
 	    key: "leaveEditing",
-	    value: (function () {
-	      var _leaveEditing = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
-	        var _this7 = this;
-	        var _a, canvas, path, centerPoint;
-	        return _regeneratorRuntime().wrap(function _callee3$(_context3) {
-	          while (1) switch (_context3.prev = _context3.next) {
-	            case 0:
-	              if (this.vizpath) {
-	                _context3.next = 2;
-	                break;
-	              }
-	              return _context3.abrupt("return");
-	            case 2:
-	              canvas = this.canvas;
-	              if (canvas) {
-	                _context3.next = 5;
-	                break;
-	              }
-	              return _context3.abrupt("return");
-	            case 5:
-	              fabricOnceRender(canvas, function () {
-	                _this7.nodes.forEach(function (node) {
-	                  delete node[VizPathEditor.symbol];
-	                  canvas.remove(node);
-	                });
-	                _this7.deformers.forEach(function (deformer) {
-	                  delete deformer.curveDot[VizPathEditor.symbol];
-	                  delete deformer.curveBar[VizPathEditor.symbol];
-	                  canvas.remove(deformer.curveDot, deformer.curveBar);
-	                });
-	              });
-	              this.nodes.length = 0;
-	              this.deformers.length = 0;
-	              this.activeNodes.length = 0;
-	              this.activePoint = null;
-	              this.nodeObjectMap.clear();
-	              this.objectNodeMap.clear();
-	              this.dotSymmetricAutoMode = 'none';
-	              this.currentConvertNodeObject = null;
-	              this._lockFocus = false;
-	              this._abandonedPool = {
-	                nodes: [],
-	                points: [],
-	                lines: []
-	              };
-	              path = this.vizpath.path;
-	              delete path[VizPathEditor.symbol];
-	              centerPoint = path.getCenterPoint();
-	              path.set((_a = this._originPathOptions) !== null && _a !== void 0 ? _a : {});
-	              path.setPositionByOrigin(centerPoint, 'center', 'center');
-	              path.setCoords();
-	              this._originPathOptions = null;
-	              this.vizpath = null;
-	            case 24:
-	            case "end":
-	              return _context3.stop();
-	          }
-	        }, _callee3, this);
-	      }));
-	      function leaveEditing() {
-	        return _leaveEditing.apply(this, arguments);
-	      }
-	      return leaveEditing;
-	    }()
+	    value: function leaveEditing() {
+	      var _this7 = this;
+	      var _a;
+	      if (!this.vizpath) return;
+	      var canvas = this.canvas;
+	      if (!canvas) return;
+	      fabricOnceRender(canvas, function () {
+	        _this7.nodes.forEach(function (node) {
+	          delete node[VizPathEditor.symbol];
+	          canvas.remove(node);
+	        });
+	        _this7.deformers.forEach(function (deformer) {
+	          delete deformer.curveDot[VizPathEditor.symbol];
+	          delete deformer.curveBar[VizPathEditor.symbol];
+	          canvas.remove(deformer.curveDot, deformer.curveBar);
+	        });
+	      });
+	      this.nodes.length = 0;
+	      this.deformers.length = 0;
+	      this.activeNodes.length = 0;
+	      this.activePoint = null;
+	      this.nodeObjectMap.clear();
+	      this.objectNodeMap.clear();
+	      this.dotSymmetricAutoMode = 'none';
+	      this.currentConvertNodeObject = null;
+	      this._lockFocus = false;
+	      var path = this.vizpath.path;
+	      delete path[VizPathEditor.symbol];
+	      var centerPoint = path.getCenterPoint();
+	      path.set((_a = this._originPathOptions) !== null && _a !== void 0 ? _a : {});
+	      path.setPositionByOrigin(centerPoint, 'center', 'center');
+	      path.setCoords();
+	      this._originPathOptions = null;
+	      this.vizpath = null;
+	    }
 	    /**
 	     * 初始路径对象事件
 	     */
-	    )
 	  }, {
 	    key: "rerender",
 	    value: function rerender(callback) {
@@ -4178,30 +4112,6 @@
 	      };
 	      var object = reuseObject !== null && reuseObject !== void 0 ? reuseObject : this.themes.create('node')(decorator);
 	      if (!object[VizPathEditor.symbol]) object = decorator(object);
-	      // 加入画布时添加自动响应
-	      // const onAddedNode = () => {
-	      //   const position = vizpath.calcAbsolutePosition(node, vizpath.coordNodeMap.get(node)!.path);
-	      //   if (object.group) {
-	      //     const relativePosition = vizpath.calcRelativeCoord(position, object.group);
-	      //     object
-	      //       .set({
-	      //         left: relativePosition.x,
-	      //         top: relativePosition.y,
-	      //       })
-	      //       .setCoords();
-	      //     object.group.addWithUpdate();
-	      //   } else {
-	      //     object.set(position).setCoords();
-	      //   }
-	      // };
-	      // // 移除时结束自动响应
-	      // const onRemovedNode = () => {
-	      //   object.off('added', onAddedNode);
-	      //   object.off('removed', onRemovedNode);
-	      //   this._abandonedPool.nodes.push(object);
-	      // };
-	      // object.on('added', onAddedNode);
-	      // object.on('removed', onRemovedNode);
 	      return object;
 	    }
 	    /**
@@ -4536,7 +4446,8 @@
 	        var newNodeObject;
 	        // 路径拼接
 	        if (event.target && event.target[VizPathEditor.symbol]) {
-	          if (_this13.activeNodes.length === 1 && event.target[VizPathEditor.symbol] === EditorObjectID.NODE) {
+	          var isSingleNodeActived = _this13.activeNodes.length === 1;
+	          if (isSingleNodeActived && event.target[VizPathEditor.symbol] === EditorObjectID.NODE) {
 	            newNodeObject = _this13.link(_this13.activeNodes[0], event.target);
 	          }
 	        }
@@ -4722,17 +4633,17 @@
 	          x: curveDot.x - newCoord.x,
 	          y: curveDot.y - newCoord.y
 	        }, [{
-	          translate: {
-	            x: newCoord.x - oldCoord.x,
-	            y: newCoord.y - oldCoord.y
-	          }
-	        }, {
 	          scale: {
 	            x: scaleX,
 	            y: scaleY
 	          }
 	        }, {
 	          rotate: angle
+	        }, {
+	          translate: {
+	            x: newCoord.x - oldCoord.x,
+	            y: newCoord.y - oldCoord.y
+	          }
 	        }]);
 	        curveDot.set(newCoord.x + relativeDiff.x, newCoord.y + relativeDiff.y);
 	        // 更新画布对象
@@ -5233,18 +5144,24 @@
 	    }
 	    /**
 	     * 节点连线
+	     * @param object1 起点
+	     * @param object2 终点
+	     * @param curvable 连线是否可弯曲的，如是则会根据起点的控制器自动计算
 	     * @returns 拼接点
 	     */
 	  }, {
 	    key: "link",
 	    value: function link(object1, object2) {
+	      var curvable = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
+	      var _a, _b;
 	      var vizpath = this.vizpath;
 	      if (!vizpath) return;
 	      var startNode = this.objectNodeMap.get(object1);
 	      var endNode = this.objectNodeMap.get(object2);
 	      if (!startNode || !endNode) return;
+	      var curvePoints = curvable ? [startNode === startNode.segment[0] ? (_a = startNode.deformers) === null || _a === void 0 ? void 0 : _a.pre : (_b = startNode.deformers) === null || _b === void 0 ? void 0 : _b.next].filter(Boolean) : [];
 	      var _this$rerender = this.rerender(function () {
-	          return vizpath.joinSegment(startNode, endNode);
+	          return vizpath.joinSegment(startNode, endNode, curvePoints);
 	        }),
 	        action = _this$rerender.action,
 	        node = _this$rerender.node;
@@ -5371,6 +5288,24 @@
 	      return this;
 	    }
 	    /**
+	     * 通过模块ID查找模块
+	     */
+	  }, {
+	    key: "findModuleByID",
+	    value: function findModuleByID(ID) {
+	      return this.modules.find(function (module) {
+	        return module.constructor.ID === ID;
+	      });
+	    }
+	    /**
+	     * 查找模块
+	     */
+	  }, {
+	    key: "findModule",
+	    value: function findModule(moduleConstructor) {
+	      return this.findModuleByID(moduleConstructor.ID);
+	    }
+	    /**
 	     * 挂载编辑器实现路径可视化，会一并加载增强模块
 	     * @param canvas fabric.Canvas对象
 	     * @this
@@ -5378,10 +5313,10 @@
 	  }, {
 	    key: "mount",
 	    value: (function () {
-	      var _mount = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5(canvas) {
+	      var _mount = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3(canvas) {
 	        var _this23 = this;
-	        return _regeneratorRuntime().wrap(function _callee5$(_context5) {
-	          while (1) switch (_context5.prev = _context5.next) {
+	        return _regeneratorRuntime().wrap(function _callee3$(_context3) {
+	          while (1) switch (_context3.prev = _context3.next) {
 	            case 0:
 	              // 在画布中建立编辑器关联，让内部vizpath对象可直接找到编辑器对象并进入编辑，避免编辑器对象层层传递
 	              canvas[VizPathEditor.symbol] = this;
@@ -5397,24 +5332,24 @@
 	              // 初始节点变换事件
 	              this._initConvertEvents();
 	              // 加载其他增强模块
-	              _context5.next = 9;
+	              _context3.next = 9;
 	              return new Promise(function (resolve) {
 	                var next = 0;
 	                var loadModule = /*#__PURE__*/function () {
-	                  var _ref13 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
+	                  var _ref13 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
 	                    var module;
-	                    return _regeneratorRuntime().wrap(function _callee4$(_context4) {
-	                      while (1) switch (_context4.prev = _context4.next) {
+	                    return _regeneratorRuntime().wrap(function _callee2$(_context2) {
+	                      while (1) switch (_context2.prev = _context2.next) {
 	                        case 0:
 	                          module = _this23.modules[next];
 	                          if (module) {
-	                            _context4.next = 4;
+	                            _context2.next = 4;
 	                            break;
 	                          }
 	                          resolve();
-	                          return _context4.abrupt("return");
+	                          return _context2.abrupt("return");
 	                        case 4:
-	                          _context4.next = 6;
+	                          _context2.next = 6;
 	                          return module.__load(_this23)["catch"](function (err) {
 	                            console.error("(VizPath Error): An error occurred while loading the module named '".concat(module.name, "'!"));
 	                            console.error(err);
@@ -5424,9 +5359,9 @@
 	                          loadModule();
 	                        case 8:
 	                        case "end":
-	                          return _context4.stop();
+	                          return _context2.stop();
 	                      }
-	                    }, _callee4);
+	                    }, _callee2);
 	                  }));
 	                  return function loadModule() {
 	                    return _ref13.apply(this, arguments);
@@ -5435,14 +5370,14 @@
 	                loadModule();
 	              });
 	            case 9:
-	              return _context5.abrupt("return", this);
+	              return _context3.abrupt("return", this);
 	            case 10:
 	            case "end":
-	              return _context5.stop();
+	              return _context3.stop();
 	          }
-	        }, _callee5, this);
+	        }, _callee3, this);
 	      }));
-	      function mount(_x5) {
+	      function mount(_x4) {
 	        return _mount.apply(this, arguments);
 	      }
 	      return mount;
@@ -5454,15 +5389,15 @@
 	  }, {
 	    key: "unmounted",
 	    value: (function () {
-	      var _unmounted = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6() {
+	      var _unmounted = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
 	        var _this24 = this;
 	        var _a;
-	        return _regeneratorRuntime().wrap(function _callee6$(_context6) {
-	          while (1) switch (_context6.prev = _context6.next) {
+	        return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+	          while (1) switch (_context4.prev = _context4.next) {
 	            case 0:
 	              if (this.vizpath) this.leaveEditing();
 	              // 卸载全部增强模块
-	              _context6.next = 3;
+	              _context4.next = 3;
 	              return Promise.all(this.modules.map(function (module) {
 	                // 模块卸载失败不能影响正常流程进
 	                module.__unload(_this24)["catch"](function (err) {
@@ -5480,9 +5415,9 @@
 	              this.canvas = null;
 	            case 6:
 	            case "end":
-	              return _context6.stop();
+	              return _context4.stop();
 	          }
-	        }, _callee6, this);
+	        }, _callee4, this);
 	      }));
 	      function unmounted() {
 	        return _unmounted.apply(this, arguments);
@@ -5496,19 +5431,19 @@
 	  }, {
 	    key: "destroy",
 	    value: (function () {
-	      var _destroy = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7() {
-	        return _regeneratorRuntime().wrap(function _callee7$(_context7) {
-	          while (1) switch (_context7.prev = _context7.next) {
+	      var _destroy = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
+	        return _regeneratorRuntime().wrap(function _callee5$(_context5) {
+	          while (1) switch (_context5.prev = _context5.next) {
 	            case 0:
-	              _context7.next = 2;
+	              _context5.next = 2;
 	              return this.unmounted();
 	            case 2:
 	              this.modules = [];
 	            case 3:
 	            case "end":
-	              return _context7.stop();
+	              return _context5.stop();
 	          }
-	        }, _callee7, this);
+	        }, _callee5, this);
 	      }));
 	      function destroy() {
 	        return _destroy.apply(this, arguments);
@@ -5591,6 +5526,17 @@
 	      instruction[1] = instruction[instruction.length - 2];
 	      instruction[2] = instruction[instruction.length - 1];
 	      instruction.length = 3;
+	    }
+	    /**
+	     * 转为贝塞尔曲线指令
+	     */
+	  }, {
+	    key: "_toCurveInstruction",
+	    value: function _toCurveInstruction(instruction, midPoints) {
+	      instruction.splice.apply(instruction, [0, instruction.length - 2, [InstructionType.LINE, InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE][Math.min(2, midPoints.length)]].concat(_toConsumableArray(midPoints.slice(0, 2).reduce(function (list, coord) {
+	        return [].concat(_toConsumableArray(list), [coord.x, coord.y]);
+	      }, []))));
+	      return instruction;
 	    }
 	    /**
 	     * 修复指令，缺失的坐标统统补0
@@ -6230,6 +6176,14 @@
 	      return ((_a = node.segment[index + 1]) === null || _a === void 0 ? void 0 : _a.instruction[0]) === InstructionType.CLOSE;
 	    }
 	    /**
+	     * 判断两点是否可以相连
+	     */
+	  }, {
+	    key: "isLinkableNodes",
+	    value: function isLinkableNodes(startNode, endNode) {
+	      return startNode !== endNode && this.isTerminalNode(startNode) && this.isTerminalNode(endNode);
+	    }
+	    /**
 	     * 遍历路径节点
 	     */
 	  }, {
@@ -6558,13 +6512,15 @@
 	  }, {
 	    key: "joinSegment",
 	    value: function joinSegment(startNode, endNode) {
-	      if (startNode === endNode || !this.isTerminalNode(startNode) || !this.isTerminalNode(endNode)) return {
+	      var _this33 = this;
+	      var curvePoints = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
+	      if (!this.isLinkableNodes(startNode, endNode)) return {
 	        action: 'none'
 	      };
 	      var startSegmentIndex = this.segments.indexOf(startNode.segment);
 	      var endSegmentIndex = this.segments.indexOf(endNode.segment);
 	      if (startSegmentIndex === endSegmentIndex) {
-	        this.closeSegment(startNode.segment);
+	        this.closeSegment(startNode.segment, curvePoints);
 	        return {
 	          action: 'close',
 	          node: endNode
@@ -6580,8 +6536,8 @@
 	        if (index === endSegmentIndex && endNode === segment[segment.length - 1]) {
 	          instructions = reversePath(instructions);
 	        }
-	        if (index === endSegmentIndex && instructions[0][0] === InstructionType.START) {
-	          instructions[0][0] = InstructionType.LINE;
+	        if (index === endSegmentIndex) {
+	          _this33._toCurveInstruction(instructions[0], curvePoints);
 	        }
 	        return instructions;
 	      });
@@ -6601,6 +6557,7 @@
 	  }, {
 	    key: "closeSegment",
 	    value: function closeSegment(segment) {
+	      var curvePoints = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
 	      // 未闭合的路径做闭合处理
 	      if (!this.isClosedSegment(segment)) {
 	        var updateCommands = [];
@@ -6611,7 +6568,7 @@
 	          updateCommands.push({
 	            type: 'add',
 	            index: segment.length,
-	            instruction: [InstructionType.LINE, startNode.x, startNode.y]
+	            instruction: this._toCurveInstruction([InstructionType.LINE, startNode.x, startNode.y], curvePoints)
 	          });
 	        }
 	        updateCommands.push({
@@ -6699,11 +6656,11 @@
 	  }, {
 	    key: "_revokeDisusedRCoords",
 	    value: function _revokeDisusedRCoords(oldSegments) {
-	      var _this33 = this;
+	      var _this34 = this;
 	      oldSegments.forEach(function (segment) {
 	        segment.forEach(function (node) {
 	          var _a, _b, _c, _e, _f;
-	          if (!_this33.instructionNodeMap.has(node.instruction)) {
+	          if (!_this34.instructionNodeMap.has(node.instruction)) {
 	            // @ts-ignore
 	            node.path = null;
 	            (_a = node.node) === null || _a === void 0 ? void 0 : _a.unobserve();
@@ -6814,26 +6771,26 @@
 	  }, {
 	    key: "loadFabricPathFromURL",
 	    value: (function () {
-	      var _loadFabricPathFromURL = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee8(url) {
+	      var _loadFabricPathFromURL = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6(url) {
 	        var options,
 	          object,
 	          pathGroup,
 	          paths,
 	          extract,
-	          _args7 = arguments;
-	        return _regeneratorRuntime().wrap(function _callee8$(_context8) {
-	          while (1) switch (_context8.prev = _context8.next) {
+	          _args5 = arguments;
+	        return _regeneratorRuntime().wrap(function _callee6$(_context6) {
+	          while (1) switch (_context6.prev = _context6.next) {
 	            case 0:
-	              options = _args7.length > 1 && _args7[1] !== undefined ? _args7[1] : {};
-	              _context8.next = 3;
+	              options = _args5.length > 1 && _args5[1] !== undefined ? _args5[1] : {};
+	              _context6.next = 3;
 	              return loadSVGToPathFromURL(url);
 	            case 3:
-	              object = _context8.sent;
+	              object = _context6.sent;
 	              if (object) {
-	                _context8.next = 6;
+	                _context6.next = 6;
 	                break;
 	              }
-	              return _context8.abrupt("return", []);
+	              return _context6.abrupt("return", []);
 	            case 6:
 	              pathGroup = new fabric.fabric.Group([object]);
 	              if (options) pathGroup.set(Object.assign({}, options));
@@ -6850,14 +6807,14 @@
 	                });
 	              };
 	              extract(pathGroup);
-	              return _context8.abrupt("return", paths);
+	              return _context6.abrupt("return", paths);
 	            case 12:
 	            case "end":
-	              return _context8.stop();
+	              return _context6.stop();
 	          }
-	        }, _callee8);
+	        }, _callee6);
 	      }));
-	      function loadFabricPathFromURL(_x6) {
+	      function loadFabricPathFromURL(_x5) {
 	        return _loadFabricPathFromURL.apply(this, arguments);
 	      }
 	      return loadFabricPathFromURL;
@@ -6866,11 +6823,11 @@
 	}();
 	var Path = /*#__PURE__*/function (_fabric$Path) {
 	  function Path() {
-	    var _this34;
+	    var _this35;
 	    _classCallCheck(this, Path);
-	    _this34 = _callSuper(this, Path, arguments);
-	    _this34.vizpath = null;
-	    return _this34;
+	    _this35 = _callSuper(this, Path, arguments);
+	    _this35.vizpath = null;
+	    return _this35;
 	  }
 	  /**
 	   * 将普通的fabric.Path对象转为可作为可视化的路径对象
@@ -6884,7 +6841,8 @@
 	     * @returns vizpath 可视化路径对象
 	     */
 	    function visualize() {
-	      this.vizpath = new VizPath(this);
+	      var _a;
+	      this.vizpath = (_a = this.vizpath) !== null && _a !== void 0 ? _a : new VizPath(this);
 	      return this.vizpath;
 	    }
 	    /**
@@ -6894,53 +6852,29 @@
 	    key: "exitVisualize",
 	    value: function exitVisualize() {
 	      var _a;
-	      this.leaveEditting();
+	      this.leaveEditing();
 	      (_a = this.vizpath) === null || _a === void 0 ? void 0 : _a.destroy();
 	    }
 	    /**
 	     * 从所在画布中寻找编辑器并进入编辑态
 	     */
 	  }, {
-	    key: "enterEditting",
-	    value: (function () {
-	      var _enterEditting = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee9() {
-	        var _a, editor;
-	        return _regeneratorRuntime().wrap(function _callee9$(_context9) {
-	          while (1) switch (_context9.prev = _context9.next) {
-	            case 0:
-	              if (this.vizpath) {
-	                _context9.next = 2;
-	                break;
-	              }
-	              throw Error('(VizPath Error) Path object visualization is pending. Complete visualization before continuing.');
-	            case 2:
-	              editor = (_a = this.canvas) === null || _a === void 0 ? void 0 : _a[VizPathEditor.symbol];
-	              if (!editor) {
-	                _context9.next = 6;
-	                break;
-	              }
-	              editor.enterEditing(this.vizpath);
-	              return _context9.abrupt("return", editor);
-	            case 6:
-	              throw Error('(VizPath Error) The VizPath Editor has not been successfully mounted on this canvas!');
-	            case 7:
-	            case "end":
-	              return _context9.stop();
-	          }
-	        }, _callee9, this);
-	      }));
-	      function enterEditting() {
-	        return _enterEditting.apply(this, arguments);
+	    key: "enterEditing",
+	    value: function enterEditing() {
+	      var _a;
+	      var editor = (_a = this.canvas) === null || _a === void 0 ? void 0 : _a[VizPathEditor.symbol];
+	      if (editor) {
+	        editor.enterEditing(this);
+	        return editor;
 	      }
-	      return enterEditting;
-	    }()
+	      throw Error('(VizPath Error) You must ensure that the path is added to the canvas within the mounted editor prior to any editing operations.');
+	    }
 	    /**
 	     * 退出编辑态
 	     */
-	    )
 	  }, {
-	    key: "leaveEditting",
-	    value: function leaveEditting() {
+	    key: "leaveEditing",
+	    value: function leaveEditing() {
 	      var _a;
 	      var editor = (_a = this.canvas) === null || _a === void 0 ? void 0 : _a[VizPathEditor.symbol];
 	      if (editor) {
@@ -7000,22 +6934,22 @@
 	  }, {
 	    key: "__unload",
 	    value: function () {
-	      var _unload = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee10(editor) {
-	        return _regeneratorRuntime().wrap(function _callee10$(_context10) {
-	          while (1) switch (_context10.prev = _context10.next) {
+	      var _unload = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7(editor) {
+	        return _regeneratorRuntime().wrap(function _callee7$(_context7) {
+	          while (1) switch (_context7.prev = _context7.next) {
 	            case 0:
-	              _context10.next = 2;
+	              _context7.next = 2;
 	              return Promise.resolve(this.unload(editor));
 	            case 2:
 	              this.editor = null;
 	              this.events.clear();
 	            case 4:
 	            case "end":
-	              return _context10.stop();
+	              return _context7.stop();
 	          }
-	        }, _callee10, this);
+	        }, _callee7, this);
 	      }));
-	      function __unload(_x7) {
+	      function __unload(_x6) {
 	        return _unload.apply(this, arguments);
 	      }
 	      return __unload;
@@ -7023,20 +6957,20 @@
 	  }, {
 	    key: "__load",
 	    value: function () {
-	      var _load = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee11(editor) {
-	        return _regeneratorRuntime().wrap(function _callee11$(_context11) {
-	          while (1) switch (_context11.prev = _context11.next) {
+	      var _load = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee8(editor) {
+	        return _regeneratorRuntime().wrap(function _callee8$(_context8) {
+	          while (1) switch (_context8.prev = _context8.next) {
 	            case 0:
 	              this.editor = editor;
-	              _context11.next = 3;
+	              _context8.next = 3;
 	              return Promise.resolve(this.load(editor));
 	            case 3:
 	            case "end":
-	              return _context11.stop();
+	              return _context8.stop();
 	          }
-	        }, _callee11, this);
+	        }, _callee8, this);
 	      }));
-	      function __load(_x8) {
+	      function __load(_x7) {
 	        return _load.apply(this, arguments);
 	      }
 	      return __load;
@@ -7628,17 +7562,17 @@
 	});
 	var EditorBackground = /*#__PURE__*/function (_VizPathModule) {
 	  function EditorBackground() {
-	    var _this35;
+	    var _this36;
 	    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 	    _classCallCheck(this, EditorBackground);
-	    _this35 = _callSuper(this, EditorBackground);
-	    _this35.options = {
+	    _this36 = _callSuper(this, EditorBackground);
+	    _this36.options = {
 	      image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADMAAAAzCAYAAAA6oTAqAAAAAXNSR0IArs4c6QAAAK9JREFUaEPtljEKw0AMBOUijWv//5mpg0MK11ssyjCGq4ws5FkNdwznOQ/OLHM5zFKaklkKZlACGJIAUGQUwFYBSGYrGZQAVPPWmCkAyRT+ACpmqrmQmKgFigxqZxwmCnShCEUGJQBvzYX4Ry1QO+MwUQYKRSgyqrmQmKgFigxqZxwmCnShCEUGJQBvzYX4Ry1QO+MwUQYKRSgyqrmQmKjFl8z5O88vvGfmPv/07vUBoQcRCbiL/70AAAAASUVORK5CYII=',
 	      repeat: 'repeat',
 	      noScaling: false
 	    };
-	    _this35.options = defaultsDeep(options, _this35.options);
-	    return _this35;
+	    _this36.options = defaultsDeep(options, _this36.options);
+	    return _this36;
 	  }
 	  // private _initAlignEvents(editor: Editor) {
 	  //   const canvas = editor.canvas;
@@ -7668,27 +7602,27 @@
 	  return _createClass(EditorBackground, [{
 	    key: "unload",
 	    value: function () {
-	      var _unload2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee12(editor) {
+	      var _unload2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee9(editor) {
 	        var canvas;
-	        return _regeneratorRuntime().wrap(function _callee12$(_context12) {
-	          while (1) switch (_context12.prev = _context12.next) {
+	        return _regeneratorRuntime().wrap(function _callee9$(_context9) {
+	          while (1) switch (_context9.prev = _context9.next) {
 	            case 0:
 	              canvas = editor.canvas;
 	              if (canvas) {
-	                _context12.next = 3;
+	                _context9.next = 3;
 	                break;
 	              }
-	              return _context12.abrupt("return");
+	              return _context9.abrupt("return");
 	            case 3:
 	              canvas.backgroundColor = undefined;
 	              canvas.requestRenderAll();
 	            case 5:
 	            case "end":
-	              return _context12.stop();
+	              return _context9.stop();
 	          }
-	        }, _callee12);
+	        }, _callee9);
 	      }));
-	      function unload(_x9) {
+	      function unload(_x8) {
 	        return _unload2.apply(this, arguments);
 	      }
 	      return unload;
@@ -7696,24 +7630,24 @@
 	  }, {
 	    key: "load",
 	    value: function () {
-	      var _load2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee13(editor) {
+	      var _load2 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee10(editor) {
 	        var canvas, _this$options, imageURL, repeat, noScaling;
-	        return _regeneratorRuntime().wrap(function _callee13$(_context13) {
-	          while (1) switch (_context13.prev = _context13.next) {
+	        return _regeneratorRuntime().wrap(function _callee10$(_context10) {
+	          while (1) switch (_context10.prev = _context10.next) {
 	            case 0:
 	              canvas = editor.canvas;
 	              if (canvas) {
-	                _context13.next = 3;
+	                _context10.next = 3;
 	                break;
 	              }
-	              return _context13.abrupt("return");
+	              return _context10.abrupt("return");
 	            case 3:
 	              _this$options = this.options, imageURL = _this$options.image, repeat = _this$options.repeat, noScaling = _this$options.noScaling;
 	              if (!imageURL) {
-	                _context13.next = 7;
+	                _context10.next = 7;
 	                break;
 	              }
-	              _context13.next = 7;
+	              _context10.next = 7;
 	              return new Promise(function (resolve) {
 	                var image = new Image();
 	                image.onload = function () {
@@ -7737,11 +7671,11 @@
 	              });
 	            case 7:
 	            case "end":
-	              return _context13.stop();
+	              return _context10.stop();
 	          }
-	        }, _callee13, this);
+	        }, _callee10, this);
 	      }));
-	      function load(_x10) {
+	      function load(_x9) {
 	        return _load2.apply(this, arguments);
 	      }
 	      return load;
@@ -8235,16 +8169,16 @@
 	   * @param verbose 输出每次的按键信息，默认false
 	   */
 	  function EditorShortcut() {
-	    var _this36;
+	    var _this37;
 	    var shortcuts = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
 	    var verbose = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
 	    _classCallCheck(this, EditorShortcut);
-	    _this36 = _callSuper(this, EditorShortcut);
-	    _this36.verbose = false;
-	    _this36.shortcuts = [];
-	    _this36.shortcutOptions = shortcuts;
-	    _this36.verbose = verbose;
-	    return _this36;
+	    _this37 = _callSuper(this, EditorShortcut);
+	    _this37.verbose = false;
+	    _this37.shortcuts = [];
+	    _this37.shortcutOptions = shortcuts;
+	    _this37.verbose = verbose;
+	    return _this37;
 	  }
 	  _inherits(EditorShortcut, _VizPathModule2);
 	  return _createClass(EditorShortcut, [{
@@ -8317,7 +8251,7 @@
 	  }, {
 	    key: "_handleShortcutKey",
 	    value: function _handleShortcutKey(e) {
-	      var _this37 = this;
+	      var _this38 = this;
 	      if (this._preEvent && this._checkIfEventSame(e, this._preEvent)) return;
 	      var activateKeys = this.shortcuts.filter(function (shortcut) {
 	        var _a;
@@ -8357,18 +8291,18 @@
 	      var shortcut = activateKeys[0];
 	      this._verbose(e, shortcut, function () {
 	        var _a, _b, _c, _d;
-	        if (shortcut && ((_a = _this37.activeShortcut) === null || _a === void 0 ? void 0 : _a.shortcut) === activateKeys[0]) return;
-	        if ((_b = _this37.activeShortcut) === null || _b === void 0 ? void 0 : _b.shortcut) {
-	          var deactivateShortcut = _this37.activeShortcut;
-	          (_d = (_c = deactivateShortcut.shortcut).onDeactivate) === null || _d === void 0 ? void 0 : _d.call(_c, e, _this37.activeShortcut.returnValue);
+	        if (shortcut && ((_a = _this38.activeShortcut) === null || _a === void 0 ? void 0 : _a.shortcut) === activateKeys[0]) return;
+	        if ((_b = _this38.activeShortcut) === null || _b === void 0 ? void 0 : _b.shortcut) {
+	          var deactivateShortcut = _this38.activeShortcut;
+	          (_d = (_c = deactivateShortcut.shortcut).onDeactivate) === null || _d === void 0 ? void 0 : _d.call(_c, e, _this38.activeShortcut.returnValue);
 	        }
 	        if (shortcut) {
-	          _this37.activeShortcut = {
+	          _this38.activeShortcut = {
 	            shortcut: shortcut,
 	            returnValue: shortcut.onActivate(e)
 	          };
 	        } else {
-	          _this37.activeShortcut = undefined;
+	          _this38.activeShortcut = undefined;
 	        }
 	      });
 	      this._preEvent = e;
@@ -8679,15 +8613,15 @@
 	};
 	var EditorResize = /*#__PURE__*/function (_VizPathModule3) {
 	  function EditorResize() {
-	    var _this38;
+	    var _this39;
 	    var parentNode = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
 	    var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 	    _classCallCheck(this, EditorResize);
-	    _this38 = _callSuper(this, EditorResize);
-	    _this38.events = new VizPathEvent();
-	    _this38._parentNode = parentNode;
-	    _this38._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$2), options);
-	    return _this38;
+	    _this39 = _callSuper(this, EditorResize);
+	    _this39.events = new VizPathEvent();
+	    _this39._parentNode = parentNode;
+	    _this39._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$2), options);
+	    return _this39;
 	  }
 	  _inherits(EditorResize, _VizPathModule3);
 	  return _createClass(EditorResize, [{
@@ -8733,7 +8667,7 @@
 	  }, {
 	    key: "load",
 	    value: function load(editor) {
-	      var _this39 = this;
+	      var _this40 = this;
 	      var _a, _b;
 	      var canvas = editor.canvas;
 	      if (!canvas) return;
@@ -8754,7 +8688,7 @@
 	        var oldWidth = canvas.getWidth();
 	        var oldHeight = canvas.getHeight();
 	        if (newWidth === oldWidth && newHeight === oldHeight) return;
-	        _this39.resize(canvas, newWidth, newHeight);
+	        _this40.resize(canvas, newWidth, newHeight);
 	      }, interval, {
 	        leading: true,
 	        trailing: true
@@ -8777,35 +8711,35 @@
 	};
 	var EditorMoveModule = /*#__PURE__*/function (_VizPathModule4) {
 	  function EditorMoveModule() {
-	    var _this40;
+	    var _this41;
 	    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 	    _classCallCheck(this, EditorMoveModule);
-	    _this40 = _callSuper(this, EditorMoveModule);
-	    _this40.events = new VizPathEvent();
+	    _this41 = _callSuper(this, EditorMoveModule);
+	    _this41.events = new VizPathEvent();
 	    /**
 	     * 当前光标
 	     */
-	    _this40._currentCursor = 'default';
+	    _this41._currentCursor = 'default';
 	    /**
 	     * 记录可操作元素，用于移动结束后重新赋于可操作
 	     */
-	    _this40._cacheSelectableObjects = [];
+	    _this41._cacheSelectableObjects = [];
 	    /**
 	     * 记录原选中元素
 	     */
-	    _this40._cacheActiveObjects = [];
+	    _this41._cacheActiveObjects = [];
 	    /**
 	     * 改变画布光标
 	     */
-	    _this40.changeCanvasCursor = function (canvas, type) {
+	    _this41.changeCanvasCursor = function (canvas, type) {
 	      var outerType = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : type;
 	      canvas.defaultCursor = type;
 	      // 这里设置外层画布的光标样式，必须和defaultCursor一起设置不然会相互冲突
 	      canvas.setCursor(outerType);
-	      _this40._currentCursor = type;
+	      _this41._currentCursor = type;
 	    };
-	    _this40._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$1), options);
-	    return _this40;
+	    _this41._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$1), options);
+	    return _this41;
 	  }
 	  /** 偏移画布 */
 	  _inherits(EditorMoveModule, _VizPathModule4);
@@ -8847,7 +8781,7 @@
 	  }, {
 	    key: "initMoveListener",
 	    value: function initMoveListener(editor) {
-	      var _this41 = this;
+	      var _this42 = this;
 	      var canvas = editor === null || editor === void 0 ? void 0 : editor.canvas;
 	      if (!canvas) return;
 	      // 是否按下空格
@@ -8862,11 +8796,11 @@
 	      // 移动相关监听方法
 	      var moveHandlers = {
 	        prepare: function prepare(event) {
-	          var _this41$_options = _this41._options,
-	            movable = _this41$_options.movable,
-	            spaceHoverCursor = _this41$_options.spaceHoverCursor,
-	            moveCursor = _this41$_options.moveCursor,
-	            spaceLeftClickMove = _this41$_options.spaceLeftClickMove;
+	          var _this42$_options = _this42._options,
+	            movable = _this42$_options.movable,
+	            spaceHoverCursor = _this42$_options.spaceHoverCursor,
+	            moveCursor = _this42$_options.moveCursor,
+	            spaceLeftClickMove = _this42$_options.spaceLeftClickMove;
 	          if (!movable) return;
 	          if (space) {
 	            event.preventDefault();
@@ -8874,21 +8808,21 @@
 	          }
 	          space = spaceLeftClickMove && event.code === 'Space';
 	          if (!space) return;else {
-	            _this41._cacheActiveObjects = canvas.getActiveObjects();
+	            _this42._cacheActiveObjects = canvas.getActiveObjects();
 	            canvas.skipTargetFind = true;
 	            canvas.discardActiveObject();
 	          }
-	          if (_this41._currentCursor !== moveCursor) _this41.changeCanvasCursor(canvas, spaceHoverCursor);
+	          if (_this42._currentCursor !== moveCursor) _this42.changeCanvasCursor(canvas, spaceHoverCursor);
 	          event.preventDefault();
 	        },
 	        start: function start(event) {
 	          var _a;
-	          var _this41$_options2 = _this41._options,
-	            movable = _this41$_options2.movable,
-	            moveCursor = _this41$_options2.moveCursor;
+	          var _this42$_options2 = _this42._options,
+	            movable = _this42$_options2.movable,
+	            moveCursor = _this42$_options2.moveCursor;
 	          if (!movable) return;
 	          var leftClick = space && event.e.buttons === 1,
-	            rightClick = _this41._options.rightClickMove && event.e.buttons === 2;
+	            rightClick = _this42._options.rightClickMove && event.e.buttons === 2;
 	          if (leftClick || rightClick) {
 	            var _ref19 = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0],
 	              _ref20 = _slicedToArray(_ref19, 6),
@@ -8897,7 +8831,7 @@
 	            var dragCursor = moveCursor;
 	            // 开始移动起取消当前画布聚焦元素并将所以元素设为不可操作
 	            canvas.forEachObject(function (object) {
-	              if (object.selectable) _this41._cacheSelectableObjects.push(object);
+	              if (object.selectable) _this42._cacheSelectableObjects.push(object);
 	              object.set({
 	                selectable: false,
 	                hoverCursor: dragCursor
@@ -8907,7 +8841,7 @@
 	              x: event.e.x - offsetX,
 	              y: event.e.y - offsetY
 	            };
-	            _this41.changeCanvasCursor(canvas, dragCursor);
+	            _this42.changeCanvasCursor(canvas, dragCursor);
 	            // 拖拽开始先禁止画布多元素框选
 	            canvas.selection = false;
 	          }
@@ -8918,35 +8852,35 @@
 	            x: event.e.x - moveInitDistance.x,
 	            y: event.e.y - moveInitDistance.y
 	          };
-	          _this41.move(canvas, newOffset);
+	          _this42.move(canvas, newOffset);
 	        },
 	        finish: function finish(event) {
 	          var _a;
 	          // 如果是键盘松开且松开的是空格，取消space按下状态，否则维持原状态
 	          var keyup = event.type === 'keyup';
 	          if (keyup && event.code === 'Space') space = false;
-	          var spaceHoverCursor = _this41._options.spaceHoverCursor;
+	          var spaceHoverCursor = _this42._options.spaceHoverCursor;
 	          if (moveInitDistance) canvas.requestRenderAll();
 	          if (!space) {
 	            canvas.skipTargetFind = false;
 	            // 重置元素悬浮光标
 	            canvas.forEachObject(function (object) {
-	              var selectable = object.selectable || _this41._cacheSelectableObjects.includes(object);
+	              var selectable = object.selectable || _this42._cacheSelectableObjects.includes(object);
 	              object.set({
 	                selectable: selectable,
 	                hoverCursor: selectable ? 'move' : 'default'
 	              });
 	            });
-	            _this41._cacheSelectableObjects = [];
-	            if (_this41._cacheActiveObjects.length) {
-	              editor.focus.apply(editor, _toConsumableArray(_this41._cacheActiveObjects));
-	              _this41._cacheActiveObjects = [];
+	            _this42._cacheSelectableObjects = [];
+	            if (_this42._cacheActiveObjects.length) {
+	              editor.focus.apply(editor, _toConsumableArray(_this42._cacheActiveObjects));
+	              _this42._cacheActiveObjects = [];
 	            }
 	          }
 	          moveInitDistance = undefined;
 	          var isHover = ((_a = canvas._hoveredTarget) === null || _a === void 0 ? void 0 : _a.selectable) === true;
 	          var newCursor = space ? spaceHoverCursor : 'default';
-	          _this41.changeCanvasCursor(canvas, newCursor, isHover ? 'move' : newCursor);
+	          _this42.changeCanvasCursor(canvas, newCursor, isHover ? 'move' : newCursor);
 	          // 拖拽结束重置画布多元素框选
 	          canvas.selection = true;
 	        }
@@ -8975,13 +8909,13 @@
 	};
 	var EditorZoom = /*#__PURE__*/function (_VizPathModule5) {
 	  function EditorZoom() {
-	    var _this42;
+	    var _this43;
 	    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
 	    _classCallCheck(this, EditorZoom);
-	    _this42 = _callSuper(this, EditorZoom);
-	    _this42.events = new VizPathEvent();
-	    _this42._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS), options);
-	    return _this42;
+	    _this43 = _callSuper(this, EditorZoom);
+	    _this43.events = new VizPathEvent();
+	    _this43._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS), options);
+	    return _this43;
 	  }
 	  /**
 	   * 允许更改是否可以缩放能力
@@ -9008,20 +8942,20 @@
 	  }, {
 	    key: "initZoomListener",
 	    value: function initZoomListener(editor) {
-	      var _this43 = this;
+	      var _this44 = this;
 	      var canvas = editor.canvas;
 	      if (!canvas) return;
 	      var handler = function handler(event) {
 	        var _a;
-	        var _this43$_options = _this43._options,
-	          zoomable = _this43$_options.zoomable,
-	          zoomCenter = _this43$_options.zoomCenter;
+	        var _this44$_options = _this44._options,
+	          zoomable = _this44$_options.zoomable,
+	          zoomCenter = _this44$_options.zoomCenter;
 	        if (!zoomable) return;
 	        event.e.preventDefault();
 	        var _ref21 = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0],
 	          _ref22 = _slicedToArray(_ref21, 1),
 	          zoom = _ref22[0];
-	        var zoomLimit = _this43._options.zoomLimit;
+	        var zoomLimit = _this44._options.zoomLimit;
 	        var _event$e = event.e,
 	          offsetX = _event$e.offsetX,
 	          offsetY = _event$e.offsetY,
@@ -9029,7 +8963,7 @@
 	        var dZoom = Math.pow(0.999, deltaY / 2);
 	        var newZoom = Math.min(Math.max(zoom * dZoom, zoomLimit[0]), zoomLimit[1]);
 	        var canvasCenter = canvas.getCenter();
-	        _this43.zoom(canvas, newZoom, {
+	        _this44.zoom(canvas, newZoom, {
 	          canvas: {
 	            x: canvasCenter.left,
 	            y: canvasCenter.top
@@ -9055,32 +8989,32 @@
 	EditorZoom.ID = 'editor-zoom';
 	var EditorTheme = /*#__PURE__*/function (_VizPathModule6) {
 	  function EditorTheme(editorConfigurator, initialShareState) {
-	    var _this44;
+	    var _this45;
 	    _classCallCheck(this, EditorTheme);
-	    _this44 = _callSuper(this, EditorTheme);
-	    _this44.events = new VizPathEvent();
+	    _this45 = _callSuper(this, EditorTheme);
+	    _this45.events = new VizPathEvent();
 	    /**
 	     * 主题配置器
 	     */
-	    _this44._configurators = new WeakMap();
+	    _this45._configurators = new Map();
 	    /**
 	     * 暂存配置器
 	     */
-	    _this44._stashConfigurators = [];
+	    _this45._stashConfigurators = [];
 	    /**
 	     * 临时共享状态的getter观察者
 	     */
-	    _this44._tempStateGetterObservers = new Set([]);
+	    _this45._tempStateGetterObservers = new Set([]);
 	    /**
 	     * 渲染依赖
 	     */
-	    _this44._rerenderDependencies = new Map([]);
-	    _this44.shareState = initialShareState;
-	    _this44._stashConfigurators.push({
+	    _this45._rerenderDependencies = new Map([]);
+	    _this45.shareState = initialShareState;
+	    _this45._stashConfigurators.push({
 	      module: null,
 	      configurator: editorConfigurator
 	    });
-	    return _this44;
+	    return _this45;
 	  }
 	  /**
 	   * 观测回调
@@ -9089,7 +9023,7 @@
 	  return _createClass(EditorTheme, [{
 	    key: "_observeCallback",
 	    value: function _observeCallback(callback) {
-	      var _this45 = this;
+	      var _this46 = this;
 	      var dependencyObserver = new Set([]);
 	      this._tempStateGetterObservers.add(dependencyObserver);
 	      callback();
@@ -9098,75 +9032,25 @@
 	      if (dependencyObserver.size) {
 	        dependencyObserver.forEach(function (key) {
 	          var _a;
-	          var dependencies = (_a = _this45._rerenderDependencies.get(key)) !== null && _a !== void 0 ? _a : new Set([]);
+	          var dependencies = (_a = _this46._rerenderDependencies.get(key)) !== null && _a !== void 0 ? _a : new Set([]);
 	          dependencies.add(callback);
-	          _this45._rerenderDependencies.set(key, dependencies);
+	          _this46._rerenderDependencies.set(key, dependencies);
 	        });
 	      }
 	    }
+	    /**
+	     * 注入配置
+	     */
 	  }, {
-	    key: "configure",
-	    value: function configure(module, configurator) {
-	      this._stashConfigurators.push({
-	        module: module,
-	        configurator: configurator
-	      });
-	    }
-	  }, {
-	    key: "unload",
-	    value: function unload() {
-	      this.shareState = {};
-	      this.events.clear();
-	      this._rerenderDependencies.forEach(function (set) {
-	        set.clear();
-	      });
-	      this._rerenderDependencies.clear();
-	    }
-	  }, {
-	    key: "load",
-	    value: function load(editor) {
-	      var _this46 = this;
-	      var canvas = editor.canvas;
-	      if (!canvas) return;
-	      this.shareState = new Proxy(this.shareState, {
-	        get: function get(target, p, receiver) {
-	          if (p in target) {
-	            _this46._tempStateGetterObservers.forEach(function (observer) {
-	              return observer.add(p);
-	            });
-	          }
-	          return Reflect.get(target, p, receiver);
-	        },
-	        // 每次共享状态修改都会触发UI更新
-	        set: function set(target, p, newValue, receiver) {
-	          var needRerender = target[p] !== newValue;
-	          var result = Reflect.set(target, p, newValue, receiver);
-	          if (needRerender) {
-	            _this46.events.fire('state-update', editor, _this46.shareState);
-	            // 重新渲染
-	            var callbackSet = _this46._rerenderDependencies.get(p);
-	            if (callbackSet) {
-	              var callbacks = [];
-	              callbackSet.forEach(function (callback) {
-	                _this46._rerenderDependencies.forEach(function (set) {
-	                  set["delete"](callback);
-	                });
-	                callbacks.push(callback);
-	              });
-	              callbacks.forEach(function (callback) {
-	                _this46._observeCallback(callback);
-	              });
-	              callbacks.length = 0;
-	            }
-	            canvas.requestRenderAll();
-	          }
-	          return result;
-	        }
-	      });
+	    key: "_injectConfigurations",
+	    value: function _injectConfigurations() {
+	      var _this47 = this;
+	      var editor = this.editor;
+	      if (!editor) return;
 	      this._stashConfigurators.forEach(function (_ref23) {
 	        var module = _ref23.module,
 	          configurator = _ref23.configurator;
-	        _this46._configurators.set(module !== null && module !== void 0 ? module : editor, function (editor, shareState) {
+	        _this47._configurators.set(module !== null && module !== void 0 ? module : editor, function (editor, shareState) {
 	          var themes = configurator(editor, shareState);
 	          var _loop2 = function _loop2() {
 	            var theme = themes[themeKey];
@@ -9178,11 +9062,11 @@
 	                decorator(customObject);
 	                if (callback) {
 	                  var _added = function _added() {
-	                    _this46._observeCallback(callback);
+	                    _this47._observeCallback(callback);
 	                    customObject.canvas.requestRenderAll();
 	                  };
 	                  var _removed = function _removed() {
-	                    _this46._rerenderDependencies.forEach(function (set) {
+	                    _this47._rerenderDependencies.forEach(function (set) {
 	                      set["delete"](callback);
 	                    });
 	                  };
@@ -9200,15 +9084,266 @@
 	        });
 	      });
 	      this._stashConfigurators.length = 0;
-	      [editor].concat(_toConsumableArray(editor.modules)).forEach(function (module) {
-	        var configurator = _this46._configurators.get(module);
-	        if (!configurator) return;
-	        module.themes.__themes = Object.assign(Object.assign({}, module.themes.__themes), configurator(editor, _this46.shareState));
+	      Array.from(this._configurators.entries()).forEach(function (_ref24) {
+	        var _ref25 = _slicedToArray(_ref24, 2),
+	          module = _ref25[0],
+	          configurator = _ref25[1];
+	        module.themes.__themes = Object.assign(Object.assign({}, module.themes.__themes), configurator(editor, _this47.shareState));
 	      });
+	    }
+	    /**
+	     * 配置模块内部主题
+	     * @param module 模块
+	     * @param configurator 模块主题配置回调
+	     *
+	     * @note
+	     * 注意配置时机，建议在模块创建画布对象前配置，如时机不对，主题的变化不会达到预期；
+	     * 更好的配置时机是编辑器挂载画布前进行统一配置。
+	     */
+	  }, {
+	    key: "configure",
+	    value: function configure(module, configurator) {
+	      var _a;
+	      this._stashConfigurators.push({
+	        module: module,
+	        configurator: configurator
+	      });
+	      // 若已经挂载画布，则配置后直接注入配置
+	      if ((_a = this.editor) === null || _a === void 0 ? void 0 : _a.canvas) {
+	        this._injectConfigurations();
+	      }
+	    }
+	  }, {
+	    key: "unload",
+	    value: function unload() {
+	      this.shareState = {};
+	      this.events.clear();
+	      this._rerenderDependencies.forEach(function (set) {
+	        set.clear();
+	      });
+	      this._rerenderDependencies.clear();
+	      this._configurators.clear();
+	    }
+	  }, {
+	    key: "load",
+	    value: function load(editor) {
+	      var _this48 = this;
+	      var canvas = editor.canvas;
+	      if (!canvas) return;
+	      this.shareState = new Proxy(this.shareState, {
+	        get: function get(target, p, receiver) {
+	          if (p in target) {
+	            _this48._tempStateGetterObservers.forEach(function (observer) {
+	              return observer.add(p);
+	            });
+	          }
+	          return Reflect.get(target, p, receiver);
+	        },
+	        // 每次共享状态修改都会触发UI更新
+	        set: function set(target, p, newValue, receiver) {
+	          var needRerender = target[p] !== newValue;
+	          var result = Reflect.set(target, p, newValue, receiver);
+	          if (needRerender) {
+	            _this48.events.fire('state-update', editor, _this48.shareState);
+	            // 重新渲染
+	            var callbackSet = _this48._rerenderDependencies.get(p);
+	            if (callbackSet) {
+	              var callbacks = [];
+	              callbackSet.forEach(function (callback) {
+	                _this48._rerenderDependencies.forEach(function (set) {
+	                  set["delete"](callback);
+	                });
+	                callbacks.push(callback);
+	              });
+	              callbacks.forEach(function (callback) {
+	                _this48._observeCallback(callback);
+	              });
+	              callbacks.length = 0;
+	            }
+	            canvas.requestRenderAll();
+	          }
+	          return result;
+	        }
+	      });
+	      this._injectConfigurations();
 	    }
 	  }]);
 	}(VizPathModule);
 	EditorTheme.ID = 'editor-theme';
+
+	/**
+	 * 路径轨迹模块，编辑器添加模式下显示预添加的路径段轨迹
+	 */
+	var EditorTrack = /*#__PURE__*/function (_VizPathModule7) {
+	  function EditorTrack() {
+	    var _this49;
+	    _classCallCheck(this, EditorTrack);
+	    _this49 = _callSuper(this, EditorTrack, arguments);
+	    _this49.themes = new VizPathTheme({
+	      virtualNode: function virtualNode(decorator) {
+	        return new fabric.fabric.Object();
+	      },
+	      virtualPath: function virtualPath(decorator) {
+	        var path = new fabric.fabric.Path('M 0 0', {
+	          fill: 'transparent',
+	          stroke: '#bebebe',
+	          strokeWidth: 1
+	        });
+	        return path;
+	      }
+	    });
+	    // 清除虚拟画布对象
+	    _this49._cleanVirtualObjects = function () {
+	      var _a;
+	      var canvas = (_a = _this49.editor) === null || _a === void 0 ? void 0 : _a.canvas;
+	      if (!canvas) return;
+	      fabricOnceRender(canvas, function () {
+	        if (_this49.virtualPath) canvas.remove(_this49.virtualPath);
+	        if (_this49.virtualNode) canvas.remove(_this49.virtualNode);
+	      });
+	    };
+	    return _this49;
+	  }
+	  // 创建虚拟节点
+	  _inherits(EditorTrack, _VizPathModule7);
+	  return _createClass(EditorTrack, [{
+	    key: "_createVirtualNode",
+	    value: function _createVirtualNode() {
+	      var decorated = false;
+	      var decorator = function decorator(customObject, callback) {
+	        customObject.set({
+	          // 选中时不出现选中框
+	          hasBorders: false,
+	          hasControls: false,
+	          // 不给选中
+	          evented: false,
+	          selectable: false,
+	          // 保持居中
+	          originX: 'center',
+	          originY: 'center'
+	        });
+	        // 不做另外的画布缓存
+	        deepIterateGroup(customObject, function (object) {
+	          object.set({
+	            objectCaching: false
+	          });
+	        });
+	        decorated = true;
+	        return customObject;
+	      };
+	      var object = this.themes.create('virtualNode')(decorator);
+	      if (!decorated) object = decorator(object);
+	      return object;
+	    }
+	    // 创建虚拟参考路径线
+	  }, {
+	    key: "_createVirtualPath",
+	    value: function _createVirtualPath() {
+	      var decorated = false;
+	      var decorator = function decorator(customPath, callback) {
+	        customPath.set({
+	          // 选中时不出现选中框
+	          hasBorders: false,
+	          hasControls: false,
+	          // 不给选中
+	          evented: false,
+	          selectable: false,
+	          // 保持居中
+	          originX: 'center',
+	          originY: 'center',
+	          // 不做另外的画布缓存
+	          objectCaching: false
+	        });
+	        decorated = true;
+	        return customPath;
+	      };
+	      var path = this.themes.create('virtualPath')(decorator);
+	      if (!decorated) path = decorator(path);
+	      return path;
+	    }
+	  }, {
+	    key: "unload",
+	    value: function unload() {
+	      this._cleanVirtualObjects();
+	      this.virtualNode = undefined;
+	      this.virtualPath = undefined;
+	    }
+	  }, {
+	    key: "load",
+	    value: function load(editor) {
+	      var _this50 = this;
+	      var canvas = editor.canvas;
+	      if (!canvas) return;
+	      var cacheEvent;
+	      var renderVirtualObjects = function renderVirtualObjects(activeNode, position) {
+	        var hideVirtualNode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+	        if (editor.get('mode') !== 'add') return;
+	        var vizpath = editor.vizpath;
+	        if (!vizpath) return;
+	        var node = editor.objectNodeMap.get(activeNode);
+	        if (!node) return;
+	        if (!vizpath.isTerminalNode(node)) return;
+	        fabricOnceRender(canvas, function () {
+	          var _a, _b, _c, _d;
+	          _this50.virtualNode = (_a = _this50.virtualNode) !== null && _a !== void 0 ? _a : _this50._createVirtualNode();
+	          _this50.virtualPath = (_b = _this50.virtualPath) !== null && _b !== void 0 ? _b : _this50._createVirtualPath();
+	          _this50.virtualNode.set(position);
+	          var curvePoint = node === node.segment[0] ? (_c = node.deformers) === null || _c === void 0 ? void 0 : _c.pre : (_d = node.deformers) === null || _d === void 0 ? void 0 : _d.next;
+	          if (curvePoint) {
+	            var _vizpath$calcAbsolute = vizpath.calcAbsolutePosition(curvePoint),
+	              left = _vizpath$calcAbsolute.left,
+	              top = _vizpath$calcAbsolute.top;
+	            _this50.virtualPath.initialize([[InstructionType.START, activeNode.left, activeNode.top], [InstructionType.QUADRATIC_CURCE, left, top, position.left, position.top]]);
+	          } else {
+	            _this50.virtualPath.initialize([[InstructionType.START, activeNode.left, activeNode.top], [InstructionType.LINE, position.left, position.top]]);
+	          }
+	          var baseIndex = canvas._objects.indexOf(vizpath.path) + 1;
+	          if (!hideVirtualNode && !canvas.contains(_this50.virtualNode)) {
+	            canvas.insertAt(_this50.virtualNode, baseIndex, false);
+	          }
+	          if (!canvas.contains(_this50.virtualPath)) {
+	            canvas.insertAt(_this50.virtualPath, baseIndex, false);
+	          }
+	        });
+	      };
+	      var renderTrackHandler = function renderTrackHandler(e) {
+	        _this50._cleanVirtualObjects();
+	        // 缓存事件对象，以应对编辑器模式变更
+	        cacheEvent = e;
+	        var vizpath = editor.vizpath;
+	        if (!vizpath) return;
+	        var target = e.target,
+	          pointer = e.pointer;
+	        if (!pointer) return;
+	        var activeNode = editor.activeNodes.length === 1 ? editor.activeNodes[0] : undefined;
+	        if (!activeNode) return;
+	        if (target) {
+	          if (target[VizPathEditor.symbol] === EditorObjectID.NODE && vizpath.isLinkableNodes(editor.objectNodeMap.get(activeNode), editor.objectNodeMap.get(target))) {
+	            var centerPoint = target.getCenterPoint();
+	            renderVirtualObjects(activeNode, {
+	              left: centerPoint.x,
+	              top: centerPoint.y
+	            }, true);
+	          }
+	        } else {
+	          var coord = calcCanvasCoord(editor.canvas, pointer);
+	          renderVirtualObjects(activeNode, {
+	            left: coord.x,
+	            top: coord.y
+	          });
+	        }
+	      };
+	      editor.events.canvas.on('mouse:move', renderTrackHandler);
+	      editor.events.canvas.on('mouse:down', function () {
+	        _this50._cleanVirtualObjects();
+	      });
+	      editor.events.on('set', function () {
+	        cacheEvent && renderTrackHandler(cacheEvent);
+	      });
+	    }
+	  }]);
+	}(VizPathModule);
+	EditorTrack.ID = 'editor-track';
 
 	function styleInject(css, ref) {
 	  if (ref === void 0) ref = {};
@@ -16932,144 +17067,38 @@
 	};
 	var IconButton$1 = React.memo(IconButton);
 
-	var defaultTheme = function defaultTheme(editor, shareState) {
-	  editor.events.on('selected', function (nodes, point) {
-	    var _a, _b;
-	    shareState.selectedNodes = nodes;
-	    shareState.selectedPoint = point;
-	    if (point) {
-	      shareState.selectedLine = (_b = (_a = editor.deformers.find(function (i) {
-	        return i.curveDot === point;
-	      })) === null || _a === void 0 ? void 0 : _a.curveBar) !== null && _b !== void 0 ? _b : null;
-	    }
-	  });
-	  editor.events.on('deselected', function () {
-	    shareState.selectedNodes = [];
-	    shareState.selectedPoint = null;
-	    shareState.selectedLine = null;
-	  });
-	  return {
-	    path: function path(decorator, pathObject) {
-	      pathObject.set({
-	        stroke: '#333',
-	        strokeWidth: 4,
-	        fill: 'transparent',
-	        strokeUniform: true
-	      });
-	    },
-	    node: function node(decorator) {
-	      var object = new fabric.fabric.Circle({
-	        strokeWidth: 4,
-	        radius: 6,
-	        fill: '#ffffff',
-	        stroke: '#4b4b4b'
-	      });
-	      object.on('mouseover', function () {
-	        shareState.hoverNode = object;
-	      });
-	      object.on('mouseout', function () {
-	        shareState.hoverNode = null;
-	      });
-	      object.on('removed', function () {
-	        if (shareState.hoverNode === object) shareState.hoverNode = null;
-	      });
-	      return decorator(object, function () {
-	        var _a;
-	        object.set({
-	          fill: ((_a = shareState.selectedNodes) === null || _a === void 0 ? void 0 : _a.includes(object)) ? '#29ca6e' : shareState.hoverNode === object ? '#7ef4ad' : '#ffffff'
-	        });
-	      });
-	    },
-	    dot: function dot(decorator) {
-	      var circle = new fabric.fabric.Circle({
-	        radius: 4,
-	        fill: '#bebebe',
-	        stroke: '#bebebe',
-	        strokeWidth: 2
-	      });
-	      circle.on('mouseover', function () {
-	        var _a, _b, _c;
-	        shareState.hoverPoint = circle;
-	        shareState.hoverLine = (_b = (_a = editor.deformers.find(function (i) {
-	          return i.curveDot === circle;
-	        })) === null || _a === void 0 ? void 0 : _a.curveBar) !== null && _b !== void 0 ? _b : null;
-	        (_c = circle.canvas) === null || _c === void 0 ? void 0 : _c.requestRenderAll();
-	      });
-	      circle.on('mouseout', function () {
-	        var _a;
-	        shareState.hoverPoint = null;
-	        shareState.hoverLine = null;
-	        (_a = circle.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
-	      });
-	      return decorator(circle, function () {
-	        circle.set({
-	          stroke: shareState.selectedPoint === circle ? '#333' : '#bebebe'
-	        });
-	      });
-	    },
-	    line: function line(decorator) {
-	      var line = new fabric.fabric.Line([0, 0, 0, 0], {
-	        stroke: '#bebebe',
-	        strokeWidth: 1,
-	        strokeDashArray: [4, 3]
-	      });
-	      return decorator(line, function () {
-	        line.set({
-	          stroke: shareState.selectedLine === line ? '#333' : '#bebebe'
-	        });
-	      });
-	    }
-	  };
-	};
+	var content$8 = "#### Installation\n\n```shell\n$ npm install fabric-vizpath --save\n// or\n$ pnpm add fabric-vizpath\n```\n\n#### Quick Start\n\n> Attention: You must make sure you had installed [fabric.js](https://github.com/fabricjs/fabric.js) before using this library!\n\n```typescript\nimport { fabric } from 'fabric';\nimport { Path, VizPathEditor, EditorMove, EditorZoom, EditorResize } from 'fabric-vizpath';\n\n// 创建路径对象，该对象继承于fabric.Path，所以也可以直接通过add方法添加进fabric画布\nconst path = new Path('M 0 100 L 100 0 L 0 -100 L -100 0 Z');\n\n// 创建路径编辑器\nconst editor = new VizPathEditor();\n\n// 应用增强模块\neditor\n  .use(new EditorMove())\n  .use(new EditorZoom())\n  .use(new EditorResize());\n\n// 挂载编辑器\neditor.mount(new fabric.Canvas(...));\n\n// 进入路径编辑 ❗进入路径编辑前未挂载编辑器会抛出错误\neditor.enterEditing(path);\n```\n";
 
-	var content$8 = "#### Installation\n\n```shell\n$ npm install fabric-vizpath --save\n// or\n$ pnpm add fabric-vizpath\n```\n\n#### Quick Start\n\n> Attention: You must make sure you had installed [fabric.js](https://github.com/fabricjs/fabric.js) before using this library!\n\n```typescript\nimport { VizPath } from 'fabric-vizpath';\n\nconst vizpath = new VizPath('');\n```\n";
-
-	var arc = "M 101 94 Q 103 -59 -52 -58 Q -204 -58 -206 93";
-	var arch = "M0.5 53.8667C0.5 24.3763 23.5738 0.5 52 0.5C80.4262 0.5 103.5 24.3763 103.5 53.8667V143.5H0.5V53.8667Z";
-	var banana = "M -105 111 C -105 111 38 114 80 -70 C 82 -81 79 -90 81 -103 L 97 -103 C 97 -103 94 -86 98 -73 C 119 -5 94 169 -106 123 L -105 111 Z M -105 118 C -105 118 83 158 91 -42";
-	var bubble = "M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z";
-	var circle = "M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z";
-	var diamond = "M 0 100 L 100 0 L 0 -100 L -100 0 Z";
-	var favicon = "M 295.233 250.642 L 390.393 281.854 C 391.402 282.189 392.1 283.112 392.145 284.174 C 392.191 285.236 391.575 286.216 390.598 286.636 L 346.157 305.682 L 326.998 350.39 C 326.586 351.364 325.619 351.985 324.562 351.953 C 323.506 351.921 322.578 351.243 322.226 350.247 L 288.823 257.237 C 288.163 255.397 288.609 253.342 289.971 251.94 C 291.334 250.539 293.375 250.035 295.233 250.642 L 295.233 250.642 Z M 346.72 156.24 C 362.4 156.244 375.375 168.438 376.351 184.088 C 377.327 199.738 365.967 213.449 350.408 215.401 C 334.85 217.353 320.456 206.872 317.536 191.465 C 278.386 195.181 245.902 223.319 236.64 261.538 C 249.18 267.502 255.91 281.363 252.842 294.906 C 249.773 308.449 237.726 318.055 223.84 318.032 C 208.938 318.053 196.329 307.026 194.362 292.256 C 192.396 277.485 201.68 263.543 216.068 259.664 C 226.553 210.348 269.336 172.951 321.232 170.678 C 326.595 161.716 336.275 156.232 346.72 156.24 Z M 223.84 277.072 C 219.816 277.072 216.097 279.219 214.085 282.704 C 212.073 286.189 212.073 290.483 214.085 293.968 C 216.097 297.453 219.816 299.6 223.84 299.6 C 230.061 299.6 235.104 294.557 235.104 288.336 C 235.104 282.115 230.061 277.072 223.84 277.072 Z M 346.72 174.672 C 342.696 174.672 338.977 176.819 336.965 180.304 C 334.953 183.789 334.953 188.083 336.965 191.568 C 338.977 195.053 342.696 197.2 346.72 197.2 C 352.941 197.2 357.984 192.157 357.984 185.936 C 357.984 179.715 352.941 174.672 346.72 174.672 L 346.72 174.672 Z";
-	var heart = "M -108.5 -211.5 C -175.5 -211.5 -228.5 -157.5 -228.5 -91.5 C -228.5 43.5 -92.5 78.5 -0.5 211.5 C 87.5 79.5 228.5 38.5 228.5 -91.5 C 228.5 -157.5 174.5 -211.5 108.5 -211.5 C 60.5 -211.5 18.5 -183.5 -0.5 -142.5 C -19.5 -183.5 -60.5 -211.5 -108.5 -211.5 z";
-	var hexagon = "M 50 0 L 150 0 L 200 86.6 L 150 173.2 L 50 173.2 L 0 86.6 Z";
-	var line = "M -150 0 L 150 0";
-	var closedLine = "M -150 0 L 150 0 z";
-	var twoLines = "M -150 -50 L -50 -50 M 50 50 L 150 50";
-	var lines = "M -45.5135 -136.3919 L 46.1892 -136.3919 M -70.2027 -113.4662 L 70.8784 -113.4662 M -94.8919 -90.5405 L 95.5676 -90.5405 M -94.8919 -67.6149 L 95.5676 -67.6149 M 42.6622 -44.6892 L 95.5676 -44.6892 M -94.8919 -44.6892 L -41.9865 -44.6892 M 42.6622 -21.7635 L 95.5676 -21.7635 M -94.8919 -21.7635 L -41.9865 -21.7635 M 42.6622 1.1622 L 95.5676 1.1622 M -94.8919 1.1622 L -41.9865 1.1622 M 42.6622 24.0878 L 95.5676 24.0878 M -94.8919 24.0878 L -41.9865 24.0878 M 42.6622 47.0135 L 95.5676 47.0135 M -94.8919 47.0135 L -41.9865 47.0135 M -94.8919 69.9392 L 95.5676 69.9392 M -94.8919 92.8649 L 95.5676 92.8649 M -70.2027 115.7905 L 70.8784 115.7905 M -45.5135 138.7162 L 46.1892 138.7162";
-	var logo = "M5.83 0L5.83 0Q4.54 0 3.64-0.90Q2.74-1.80 2.74-3.10L2.74-3.10L2.74-53.14Q2.74-54.50 3.60-55.37Q4.46-56.23 5.83-56.23L5.83-56.23L39.17-56.23Q40.54-56.23 41.40-55.40Q42.26-54.58 42.26-53.28L42.26-53.28Q42.26-52.06 41.40-51.23Q40.54-50.40 39.17-50.40L39.17-50.40L8.93-50.40L8.93-31.25L30.89-31.25Q32.26-31.25 33.08-30.38Q33.91-29.52 33.91-28.30L33.91-28.30Q33.91-27.00 33.08-26.17Q32.26-25.34 30.89-25.34L30.89-25.34L8.93-25.34L8.93-3.10Q8.93-1.80 8.03-0.90Q7.13 0 5.83 0ZM68.54 0.36L68.54 0.36Q63.07 0.36 58.75-2.27Q54.43-4.90 51.91-9.43Q49.39-13.97 49.39-19.66L49.39-19.66Q49.39-25.42 52.02-29.95Q54.65-34.49 59.18-37.12Q63.72-39.74 69.41-39.74L69.41-39.74Q75.02-39.74 79.52-37.12Q84.02-34.49 86.65-29.95Q89.28-25.42 89.35-19.66L89.35-19.66L86.90-18.43Q86.90-13.10 84.49-8.86Q82.08-4.61 77.94-2.12Q73.80 0.36 68.54 0.36ZM69.41-5.11L69.41-5.11Q73.44-5.11 76.57-7.02Q79.70-8.93 81.54-12.24Q83.38-15.55 83.38-19.66L83.38-19.66Q83.38-23.83 81.54-27.11Q79.70-30.38 76.57-32.33Q73.44-34.27 69.41-34.27L69.41-34.27Q65.45-34.27 62.24-32.33Q59.04-30.38 57.17-27.11Q55.30-23.83 55.30-19.66L55.30-19.66Q55.30-15.55 57.17-12.24Q59.04-8.93 62.24-7.02Q65.45-5.11 69.41-5.11ZM86.26 0L86.26 0Q84.96 0 84.06-0.83Q83.16-1.66 83.16-3.02L83.16-3.02L83.16-14.90L84.53-21.17L89.35-19.66L89.35-3.02Q89.35-1.66 88.49-0.83Q87.62 0 86.26 0ZM120.02 0.36L120.02 0.36Q114.41 0.36 109.94-2.27Q105.48-4.90 102.85-9.40Q100.22-13.90 100.15-19.51L100.15-19.51L100.15-53.14Q100.15-54.58 100.98-55.40Q101.81-56.23 103.25-56.23L103.25-56.23Q104.62-56.23 105.44-55.40Q106.27-54.58 106.27-53.14L106.27-53.14L106.27-32.54Q108.65-35.78 112.46-37.76Q116.28-39.74 120.96-39.74L120.96-39.74Q126.43-39.74 130.75-37.12Q135.07-34.49 137.56-29.95Q140.04-25.42 140.04-19.73L140.04-19.73Q140.04-13.97 137.41-9.43Q134.78-4.90 130.28-2.27Q125.78 0.36 120.02 0.36ZM120.02-5.11L120.02-5.11Q124.06-5.11 127.26-7.06Q130.46-9.00 132.30-12.28Q134.14-15.55 134.14-19.73L134.14-19.73Q134.14-23.83 132.30-27.14Q130.46-30.46 127.26-32.36Q124.06-34.27 120.02-34.27L120.02-34.27Q116.14-34.27 112.93-32.36Q109.73-30.46 107.93-27.14Q106.13-23.83 106.13-19.73L106.13-19.73Q106.13-15.55 107.93-12.28Q109.73-9.00 112.93-7.06Q116.14-5.11 120.02-5.11ZM156.96-24.41L153.65-24.41Q153.79-28.80 155.92-32.29Q158.04-35.78 161.53-37.80Q165.02-39.82 169.20-39.82L169.20-39.82Q172.87-39.82 174.78-38.74Q176.69-37.66 176.18-35.78L176.18-35.78Q175.97-34.78 175.28-34.34Q174.60-33.91 173.70-33.91Q172.80-33.91 171.65-34.06L171.65-34.06Q167.40-34.56 164.12-33.52Q160.85-32.47 158.90-30.10Q156.96-27.72 156.96-24.41L156.96-24.41ZM154.01 0L154.01 0Q152.57 0 151.78-0.79Q150.98-1.58 150.98-3.02L150.98-3.02L150.98-36.36Q150.98-37.80 151.78-38.59Q152.57-39.38 154.01-39.38L154.01-39.38Q155.45-39.38 156.20-38.59Q156.96-37.80 156.96-36.36L156.96-36.36L156.96-3.02Q156.96-1.58 156.20-0.79Q155.45 0 154.01 0ZM188.71 0L188.71 0Q187.34 0 186.48-0.83Q185.62-1.66 185.62-3.10L185.62-3.10L185.62-36.29Q185.62-37.73 186.48-38.56Q187.34-39.38 188.71-39.38L188.71-39.38Q190.08-39.38 190.91-38.56Q191.74-37.73 191.74-36.29L191.74-36.29L191.74-3.10Q191.74-1.66 190.91-0.83Q190.08 0 188.71 0ZM188.64-46.51L188.64-46.51Q186.91-46.51 185.69-47.77Q184.46-49.03 184.46-50.76L184.46-50.76Q184.46-52.56 185.72-53.71Q186.98-54.86 188.64-54.86L188.64-54.86Q190.30-54.86 191.56-53.71Q192.82-52.56 192.82-50.76L192.82-50.76Q192.82-49.03 191.59-47.77Q190.37-46.51 188.64-46.51ZM223.34 0.36L223.34 0.36Q217.66 0.36 213.19-2.27Q208.73-4.90 206.17-9.43Q203.62-13.97 203.62-19.66L203.62-19.66Q203.62-25.42 206.10-29.95Q208.58-34.49 212.87-37.12Q217.15-39.74 222.77-39.74L222.77-39.74Q227.09-39.74 230.76-38.05Q234.43-36.36 237.24-32.98L237.24-32.98Q238.10-31.97 237.85-30.92Q237.60-29.88 236.52-29.09L236.52-29.09Q235.66-28.51 234.61-28.69Q233.57-28.87 232.70-29.81L232.70-29.81Q228.74-34.27 222.77-34.27L222.77-34.27Q218.81-34.27 215.82-32.40Q212.83-30.53 211.18-27.25Q209.52-23.98 209.52-19.66L209.52-19.66Q209.52-15.48 211.28-12.20Q213.05-8.93 216.18-7.02Q219.31-5.11 223.34-5.11L223.34-5.11Q226.08-5.11 228.28-5.83Q230.47-6.55 232.20-8.06L232.20-8.06Q233.21-8.86 234.22-8.93Q235.22-9.00 236.09-8.35L236.09-8.35Q237.02-7.49 237.17-6.41Q237.31-5.33 236.45-4.46L236.45-4.46Q231.19 0.36 223.34 0.36ZM289.37 0L289.37 0Q287.42 0 286.49-1.94L286.49-1.94L265.25-51.48Q264.38-53.64 265.10-54.94Q265.82-56.23 267.70-56.23L267.70-56.23Q269.71-56.23 270.50-54.29L270.50-54.29L290.02-7.70L288.65-7.70L308.16-54.22Q308.66-55.37 309.35-55.80Q310.03-56.23 311.11-56.23L311.11-56.23Q312.98-56.23 313.63-54.90Q314.28-53.57 313.56-51.84L313.56-51.84L292.10-1.94Q291.67-0.94 290.99-0.47Q290.30 0 289.37 0ZM325.87 0L325.87 0Q324.50 0 323.64-0.83Q322.78-1.66 322.78-3.10L322.78-3.10L322.78-36.29Q322.78-37.73 323.64-38.56Q324.50-39.38 325.87-39.38L325.87-39.38Q327.24-39.38 328.07-38.56Q328.90-37.73 328.90-36.29L328.90-36.29L328.90-3.10Q328.90-1.66 328.07-0.83Q327.24 0 325.87 0ZM325.80-46.51L325.80-46.51Q324.07-46.51 322.85-47.77Q321.62-49.03 321.62-50.76L321.62-50.76Q321.62-52.56 322.88-53.71Q324.14-54.86 325.80-54.86L325.80-54.86Q327.46-54.86 328.72-53.71Q329.98-52.56 329.98-50.76L329.98-50.76Q329.98-49.03 328.75-47.77Q327.53-46.51 325.80-46.51ZM371.74-34.78L346.25-1.73L341.64-4.75L367.70-38.23L371.74-34.78ZM369.86 0L343.87 0Q341.06 0 341.06-2.81L341.06-2.81Q341.06-5.54 343.87-5.54L343.87-5.54L369.86-5.54Q372.67-5.54 372.67-2.81L372.67-2.81Q372.67 0 369.86 0L369.86 0ZM369.50-33.84L343.44-33.84Q340.63-33.84 340.63-36.58L340.63-36.58Q340.63-39.38 343.44-39.38L343.44-39.38L369.50-39.38Q372.24-39.38 372.24-36.58L372.24-36.58Q372.24-33.84 369.50-33.84L369.50-33.84ZM385.99 0L385.99 0Q384.62 0 383.76-0.86Q382.90-1.73 382.90-3.10L382.90-3.10L382.90-53.14Q382.90-54.50 383.76-55.37Q384.62-56.23 385.99-56.23L385.99-56.23L400.39-56.23Q405.72-56.23 409.86-53.89Q414-51.55 416.30-47.41Q418.61-43.27 418.61-37.80L418.61-37.80Q418.61-32.54 416.30-28.48Q414-24.41 409.86-22.07Q405.72-19.73 400.39-19.73L400.39-19.73L389.09-19.73L389.09-3.10Q389.09-1.73 388.22-0.86Q387.36 0 385.99 0ZM389.09-50.40L389.09-25.63L400.39-25.63Q403.92-25.63 406.69-27.18Q409.46-28.73 411.05-31.50Q412.63-34.27 412.63-37.80L412.63-37.80Q412.63-41.54 411.08-44.35Q409.54-47.16 406.73-48.78Q403.92-50.40 400.39-50.40L400.39-50.40L389.09-50.40ZM442.08 0.36L442.08 0.36Q436.61 0.36 432.29-2.27Q427.97-4.90 425.45-9.43Q422.93-13.97 422.93-19.66L422.93-19.66Q422.93-25.42 425.56-29.95Q428.18-34.49 432.72-37.12Q437.26-39.74 442.94-39.74L442.94-39.74Q448.56-39.74 453.06-37.12Q457.56-34.49 460.19-29.95Q462.82-25.42 462.89-19.66L462.89-19.66L460.44-18.43Q460.44-13.10 458.03-8.86Q455.62-4.61 451.48-2.12Q447.34 0.36 442.08 0.36ZM442.94-5.11L442.94-5.11Q446.98-5.11 450.11-7.02Q453.24-8.93 455.08-12.24Q456.91-15.55 456.91-19.66L456.91-19.66Q456.91-23.83 455.08-27.11Q453.24-30.38 450.11-32.33Q446.98-34.27 442.94-34.27L442.94-34.27Q438.98-34.27 435.78-32.33Q432.58-30.38 430.70-27.11Q428.83-23.83 428.83-19.66L428.83-19.66Q428.83-15.55 430.70-12.24Q432.58-8.93 435.78-7.02Q438.98-5.11 442.94-5.11ZM459.79 0L459.79 0Q458.50 0 457.60-0.83Q456.70-1.66 456.70-3.02L456.70-3.02L456.70-14.90L458.06-21.17L462.89-19.66L462.89-3.02Q462.89-1.66 462.02-0.83Q461.16 0 459.79 0ZM490.18 0L488.74 0Q484.99 0 482.04-1.80Q479.09-3.60 477.40-6.77Q475.70-9.94 475.70-13.90L475.70-13.90L475.70-48.89Q475.70-50.18 476.53-51.05Q477.36-51.91 478.73-51.91L478.73-51.91Q480.02-51.91 480.89-51.05Q481.75-50.18 481.75-48.89L481.75-48.89L481.75-13.90Q481.75-10.51 483.73-8.28Q485.71-6.05 488.74-6.05L488.74-6.05L490.90-6.05Q492.05-6.05 492.84-5.18Q493.63-4.32 493.63-3.02L493.63-3.02Q493.63-1.66 492.66-0.83Q491.69 0 490.18 0L490.18 0ZM489.24-32.69L471.46-32.69Q470.23-32.69 469.44-33.44Q468.65-34.20 468.65-35.28L468.65-35.28Q468.65-36.43 469.44-37.19Q470.23-37.94 471.46-37.94L471.46-37.94L489.24-37.94Q490.46-37.94 491.26-37.19Q492.05-36.43 492.05-35.28L492.05-35.28Q492.05-34.20 491.26-33.44Q490.46-32.69 489.24-32.69L489.24-32.69ZM505.73-15.55L505.73-15.55Q504.29-15.55 503.46-16.42Q502.63-17.28 502.63-18.58L502.63-18.58L502.63-53.14Q502.63-54.58 503.46-55.40Q504.29-56.23 505.73-56.23L505.73-56.23Q507.10-56.23 507.92-55.40Q508.75-54.58 508.75-53.14L508.75-53.14L508.75-18.58Q508.75-17.28 507.92-16.42Q507.10-15.55 505.73-15.55ZM536.26 0L536.26 0Q534.89 0 534.02-0.86Q533.16-1.73 533.16-3.02L533.16-3.02L533.16-21.38Q533.16-25.78 531.54-28.55Q529.92-31.32 527.11-32.72Q524.30-34.13 520.70-34.13L520.70-34.13Q517.32-34.13 514.62-32.80Q511.92-31.46 510.34-29.20Q508.75-26.93 508.75-23.98L508.75-23.98L504.58-23.98Q504.72-28.51 506.99-32.08Q509.26-35.64 513.07-37.73Q516.89-39.82 521.57-39.82L521.57-39.82Q526.61-39.82 530.60-37.69Q534.60-35.57 536.94-31.46Q539.28-27.36 539.28-21.38L539.28-21.38L539.28-3.02Q539.28-1.73 538.42-0.86Q537.55 0 536.26 0ZM505.73 0L505.73 0Q504.29 0 503.46-0.83Q502.63-1.66 502.63-3.02L502.63-3.02L502.63-36.29Q502.63-37.73 503.46-38.56Q504.29-39.38 505.73-39.38L505.73-39.38Q507.10-39.38 507.92-38.56Q508.75-37.73 508.75-36.29L508.75-36.29L508.75-3.02Q508.75-1.66 507.92-0.83Q507.10 0 505.73 0Z";
-	var pentagon = "M 100 0 L 190 50 L 160 140 L 40 140 L 10 50 z";
-	var point = "M 100 100 z";
-	var polyline = "M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160";
-	var shapes = "M -61.1077 -171 L 26.7539 -27 L -128.6769 -27 L -61.1077 -171 Z M 218.6769 -97.5 C 218.6769 -61.8777 189.7992 -33 154.1769 -33 C 118.5546 -33 89.6769 -61.8777 89.6769 -97.5 C 89.6769 -133.1223 118.5546 -162 154.1769 -162 C 189.7992 -162 218.6769 -133.1223 218.6769 -97.5 Z M -124.3231 181 L 28.6769 180 L 28.6769 28 L -124.3231 28 L -124.3231 181 Z M 230.6769 180 L 79.6769 177 L 230.6769 27 L 79.6769 28";
-	var spiral = "M 23.5296 117.9696 C 23.5296 117.9696 23.5009 117.9777 23.4892 117.9817 C 15.6793 119.9628 7.2337 121.9278 -1.6511 122.8701 C -13.0515 124.0857 -24.9443 123.6698 -37.0108 121.6325 C -59.034 117.9214 -79.0017 109.0888 -96.3677 95.3959 C -118.0763 78.2732 -133.1613 56.2982 -141.1879 30.0912 L -141.316 29.6723 C -152.0365 -6.3544 -149.1799 -41.6978 -132.8198 -75.3812 C -124.6557 -92.1925 -113.1862 -107.107 -98.7396 -119.7129 C -88.8397 -128.3516 -77.4946 -135.6064 -65.0201 -141.2725 C -43.5422 -151.0406 -19.8783 -155.3314 5.3047 -154.0363 C 21.5845 -153.1997 37.8936 -149.5028 53.7808 -143.0425 C 72.2356 -135.5424 89.0348 -124.513 103.7183 -110.2669 C 113.6378 -100.6403 122.3519 -89.3142 129.6072 -76.6012 C 134.7589 -67.5772 139.2375 -57.3425 143.3001 -45.2946 C 143.4609 -44.8152 143.2077 -44.299 142.7315 -44.1409 C 142.2674 -43.9729 141.743 -44.2393 141.5843 -44.7187 C 137.5578 -56.6503 133.1274 -66.7855 128.034 -75.7005 C 120.863 -88.261 112.2615 -99.4492 102.4585 -108.9593 C 87.9438 -123.041 71.3395 -133.9383 53.1037 -141.3535 C 37.407 -147.7316 21.2935 -151.3866 5.212 -152.2138 C -19.6711 -153.4988 -43.0531 -149.256 -64.2666 -139.6134 C -76.5792 -134.0158 -87.777 -126.8571 -97.5425 -118.3358 C -111.8117 -105.8924 -123.1241 -91.1657 -131.1859 -74.5765 C -147.3456 -41.3109 -150.1692 -6.4165 -139.5835 29.1489 L -139.4572 29.562 C -131.5426 55.4021 -116.6646 77.0717 -95.2528 93.9673 C -78.1327 107.4754 -58.439 116.1734 -36.7204 119.8402 C -24.8212 121.8434 -13.0868 122.2573 -1.851 121.0618 C 6.9038 120.1275 15.2684 118.1866 22.996 116.2236 L 23.2405 116.1372 C 43.0485 110.3968 60.5479 99.4224 75.2957 83.5053 C 88.8459 68.876 98.2552 51.4359 103.2622 31.6837 C 106.5392 18.759 107.6523 5.892 106.5653 -6.5702 C 105.8742 -14.5025 104.6084 -21.7622 102.6976 -28.7491 C 99.2759 -41.2604 94.3753 -52.1489 87.7228 -62.024 C 79.6095 -74.0682 69.5051 -84.1537 57.6767 -92.0078 C 44.552 -100.7247 30.2641 -106.414 15.2136 -108.9243 C 3.0419 -110.9537 -8.0997 -110.9758 -18.8547 -108.991 L -20.1684 -108.7483 C -24.3203 -107.9876 -28.6102 -107.2038 -32.7174 -105.9669 C -62.082 -96.7582 -82.989 -77.2018 -94.8596 -47.837 C -101.3247 -31.8442 -103.1177 -14.7671 -100.1939 2.9224 C -95.7581 29.7438 -82.4005 50.5659 -60.5013 64.8073 C -46.8164 73.7022 -31.3984 78.3857 -14.6679 78.7153 C -5.8255 78.8921 2.7178 77.6805 10.7129 75.1087 C 10.7418 75.0986 10.7764 75.0886 10.8053 75.0806 C 30.1329 68.4501 44.7025 56.5775 54.1224 39.7886 C 63.3588 23.3241 66.2099 5.6435 62.6074 -12.7611 C 58.9184 -31.585 49.2492 -46.27 33.8699 -56.4163 C 23.2162 -63.4458 12.133 -67.0103 -0.0106 -67.3178 C -18.7428 -67.7988 -33.5227 -61.9557 -45.1765 -49.4597 C -56.386 -37.4493 -61.2212 -23.0174 -59.5473 -6.568 C -57.1837 16.6752 -41.9533 32.523 -19.7983 34.7884 C -4.1488 36.3904 7.6748 31.0506 15.3575 18.9163 C 21.8959 8.5888 21.4543 -6.7806 14.3798 -15.35 C 9.0101 -21.8514 3.1473 -24.2513 -4.628 -23.1269 C -8.2418 -22.6071 -11.5279 -20.6861 -13.4178 -17.9959 C -15.1598 -15.5228 -15.7079 -12.5495 -15.0448 -9.1639 C -14.9508 -8.6711 -15.2711 -8.1915 -15.7583 -8.0932 C -16.2474 -8.001 -16.7252 -8.3257 -16.825 -8.817 C -17.5771 -12.6586 -16.9112 -16.1961 -14.901 -19.0502 C -12.729 -22.1384 -8.9916 -24.3373 -4.895 -24.9284 C 3.5759 -26.151 9.9462 -23.5565 15.7675 -16.5061 C 23.3106 -7.3737 23.8145 8.9627 16.8843 19.9064 C 8.8053 32.6645 -3.5954 38.2825 -19.9747 36.6048 C -31.4171 35.434 -41.3393 30.6936 -48.6657 22.8883 C -55.7911 15.3079 -60.1758 5.1778 -61.354 -6.3908 C -63.0826 -23.3899 -58.0838 -38.298 -46.5064 -50.7135 C -34.6413 -63.4269 -18.9882 -69.6324 0.0248 -69.1417 C 12.3418 -68.8239 24.0602 -65.059 34.8552 -57.9391 C 50.6599 -47.5158 60.5921 -32.4274 64.3835 -13.1006 C 68.0745 5.7409 65.1571 23.8427 55.6996 40.6935 C 46.0439 57.9097 31.0972 70.0776 11.2888 76.8467 C 11.2427 76.8607 11.2024 76.8728 11.162 76.8848 C 2.9995 79.5089 -5.6947 80.7245 -14.6956 80.5437 C -31.7639 80.2021 -47.5064 75.4281 -61.4772 66.3404 C -83.8321 51.8056 -97.4555 30.5682 -101.9785 3.2137 C -104.9616 -14.8141 -103.1324 -32.2267 -96.5361 -48.533 C -84.5362 -78.2172 -63.4509 -98.0574 -33.8726 -107.5161 C -33.8378 -107.5267 -33.8165 -107.5396 -33.7761 -107.5518 C -33.6262 -107.5976 -33.4761 -107.6437 -33.3262 -107.6895 L -33.2107 -107.7248 C -33.2107 -107.7248 -33.1878 -107.7319 -33.1703 -107.7371 C -28.998 -108.9876 -24.6908 -109.7767 -20.514 -110.5386 L -19.206 -110.7795 C -8.242 -112.8026 3.1078 -112.7807 15.485 -110.7188 C 30.7868 -108.1707 45.3131 -102.3825 58.6572 -93.529 C 70.6805 -85.5443 80.9597 -75.2886 89.2076 -63.0445 C 95.9707 -52.9992 100.9495 -41.9373 104.4315 -29.2283 C 106.3745 -22.1309 107.6584 -14.7745 108.3616 -6.7247 C 109.4586 5.9437 108.3335 19.0181 105.0022 32.1374 C 99.9188 52.1934 90.3669 69.8927 76.6097 84.751 C 61.6409 100.9133 43.8498 112.0484 23.784 117.8732 L 23.5509 117.9556 C 23.5509 117.9556 23.528 117.9636 23.5163 117.9676 L 23.5296 117.9696 Z";
-	var test = "M -150 50 z M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100";
-	var curve1 = "M 0 -197.5 Q -185 -195.5 -197 1.5 Q -174 176.5 2 176.5 Q 158 164.5 158 -1.5 Q 142 -134.5 0 -147.5 Q -141 -146.5 -148 0.5 Q -128 131.5 0 129.5 Q 106 110.5 110 -0.5 Q 95 -97.5 -2 -103.5 Q -96 -97.5 -102 0 Q -88 81.5 -7 80.5 Q 54 72.5 62 3.5 Q 51 -62.5 -3 -60.5 Q -57 -58.5 -57 -1.5 Q -44 35.5 -10 35.5 C 24 35.5 30 -0.5 17 -10.5 C 4 -20.5 -16 -21.5 -24 -4.5";
-	var curve2 = "M 12.969 12.166 Q 11.3986 62.4165 49.612 61.0162 Q 102.218 62.194 110.4623 0.9512 Q 102.6106 -59.5064 49.612 -59.5064 Q -3.3865 -59.1139 -10.0604 0.5586 Q -45.5891 -53.814 -118.6093 0.3623";
-	var paths = {
-		arc: arc,
-		arch: arch,
-		banana: banana,
-		bubble: bubble,
-		circle: circle,
-		diamond: diamond,
-		favicon: favicon,
-		heart: heart,
-		hexagon: hexagon,
-		line: line,
-		closedLine: closedLine,
-		twoLines: twoLines,
-		lines: lines,
-		logo: logo,
-		pentagon: pentagon,
-		point: point,
-		polyline: polyline,
-		shapes: shapes,
-		spiral: spiral,
-		test: test,
-		curve1: curve1,
-		curve2: curve2
-	};
+	function Demo01() {
+	    const { canvas, currentDemo, setEditor } = React.useContext(PageContext);
+	    const run = React.useCallback(async () => {
+	        if (!canvas)
+	            return;
+	        if (currentDemo !== Instruction._01_INSTALL_AND_START)
+	            return;
+	        // 创建路径对象，该对象继承于fabric.Path，所以也可以直接通过add方法添加进fabric画布
+	        const path = new Path('M 0 100 L 100 0 L 0 -100 L -100 0 Z');
+	        // 创建路径编辑器
+	        const editor = new VizPathEditor();
+	        // 应用增强模块
+	        editor.use(new EditorMoveModule()).use(new EditorZoom()).use(new EditorResize());
+	        // 挂载编辑器
+	        editor.mount(canvas);
+	        // 进入路径编辑 ❗进入路径编辑前未挂载编辑器会抛出错误
+	        editor.enterEditing(path);
+	        // 或者直接通过路径自身方法进入编辑，但是要确保path已经加入编辑器所挂载的画布中
+	        // canvas.add(path);
+	        // path.enterEditing();
+	        // 退出路径编辑
+	        // path.leaveEditing();
+	        setEditor(editor);
+	    }, [currentDemo, canvas, setEditor]);
+	    React.useEffect(() => {
+	        run();
+	    }, [run]);
+	    return (React.createElement("div", null,
+	        React.createElement(Markdown$1, { content: content$8 })));
+	}
 
 	var index_umd = {exports: {}};
 
@@ -17163,102 +17192,54 @@
 	})(index_umd, index_umd.exports);
 	var index_umdExports = index_umd.exports;
 
-	function Demo01() {
-	    const { canvas, currentDemo, setEditor } = React.useContext(PageContext);
-	    const run = React.useCallback(async () => {
-	        if (!canvas)
-	            return;
-	        if (currentDemo !== Instruction._01_INSTALL_AND_START)
-	            return;
-	        const path = new Path(paths.banana);
-	        const vizpath = path.visualize();
-	        // console.log(vizpath.joinSegment(vizpath.segments[0][0], vizpath.segments[0][5]));
-	        const editor = new VizPathEditor();
-	        await editor
-	            .use(new EditorBackground())
-	            .use(new EditorMoveModule())
-	            .use(new EditorZoom())
-	            .use(new EditorResize())
-	            .use(new EditorShortcut([
-	            {
-	                key: 'C',
-	                combinationKeys: ['ctrl'],
-	                onActivate: () => {
-	                    editor.draw(Path.transform(vizpath.getPathData(null), [{ translate: { x: 10, y: 10 } }]));
-	                },
-	            },
-	            {
-	                key: 'A',
-	                combinationKeys: ['ctrl'],
-	                onActivate: () => {
-	                    return editor.focus(...editor.nodes);
-	                },
-	            },
-	            {
-	                key: 'D',
-	                onActivate: () => {
-	                    return editor.set('mode', 'delete');
-	                },
-	                onDeactivate: (e, reset) => {
-	                    reset();
-	                },
-	            },
-	            {
-	                key: 'P',
-	                onActivate: () => {
-	                    return editor.set('mode', 'add');
-	                },
-	                onDeactivate: (e, reset) => {
-	                    reset();
-	                },
-	            },
-	            {
-	                key: 'V',
-	                onActivate: () => {
-	                    return editor.set('mode', 'convert');
-	                },
-	                onDeactivate: (e, reset) => {
-	                    reset();
-	                },
-	            },
-	            {
-	                key: 'O',
-	                combinationKeys: ['ctrl'],
-	                onActivate: () => {
-	                    console.log(vizpath.getPathData(null, { withTransform: true, withTranslate: true }));
-	                },
-	            },
-	            {
-	                key: 'BACKSPACE',
-	                onActivate: () => {
-	                    if (editor.activePoint)
-	                        editor.remove(editor.activePoint);
-	                    else
-	                        editor.remove(...editor.activeNodes);
-	                },
-	            },
-	        ], 
-	        /** verbose */ false))
-	            .use(new EditorTheme(defaultTheme, {
-	            hoverNode: null,
-	            hoverPoint: null,
-	            hoverLine: null,
-	            selectedNodes: [],
-	            selectedPoint: null,
-	            selectedLine: null,
-	        }))
-	            .mount(canvas);
-	        await editor.enterEditing(vizpath);
-	        setEditor(editor);
-	    }, [currentDemo, canvas, setEditor]);
-	    React.useEffect(() => {
-	        run();
-	    }, [run]);
-	    return (React.createElement("div", null,
-	        React.createElement(Markdown$1, { content: content$8 })));
-	}
-
 	var content$7 = "基础使用\n\n第二章";
+
+	var arc = "M 101 94 Q 103 -59 -52 -58 Q -204 -58 -206 93";
+	var arch = "M0.5 53.8667C0.5 24.3763 23.5738 0.5 52 0.5C80.4262 0.5 103.5 24.3763 103.5 53.8667V143.5H0.5V53.8667Z";
+	var banana = "M -105 111 C -105 111 38 114 80 -70 C 82 -81 79 -90 81 -103 L 97 -103 C 97 -103 94 -86 98 -73 C 119 -5 94 169 -106 123 L -105 111 Z M -105 118 C -105 118 83 158 91 -42";
+	var bubble = "M5 -39c-29.8233 0 -54 24.1767 -54 54c0 22.3749 13.6084 41.5716 33 49.7646V93L16.0001 69H50c29.8233 0 54 -24.1767 54 -54S79.8233 -39 50 -39H5z";
+	var circle = "M91 26.5C91 62.1223 62.1223 91 26.5 91S-38 62.1223 -38 26.5S-9.1223 -38 26.5 -38S91 -9.1223 91 26.5z";
+	var diamond = "M 0 100 L 100 0 L 0 -100 L -100 0 Z";
+	var favicon = "M 295.233 250.642 L 390.393 281.854 C 391.402 282.189 392.1 283.112 392.145 284.174 C 392.191 285.236 391.575 286.216 390.598 286.636 L 346.157 305.682 L 326.998 350.39 C 326.586 351.364 325.619 351.985 324.562 351.953 C 323.506 351.921 322.578 351.243 322.226 350.247 L 288.823 257.237 C 288.163 255.397 288.609 253.342 289.971 251.94 C 291.334 250.539 293.375 250.035 295.233 250.642 L 295.233 250.642 Z M 346.72 156.24 C 362.4 156.244 375.375 168.438 376.351 184.088 C 377.327 199.738 365.967 213.449 350.408 215.401 C 334.85 217.353 320.456 206.872 317.536 191.465 C 278.386 195.181 245.902 223.319 236.64 261.538 C 249.18 267.502 255.91 281.363 252.842 294.906 C 249.773 308.449 237.726 318.055 223.84 318.032 C 208.938 318.053 196.329 307.026 194.362 292.256 C 192.396 277.485 201.68 263.543 216.068 259.664 C 226.553 210.348 269.336 172.951 321.232 170.678 C 326.595 161.716 336.275 156.232 346.72 156.24 Z M 223.84 277.072 C 219.816 277.072 216.097 279.219 214.085 282.704 C 212.073 286.189 212.073 290.483 214.085 293.968 C 216.097 297.453 219.816 299.6 223.84 299.6 C 230.061 299.6 235.104 294.557 235.104 288.336 C 235.104 282.115 230.061 277.072 223.84 277.072 Z M 346.72 174.672 C 342.696 174.672 338.977 176.819 336.965 180.304 C 334.953 183.789 334.953 188.083 336.965 191.568 C 338.977 195.053 342.696 197.2 346.72 197.2 C 352.941 197.2 357.984 192.157 357.984 185.936 C 357.984 179.715 352.941 174.672 346.72 174.672 L 346.72 174.672 Z";
+	var heart = "M -108.5 -211.5 C -175.5 -211.5 -228.5 -157.5 -228.5 -91.5 C -228.5 43.5 -92.5 78.5 -0.5 211.5 C 87.5 79.5 228.5 38.5 228.5 -91.5 C 228.5 -157.5 174.5 -211.5 108.5 -211.5 C 60.5 -211.5 18.5 -183.5 -0.5 -142.5 C -19.5 -183.5 -60.5 -211.5 -108.5 -211.5 z";
+	var hexagon = "M 50 0 L 150 0 L 200 86.6 L 150 173.2 L 50 173.2 L 0 86.6 Z";
+	var line = "M -150 0 L 150 0";
+	var closedLine = "M -150 0 L 150 0 z";
+	var twoLines = "M -150 -50 L -50 -50 M 50 50 L 150 50";
+	var lines = "M -45.5135 -136.3919 L 46.1892 -136.3919 M -70.2027 -113.4662 L 70.8784 -113.4662 M -94.8919 -90.5405 L 95.5676 -90.5405 M -94.8919 -67.6149 L 95.5676 -67.6149 M 42.6622 -44.6892 L 95.5676 -44.6892 M -94.8919 -44.6892 L -41.9865 -44.6892 M 42.6622 -21.7635 L 95.5676 -21.7635 M -94.8919 -21.7635 L -41.9865 -21.7635 M 42.6622 1.1622 L 95.5676 1.1622 M -94.8919 1.1622 L -41.9865 1.1622 M 42.6622 24.0878 L 95.5676 24.0878 M -94.8919 24.0878 L -41.9865 24.0878 M 42.6622 47.0135 L 95.5676 47.0135 M -94.8919 47.0135 L -41.9865 47.0135 M -94.8919 69.9392 L 95.5676 69.9392 M -94.8919 92.8649 L 95.5676 92.8649 M -70.2027 115.7905 L 70.8784 115.7905 M -45.5135 138.7162 L 46.1892 138.7162";
+	var logo = "M5.83 0L5.83 0Q4.54 0 3.64-0.90Q2.74-1.80 2.74-3.10L2.74-3.10L2.74-53.14Q2.74-54.50 3.60-55.37Q4.46-56.23 5.83-56.23L5.83-56.23L39.17-56.23Q40.54-56.23 41.40-55.40Q42.26-54.58 42.26-53.28L42.26-53.28Q42.26-52.06 41.40-51.23Q40.54-50.40 39.17-50.40L39.17-50.40L8.93-50.40L8.93-31.25L30.89-31.25Q32.26-31.25 33.08-30.38Q33.91-29.52 33.91-28.30L33.91-28.30Q33.91-27.00 33.08-26.17Q32.26-25.34 30.89-25.34L30.89-25.34L8.93-25.34L8.93-3.10Q8.93-1.80 8.03-0.90Q7.13 0 5.83 0ZM68.54 0.36L68.54 0.36Q63.07 0.36 58.75-2.27Q54.43-4.90 51.91-9.43Q49.39-13.97 49.39-19.66L49.39-19.66Q49.39-25.42 52.02-29.95Q54.65-34.49 59.18-37.12Q63.72-39.74 69.41-39.74L69.41-39.74Q75.02-39.74 79.52-37.12Q84.02-34.49 86.65-29.95Q89.28-25.42 89.35-19.66L89.35-19.66L86.90-18.43Q86.90-13.10 84.49-8.86Q82.08-4.61 77.94-2.12Q73.80 0.36 68.54 0.36ZM69.41-5.11L69.41-5.11Q73.44-5.11 76.57-7.02Q79.70-8.93 81.54-12.24Q83.38-15.55 83.38-19.66L83.38-19.66Q83.38-23.83 81.54-27.11Q79.70-30.38 76.57-32.33Q73.44-34.27 69.41-34.27L69.41-34.27Q65.45-34.27 62.24-32.33Q59.04-30.38 57.17-27.11Q55.30-23.83 55.30-19.66L55.30-19.66Q55.30-15.55 57.17-12.24Q59.04-8.93 62.24-7.02Q65.45-5.11 69.41-5.11ZM86.26 0L86.26 0Q84.96 0 84.06-0.83Q83.16-1.66 83.16-3.02L83.16-3.02L83.16-14.90L84.53-21.17L89.35-19.66L89.35-3.02Q89.35-1.66 88.49-0.83Q87.62 0 86.26 0ZM120.02 0.36L120.02 0.36Q114.41 0.36 109.94-2.27Q105.48-4.90 102.85-9.40Q100.22-13.90 100.15-19.51L100.15-19.51L100.15-53.14Q100.15-54.58 100.98-55.40Q101.81-56.23 103.25-56.23L103.25-56.23Q104.62-56.23 105.44-55.40Q106.27-54.58 106.27-53.14L106.27-53.14L106.27-32.54Q108.65-35.78 112.46-37.76Q116.28-39.74 120.96-39.74L120.96-39.74Q126.43-39.74 130.75-37.12Q135.07-34.49 137.56-29.95Q140.04-25.42 140.04-19.73L140.04-19.73Q140.04-13.97 137.41-9.43Q134.78-4.90 130.28-2.27Q125.78 0.36 120.02 0.36ZM120.02-5.11L120.02-5.11Q124.06-5.11 127.26-7.06Q130.46-9.00 132.30-12.28Q134.14-15.55 134.14-19.73L134.14-19.73Q134.14-23.83 132.30-27.14Q130.46-30.46 127.26-32.36Q124.06-34.27 120.02-34.27L120.02-34.27Q116.14-34.27 112.93-32.36Q109.73-30.46 107.93-27.14Q106.13-23.83 106.13-19.73L106.13-19.73Q106.13-15.55 107.93-12.28Q109.73-9.00 112.93-7.06Q116.14-5.11 120.02-5.11ZM156.96-24.41L153.65-24.41Q153.79-28.80 155.92-32.29Q158.04-35.78 161.53-37.80Q165.02-39.82 169.20-39.82L169.20-39.82Q172.87-39.82 174.78-38.74Q176.69-37.66 176.18-35.78L176.18-35.78Q175.97-34.78 175.28-34.34Q174.60-33.91 173.70-33.91Q172.80-33.91 171.65-34.06L171.65-34.06Q167.40-34.56 164.12-33.52Q160.85-32.47 158.90-30.10Q156.96-27.72 156.96-24.41L156.96-24.41ZM154.01 0L154.01 0Q152.57 0 151.78-0.79Q150.98-1.58 150.98-3.02L150.98-3.02L150.98-36.36Q150.98-37.80 151.78-38.59Q152.57-39.38 154.01-39.38L154.01-39.38Q155.45-39.38 156.20-38.59Q156.96-37.80 156.96-36.36L156.96-36.36L156.96-3.02Q156.96-1.58 156.20-0.79Q155.45 0 154.01 0ZM188.71 0L188.71 0Q187.34 0 186.48-0.83Q185.62-1.66 185.62-3.10L185.62-3.10L185.62-36.29Q185.62-37.73 186.48-38.56Q187.34-39.38 188.71-39.38L188.71-39.38Q190.08-39.38 190.91-38.56Q191.74-37.73 191.74-36.29L191.74-36.29L191.74-3.10Q191.74-1.66 190.91-0.83Q190.08 0 188.71 0ZM188.64-46.51L188.64-46.51Q186.91-46.51 185.69-47.77Q184.46-49.03 184.46-50.76L184.46-50.76Q184.46-52.56 185.72-53.71Q186.98-54.86 188.64-54.86L188.64-54.86Q190.30-54.86 191.56-53.71Q192.82-52.56 192.82-50.76L192.82-50.76Q192.82-49.03 191.59-47.77Q190.37-46.51 188.64-46.51ZM223.34 0.36L223.34 0.36Q217.66 0.36 213.19-2.27Q208.73-4.90 206.17-9.43Q203.62-13.97 203.62-19.66L203.62-19.66Q203.62-25.42 206.10-29.95Q208.58-34.49 212.87-37.12Q217.15-39.74 222.77-39.74L222.77-39.74Q227.09-39.74 230.76-38.05Q234.43-36.36 237.24-32.98L237.24-32.98Q238.10-31.97 237.85-30.92Q237.60-29.88 236.52-29.09L236.52-29.09Q235.66-28.51 234.61-28.69Q233.57-28.87 232.70-29.81L232.70-29.81Q228.74-34.27 222.77-34.27L222.77-34.27Q218.81-34.27 215.82-32.40Q212.83-30.53 211.18-27.25Q209.52-23.98 209.52-19.66L209.52-19.66Q209.52-15.48 211.28-12.20Q213.05-8.93 216.18-7.02Q219.31-5.11 223.34-5.11L223.34-5.11Q226.08-5.11 228.28-5.83Q230.47-6.55 232.20-8.06L232.20-8.06Q233.21-8.86 234.22-8.93Q235.22-9.00 236.09-8.35L236.09-8.35Q237.02-7.49 237.17-6.41Q237.31-5.33 236.45-4.46L236.45-4.46Q231.19 0.36 223.34 0.36ZM289.37 0L289.37 0Q287.42 0 286.49-1.94L286.49-1.94L265.25-51.48Q264.38-53.64 265.10-54.94Q265.82-56.23 267.70-56.23L267.70-56.23Q269.71-56.23 270.50-54.29L270.50-54.29L290.02-7.70L288.65-7.70L308.16-54.22Q308.66-55.37 309.35-55.80Q310.03-56.23 311.11-56.23L311.11-56.23Q312.98-56.23 313.63-54.90Q314.28-53.57 313.56-51.84L313.56-51.84L292.10-1.94Q291.67-0.94 290.99-0.47Q290.30 0 289.37 0ZM325.87 0L325.87 0Q324.50 0 323.64-0.83Q322.78-1.66 322.78-3.10L322.78-3.10L322.78-36.29Q322.78-37.73 323.64-38.56Q324.50-39.38 325.87-39.38L325.87-39.38Q327.24-39.38 328.07-38.56Q328.90-37.73 328.90-36.29L328.90-36.29L328.90-3.10Q328.90-1.66 328.07-0.83Q327.24 0 325.87 0ZM325.80-46.51L325.80-46.51Q324.07-46.51 322.85-47.77Q321.62-49.03 321.62-50.76L321.62-50.76Q321.62-52.56 322.88-53.71Q324.14-54.86 325.80-54.86L325.80-54.86Q327.46-54.86 328.72-53.71Q329.98-52.56 329.98-50.76L329.98-50.76Q329.98-49.03 328.75-47.77Q327.53-46.51 325.80-46.51ZM371.74-34.78L346.25-1.73L341.64-4.75L367.70-38.23L371.74-34.78ZM369.86 0L343.87 0Q341.06 0 341.06-2.81L341.06-2.81Q341.06-5.54 343.87-5.54L343.87-5.54L369.86-5.54Q372.67-5.54 372.67-2.81L372.67-2.81Q372.67 0 369.86 0L369.86 0ZM369.50-33.84L343.44-33.84Q340.63-33.84 340.63-36.58L340.63-36.58Q340.63-39.38 343.44-39.38L343.44-39.38L369.50-39.38Q372.24-39.38 372.24-36.58L372.24-36.58Q372.24-33.84 369.50-33.84L369.50-33.84ZM385.99 0L385.99 0Q384.62 0 383.76-0.86Q382.90-1.73 382.90-3.10L382.90-3.10L382.90-53.14Q382.90-54.50 383.76-55.37Q384.62-56.23 385.99-56.23L385.99-56.23L400.39-56.23Q405.72-56.23 409.86-53.89Q414-51.55 416.30-47.41Q418.61-43.27 418.61-37.80L418.61-37.80Q418.61-32.54 416.30-28.48Q414-24.41 409.86-22.07Q405.72-19.73 400.39-19.73L400.39-19.73L389.09-19.73L389.09-3.10Q389.09-1.73 388.22-0.86Q387.36 0 385.99 0ZM389.09-50.40L389.09-25.63L400.39-25.63Q403.92-25.63 406.69-27.18Q409.46-28.73 411.05-31.50Q412.63-34.27 412.63-37.80L412.63-37.80Q412.63-41.54 411.08-44.35Q409.54-47.16 406.73-48.78Q403.92-50.40 400.39-50.40L400.39-50.40L389.09-50.40ZM442.08 0.36L442.08 0.36Q436.61 0.36 432.29-2.27Q427.97-4.90 425.45-9.43Q422.93-13.97 422.93-19.66L422.93-19.66Q422.93-25.42 425.56-29.95Q428.18-34.49 432.72-37.12Q437.26-39.74 442.94-39.74L442.94-39.74Q448.56-39.74 453.06-37.12Q457.56-34.49 460.19-29.95Q462.82-25.42 462.89-19.66L462.89-19.66L460.44-18.43Q460.44-13.10 458.03-8.86Q455.62-4.61 451.48-2.12Q447.34 0.36 442.08 0.36ZM442.94-5.11L442.94-5.11Q446.98-5.11 450.11-7.02Q453.24-8.93 455.08-12.24Q456.91-15.55 456.91-19.66L456.91-19.66Q456.91-23.83 455.08-27.11Q453.24-30.38 450.11-32.33Q446.98-34.27 442.94-34.27L442.94-34.27Q438.98-34.27 435.78-32.33Q432.58-30.38 430.70-27.11Q428.83-23.83 428.83-19.66L428.83-19.66Q428.83-15.55 430.70-12.24Q432.58-8.93 435.78-7.02Q438.98-5.11 442.94-5.11ZM459.79 0L459.79 0Q458.50 0 457.60-0.83Q456.70-1.66 456.70-3.02L456.70-3.02L456.70-14.90L458.06-21.17L462.89-19.66L462.89-3.02Q462.89-1.66 462.02-0.83Q461.16 0 459.79 0ZM490.18 0L488.74 0Q484.99 0 482.04-1.80Q479.09-3.60 477.40-6.77Q475.70-9.94 475.70-13.90L475.70-13.90L475.70-48.89Q475.70-50.18 476.53-51.05Q477.36-51.91 478.73-51.91L478.73-51.91Q480.02-51.91 480.89-51.05Q481.75-50.18 481.75-48.89L481.75-48.89L481.75-13.90Q481.75-10.51 483.73-8.28Q485.71-6.05 488.74-6.05L488.74-6.05L490.90-6.05Q492.05-6.05 492.84-5.18Q493.63-4.32 493.63-3.02L493.63-3.02Q493.63-1.66 492.66-0.83Q491.69 0 490.18 0L490.18 0ZM489.24-32.69L471.46-32.69Q470.23-32.69 469.44-33.44Q468.65-34.20 468.65-35.28L468.65-35.28Q468.65-36.43 469.44-37.19Q470.23-37.94 471.46-37.94L471.46-37.94L489.24-37.94Q490.46-37.94 491.26-37.19Q492.05-36.43 492.05-35.28L492.05-35.28Q492.05-34.20 491.26-33.44Q490.46-32.69 489.24-32.69L489.24-32.69ZM505.73-15.55L505.73-15.55Q504.29-15.55 503.46-16.42Q502.63-17.28 502.63-18.58L502.63-18.58L502.63-53.14Q502.63-54.58 503.46-55.40Q504.29-56.23 505.73-56.23L505.73-56.23Q507.10-56.23 507.92-55.40Q508.75-54.58 508.75-53.14L508.75-53.14L508.75-18.58Q508.75-17.28 507.92-16.42Q507.10-15.55 505.73-15.55ZM536.26 0L536.26 0Q534.89 0 534.02-0.86Q533.16-1.73 533.16-3.02L533.16-3.02L533.16-21.38Q533.16-25.78 531.54-28.55Q529.92-31.32 527.11-32.72Q524.30-34.13 520.70-34.13L520.70-34.13Q517.32-34.13 514.62-32.80Q511.92-31.46 510.34-29.20Q508.75-26.93 508.75-23.98L508.75-23.98L504.58-23.98Q504.72-28.51 506.99-32.08Q509.26-35.64 513.07-37.73Q516.89-39.82 521.57-39.82L521.57-39.82Q526.61-39.82 530.60-37.69Q534.60-35.57 536.94-31.46Q539.28-27.36 539.28-21.38L539.28-21.38L539.28-3.02Q539.28-1.73 538.42-0.86Q537.55 0 536.26 0ZM505.73 0L505.73 0Q504.29 0 503.46-0.83Q502.63-1.66 502.63-3.02L502.63-3.02L502.63-36.29Q502.63-37.73 503.46-38.56Q504.29-39.38 505.73-39.38L505.73-39.38Q507.10-39.38 507.92-38.56Q508.75-37.73 508.75-36.29L508.75-36.29L508.75-3.02Q508.75-1.66 507.92-0.83Q507.10 0 505.73 0Z";
+	var pentagon = "M 100 0 L 190 50 L 160 140 L 40 140 L 10 50 z";
+	var point = "M 100 100 z";
+	var polyline = "M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160";
+	var shapes = "M -61.1077 -171 L 26.7539 -27 L -128.6769 -27 L -61.1077 -171 Z M 218.6769 -97.5 C 218.6769 -61.8777 189.7992 -33 154.1769 -33 C 118.5546 -33 89.6769 -61.8777 89.6769 -97.5 C 89.6769 -133.1223 118.5546 -162 154.1769 -162 C 189.7992 -162 218.6769 -133.1223 218.6769 -97.5 Z M -124.3231 181 L 28.6769 180 L 28.6769 28 L -124.3231 28 L -124.3231 181 Z M 230.6769 180 L 79.6769 177 L 230.6769 27 L 79.6769 28";
+	var spiral = "M 23.5296 117.9696 C 23.5296 117.9696 23.5009 117.9777 23.4892 117.9817 C 15.6793 119.9628 7.2337 121.9278 -1.6511 122.8701 C -13.0515 124.0857 -24.9443 123.6698 -37.0108 121.6325 C -59.034 117.9214 -79.0017 109.0888 -96.3677 95.3959 C -118.0763 78.2732 -133.1613 56.2982 -141.1879 30.0912 L -141.316 29.6723 C -152.0365 -6.3544 -149.1799 -41.6978 -132.8198 -75.3812 C -124.6557 -92.1925 -113.1862 -107.107 -98.7396 -119.7129 C -88.8397 -128.3516 -77.4946 -135.6064 -65.0201 -141.2725 C -43.5422 -151.0406 -19.8783 -155.3314 5.3047 -154.0363 C 21.5845 -153.1997 37.8936 -149.5028 53.7808 -143.0425 C 72.2356 -135.5424 89.0348 -124.513 103.7183 -110.2669 C 113.6378 -100.6403 122.3519 -89.3142 129.6072 -76.6012 C 134.7589 -67.5772 139.2375 -57.3425 143.3001 -45.2946 C 143.4609 -44.8152 143.2077 -44.299 142.7315 -44.1409 C 142.2674 -43.9729 141.743 -44.2393 141.5843 -44.7187 C 137.5578 -56.6503 133.1274 -66.7855 128.034 -75.7005 C 120.863 -88.261 112.2615 -99.4492 102.4585 -108.9593 C 87.9438 -123.041 71.3395 -133.9383 53.1037 -141.3535 C 37.407 -147.7316 21.2935 -151.3866 5.212 -152.2138 C -19.6711 -153.4988 -43.0531 -149.256 -64.2666 -139.6134 C -76.5792 -134.0158 -87.777 -126.8571 -97.5425 -118.3358 C -111.8117 -105.8924 -123.1241 -91.1657 -131.1859 -74.5765 C -147.3456 -41.3109 -150.1692 -6.4165 -139.5835 29.1489 L -139.4572 29.562 C -131.5426 55.4021 -116.6646 77.0717 -95.2528 93.9673 C -78.1327 107.4754 -58.439 116.1734 -36.7204 119.8402 C -24.8212 121.8434 -13.0868 122.2573 -1.851 121.0618 C 6.9038 120.1275 15.2684 118.1866 22.996 116.2236 L 23.2405 116.1372 C 43.0485 110.3968 60.5479 99.4224 75.2957 83.5053 C 88.8459 68.876 98.2552 51.4359 103.2622 31.6837 C 106.5392 18.759 107.6523 5.892 106.5653 -6.5702 C 105.8742 -14.5025 104.6084 -21.7622 102.6976 -28.7491 C 99.2759 -41.2604 94.3753 -52.1489 87.7228 -62.024 C 79.6095 -74.0682 69.5051 -84.1537 57.6767 -92.0078 C 44.552 -100.7247 30.2641 -106.414 15.2136 -108.9243 C 3.0419 -110.9537 -8.0997 -110.9758 -18.8547 -108.991 L -20.1684 -108.7483 C -24.3203 -107.9876 -28.6102 -107.2038 -32.7174 -105.9669 C -62.082 -96.7582 -82.989 -77.2018 -94.8596 -47.837 C -101.3247 -31.8442 -103.1177 -14.7671 -100.1939 2.9224 C -95.7581 29.7438 -82.4005 50.5659 -60.5013 64.8073 C -46.8164 73.7022 -31.3984 78.3857 -14.6679 78.7153 C -5.8255 78.8921 2.7178 77.6805 10.7129 75.1087 C 10.7418 75.0986 10.7764 75.0886 10.8053 75.0806 C 30.1329 68.4501 44.7025 56.5775 54.1224 39.7886 C 63.3588 23.3241 66.2099 5.6435 62.6074 -12.7611 C 58.9184 -31.585 49.2492 -46.27 33.8699 -56.4163 C 23.2162 -63.4458 12.133 -67.0103 -0.0106 -67.3178 C -18.7428 -67.7988 -33.5227 -61.9557 -45.1765 -49.4597 C -56.386 -37.4493 -61.2212 -23.0174 -59.5473 -6.568 C -57.1837 16.6752 -41.9533 32.523 -19.7983 34.7884 C -4.1488 36.3904 7.6748 31.0506 15.3575 18.9163 C 21.8959 8.5888 21.4543 -6.7806 14.3798 -15.35 C 9.0101 -21.8514 3.1473 -24.2513 -4.628 -23.1269 C -8.2418 -22.6071 -11.5279 -20.6861 -13.4178 -17.9959 C -15.1598 -15.5228 -15.7079 -12.5495 -15.0448 -9.1639 C -14.9508 -8.6711 -15.2711 -8.1915 -15.7583 -8.0932 C -16.2474 -8.001 -16.7252 -8.3257 -16.825 -8.817 C -17.5771 -12.6586 -16.9112 -16.1961 -14.901 -19.0502 C -12.729 -22.1384 -8.9916 -24.3373 -4.895 -24.9284 C 3.5759 -26.151 9.9462 -23.5565 15.7675 -16.5061 C 23.3106 -7.3737 23.8145 8.9627 16.8843 19.9064 C 8.8053 32.6645 -3.5954 38.2825 -19.9747 36.6048 C -31.4171 35.434 -41.3393 30.6936 -48.6657 22.8883 C -55.7911 15.3079 -60.1758 5.1778 -61.354 -6.3908 C -63.0826 -23.3899 -58.0838 -38.298 -46.5064 -50.7135 C -34.6413 -63.4269 -18.9882 -69.6324 0.0248 -69.1417 C 12.3418 -68.8239 24.0602 -65.059 34.8552 -57.9391 C 50.6599 -47.5158 60.5921 -32.4274 64.3835 -13.1006 C 68.0745 5.7409 65.1571 23.8427 55.6996 40.6935 C 46.0439 57.9097 31.0972 70.0776 11.2888 76.8467 C 11.2427 76.8607 11.2024 76.8728 11.162 76.8848 C 2.9995 79.5089 -5.6947 80.7245 -14.6956 80.5437 C -31.7639 80.2021 -47.5064 75.4281 -61.4772 66.3404 C -83.8321 51.8056 -97.4555 30.5682 -101.9785 3.2137 C -104.9616 -14.8141 -103.1324 -32.2267 -96.5361 -48.533 C -84.5362 -78.2172 -63.4509 -98.0574 -33.8726 -107.5161 C -33.8378 -107.5267 -33.8165 -107.5396 -33.7761 -107.5518 C -33.6262 -107.5976 -33.4761 -107.6437 -33.3262 -107.6895 L -33.2107 -107.7248 C -33.2107 -107.7248 -33.1878 -107.7319 -33.1703 -107.7371 C -28.998 -108.9876 -24.6908 -109.7767 -20.514 -110.5386 L -19.206 -110.7795 C -8.242 -112.8026 3.1078 -112.7807 15.485 -110.7188 C 30.7868 -108.1707 45.3131 -102.3825 58.6572 -93.529 C 70.6805 -85.5443 80.9597 -75.2886 89.2076 -63.0445 C 95.9707 -52.9992 100.9495 -41.9373 104.4315 -29.2283 C 106.3745 -22.1309 107.6584 -14.7745 108.3616 -6.7247 C 109.4586 5.9437 108.3335 19.0181 105.0022 32.1374 C 99.9188 52.1934 90.3669 69.8927 76.6097 84.751 C 61.6409 100.9133 43.8498 112.0484 23.784 117.8732 L 23.5509 117.9556 C 23.5509 117.9556 23.528 117.9636 23.5163 117.9676 L 23.5296 117.9696 Z";
+	var test = "M -150 50 z M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100";
+	var curve1 = "M 0 -197.5 Q -185 -195.5 -197 1.5 Q -174 176.5 2 176.5 Q 158 164.5 158 -1.5 Q 142 -134.5 0 -147.5 Q -141 -146.5 -148 0.5 Q -128 131.5 0 129.5 Q 106 110.5 110 -0.5 Q 95 -97.5 -2 -103.5 Q -96 -97.5 -102 0 Q -88 81.5 -7 80.5 Q 54 72.5 62 3.5 Q 51 -62.5 -3 -60.5 Q -57 -58.5 -57 -1.5 Q -44 35.5 -10 35.5 C 24 35.5 30 -0.5 17 -10.5 C 4 -20.5 -16 -21.5 -24 -4.5";
+	var curve2 = "M 12.969 12.166 Q 11.3986 62.4165 49.612 61.0162 Q 102.218 62.194 110.4623 0.9512 Q 102.6106 -59.5064 49.612 -59.5064 Q -3.3865 -59.1139 -10.0604 0.5586 Q -45.5891 -53.814 -118.6093 0.3623";
+	var paths = {
+		arc: arc,
+		arch: arch,
+		banana: banana,
+		bubble: bubble,
+		circle: circle,
+		diamond: diamond,
+		favicon: favicon,
+		heart: heart,
+		hexagon: hexagon,
+		line: line,
+		closedLine: closedLine,
+		twoLines: twoLines,
+		lines: lines,
+		logo: logo,
+		pentagon: pentagon,
+		point: point,
+		polyline: polyline,
+		shapes: shapes,
+		spiral: spiral,
+		test: test,
+		curve1: curve1,
+		curve2: curve2
+	};
 
 	function Demo02() {
 	    const { canvas, currentDemo, setEditor } = React.useContext(PageContext);
@@ -17546,6 +17527,96 @@
 	        React.createElement(Markdown$1, { content: content$7 })));
 	}
 
+	var defaultTheme = function defaultTheme(editor, shareState) {
+	  editor.events.on('selected', function (nodes, point) {
+	    var _a, _b;
+	    shareState.selectedNodes = nodes;
+	    shareState.selectedPoint = point;
+	    if (point) {
+	      shareState.selectedLine = (_b = (_a = editor.deformers.find(function (i) {
+	        return i.curveDot === point;
+	      })) === null || _a === void 0 ? void 0 : _a.curveBar) !== null && _b !== void 0 ? _b : null;
+	    }
+	  });
+	  editor.events.on('deselected', function () {
+	    shareState.selectedNodes = [];
+	    shareState.selectedPoint = null;
+	    shareState.selectedLine = null;
+	  });
+	  return {
+	    path: function path(decorator, pathObject) {
+	      pathObject.set({
+	        stroke: '#333',
+	        strokeWidth: 4,
+	        fill: 'transparent',
+	        strokeUniform: true
+	      });
+	    },
+	    node: function node(decorator) {
+	      var object = new fabric.fabric.Circle({
+	        strokeWidth: 4,
+	        radius: 6,
+	        fill: '#ffffff',
+	        stroke: '#4b4b4b'
+	      });
+	      object.on('mouseover', function () {
+	        shareState.hoverNode = object;
+	      });
+	      object.on('mouseout', function () {
+	        shareState.hoverNode = null;
+	      });
+	      object.on('removed', function () {
+	        if (shareState.hoverNode === object) shareState.hoverNode = null;
+	      });
+	      return decorator(object, function () {
+	        var _a;
+	        object.set({
+	          fill: ((_a = shareState.selectedNodes) === null || _a === void 0 ? void 0 : _a.includes(object)) ? '#29ca6e' : shareState.hoverNode === object ? '#7ef4ad' : '#ffffff'
+	        });
+	      });
+	    },
+	    dot: function dot(decorator) {
+	      var circle = new fabric.fabric.Circle({
+	        radius: 4,
+	        fill: '#bebebe',
+	        stroke: '#bebebe',
+	        strokeWidth: 2
+	      });
+	      circle.on('mouseover', function () {
+	        var _a, _b, _c;
+	        shareState.hoverPoint = circle;
+	        shareState.hoverLine = (_b = (_a = editor.deformers.find(function (i) {
+	          return i.curveDot === circle;
+	        })) === null || _a === void 0 ? void 0 : _a.curveBar) !== null && _b !== void 0 ? _b : null;
+	        (_c = circle.canvas) === null || _c === void 0 ? void 0 : _c.requestRenderAll();
+	      });
+	      circle.on('mouseout', function () {
+	        var _a;
+	        shareState.hoverPoint = null;
+	        shareState.hoverLine = null;
+	        (_a = circle.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
+	      });
+	      return decorator(circle, function () {
+	        circle.set({
+	          stroke: shareState.selectedPoint === circle ? '#333' : '#bebebe'
+	        });
+	      });
+	    },
+	    line: function line(decorator) {
+	      var line = new fabric.fabric.Line([0, 0, 0, 0], {
+	        stroke: '#bebebe',
+	        strokeWidth: 1,
+	        strokeDashArray: [4, 3]
+	      });
+	      return decorator(line, function () {
+	        line.set({
+	          stroke: shareState.selectedLine === line ? '#333' : '#bebebe'
+	        });
+	      });
+	    }
+	  };
+	};
+
 	var content$6 = "#### 变换路径 Transform";
 
 	function Demo03() {
@@ -17555,9 +17626,87 @@
 	            return;
 	        if (currentDemo !== Instruction._03_TRANSFORM_PATH)
 	            return;
-	        const path = new Path();
+	        const path = new Path(paths.line);
 	        const vizpath = path.visualize();
-	        console.log(vizpath);
+	        const editor = new VizPathEditor();
+	        await editor
+	            .use(new EditorBackground())
+	            .use(new EditorMoveModule())
+	            .use(new EditorZoom())
+	            .use(new EditorResize())
+	            .use(new EditorShortcut([
+	            {
+	                key: 'C',
+	                combinationKeys: ['ctrl'],
+	                onActivate: () => {
+	                    editor.draw(Path.transform(vizpath.getPathData(null), [{ translate: { x: 10, y: 10 } }]));
+	                },
+	            },
+	            {
+	                key: 'A',
+	                combinationKeys: ['ctrl'],
+	                onActivate: () => {
+	                    return editor.focus(...editor.nodes);
+	                },
+	            },
+	            {
+	                key: 'D',
+	                onActivate: () => {
+	                    return editor.set('mode', 'delete');
+	                },
+	                onDeactivate: (e, reset) => {
+	                    reset();
+	                },
+	            },
+	            {
+	                key: 'P',
+	                onActivate: () => {
+	                    return editor.set('mode', 'add');
+	                },
+	                onDeactivate: (e, reset) => {
+	                    reset();
+	                },
+	            },
+	            {
+	                key: 'V',
+	                onActivate: () => {
+	                    return editor.set('mode', 'convert');
+	                },
+	                onDeactivate: (e, reset) => {
+	                    reset();
+	                },
+	            },
+	            {
+	                key: 'O',
+	                combinationKeys: ['ctrl'],
+	                onActivate: () => {
+	                    console.log(vizpath.getPathData(null, { withTransform: true, withTranslate: true }));
+	                },
+	            },
+	            {
+	                key: 'BACKSPACE',
+	                onActivate: () => {
+	                    if (editor.activePoint)
+	                        editor.remove(editor.activePoint);
+	                    else
+	                        editor.remove(...editor.activeNodes);
+	                },
+	            },
+	        ], 
+	        /** verbose */ false))
+	            .use(new EditorTheme(defaultTheme, {
+	            hoverNode: null,
+	            hoverPoint: null,
+	            hoverLine: null,
+	            selectedNodes: [],
+	            selectedPoint: null,
+	            selectedLine: null,
+	        }))
+	            .use(new EditorTrack())
+	            .mount(canvas);
+	        editor.enterEditing(path);
+	        await index_umdExports.wait(3000);
+	        setEditor(editor);
 	    }, [currentDemo, canvas, setEditor]);
 	    React.useEffect(() => {
 	        run();
@@ -17751,7 +17900,7 @@
 	    const [view, setView] = React.useState('only-demo');
 	    const [canvas, setCanvas] = React.useState();
 	    const [editor, setEditor] = React.useState();
-	    const [currentDemo, setCurrentDemo] = React.useState(Instruction._01_INSTALL_AND_START);
+	    const [currentDemo, setCurrentDemo] = React.useState(Instruction._03_TRANSFORM_PATH);
 	    const initial = React.useCallback(async () => {
 	        if (!_canvasEl.current)
 	            return;

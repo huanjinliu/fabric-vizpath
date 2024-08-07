@@ -9,42 +9,54 @@ import terser from '@rollup/plugin-terser';
 import serve from 'rollup-plugin-serve';
 import livereload from 'rollup-plugin-livereload';
 import clean from 'rollup-plugin-clear';
+import cleanup from 'rollup-plugin-cleanup';
 import replace from '@rollup/plugin-replace';
 import postcss from 'rollup-plugin-postcss';
+import { visualizer } from 'rollup-plugin-visualizer';
 import postcssLess from 'postcss-less';
 
-const build_umd = () => ({
-  input: 'src/index.ts',
-  output: [
-    {
-      file: 'dist/index.js',
-      format: 'umd',
-      sourcemap: true,
-      name: 'FabricVizPath',
-      globals: {
-        fabric: 'fabric',
+const build_umd = () => {
+  const config = {
+    input: 'src/index.ts',
+    output: [
+      {
+        file: 'dist/index.min.js',
+        format: 'umd',
+        sourcemap: true,
+        name: 'FabricVizPath',
+        globals: {
+          fabric: 'fabric',
+        },
       },
+    ],
+    external: ['fabric'],
+    plugins: [
+      clean({ targets: ['dist'] }),
+      resolve(),
+      commonjs(),
+      json(),
+      typescript({
+        declaration: false,
+        exclude: ['src/example/**/*'],
+      }),
+      babel({
+        babelHelpers: 'bundled',
+      }),
+      cleanup({
+        comments: 'none',
+      }),
+      terser(),
+    ],
+    onwarn: (warning, warn) => {
+      if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+      warn(warning);
     },
-  ],
-  external: ['fabric'],
-  plugins: [
-    clean({ targets: ['dist'] }),
-    resolve(),
-    commonjs(),
-    json(),
-    typescript({
-      exclude: ['src/example/**/*'],
-    }),
-    babel({
-      babelHelpers: 'bundled',
-    }),
-    terser(),
-  ],
-  onwarn: (warning, warn) => {
-    if (warning.code === 'CIRCULAR_DEPENDENCY') return;
-    warn(warning);
-  },
-});
+  };
+  if (process.env.NODE_ENV === 'production') {
+    config.plugins.push(visualizer());
+  }
+  return config;
+};
 
 const build_es_lib = () => ({
   input: 'src/index.ts',
@@ -60,7 +72,6 @@ const build_es_lib = () => ({
     commonjs(),
     json(),
     typescript({
-      declaration: false,
       exclude: ['src/example/**/*'],
     }),
     babel({
@@ -186,10 +197,10 @@ const build_serve = () => {
 };
 
 const configs = {
-  umd: build_umd(),
+  umd: process.env.NODE_ENV === 'production' ? build_umd() : undefined,
   es_lib: build_es_lib(),
   es_theme: build_es_theme(),
-  serve: process.env.ENV === 'dev' ? build_serve() : undefined,
+  serve: process.env.NODE_ENV === 'development' ? build_serve() : undefined,
 };
 
 export default Object.values(configs).filter(Boolean);

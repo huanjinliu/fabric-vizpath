@@ -241,6 +241,21 @@ export class VizPath {
   }
 
   /**
+   * 转为贝塞尔曲线指令
+   */
+  private _toCurveInstruction(instruction: Instruction, midPoints: Coord[]) {
+    instruction.splice(
+      0,
+      instruction.length - 2,
+      [InstructionType.LINE, InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE][
+        Math.min(2, midPoints.length)
+      ],
+      ...midPoints.slice(0, 2).reduce((list, coord) => [...list, coord.x, coord.y], [] as number[]),
+    );
+    return instruction;
+  }
+
+  /**
    * 修复指令，缺失的坐标统统补0
    */
   private _repairInstruction(instruction: Instruction) {
@@ -914,6 +929,13 @@ export class VizPath {
   }
 
   /**
+   * 判断两点是否可以相连
+   */
+  isLinkableNodes(startNode: PathNode, endNode: PathNode) {
+    return startNode !== endNode && this.isTerminalNode(startNode) && this.isTerminalNode(endNode);
+  }
+
+  /**
    * 遍历路径节点
    */
   forEachNodes(callbackfn: (node: PathNode) => void) {
@@ -1259,18 +1281,18 @@ export class VizPath {
   joinSegment(
     startNode: PathNode,
     endNode: PathNode,
+    curvePoints: Coord[] = [],
   ): {
     action: 'close' | 'join' | 'none';
     node?: PathNode;
   } {
-    if (startNode === endNode || !this.isTerminalNode(startNode) || !this.isTerminalNode(endNode))
-      return { action: 'none' };
+    if (!this.isLinkableNodes(startNode, endNode)) return { action: 'none' };
 
     const startSegmentIndex = this.segments.indexOf(startNode.segment);
     const endSegmentIndex = this.segments.indexOf(endNode.segment);
 
     if (startSegmentIndex === endSegmentIndex) {
-      this.closeSegment(startNode.segment);
+      this.closeSegment(startNode.segment, curvePoints);
       return { action: 'close', node: endNode };
     }
 
@@ -1282,8 +1304,8 @@ export class VizPath {
       if (index === endSegmentIndex && endNode === segment[segment.length - 1]) {
         instructions = reversePath(instructions);
       }
-      if (index === endSegmentIndex && instructions[0][0] === InstructionType.START) {
-        instructions[0][0] = InstructionType.LINE;
+      if (index === endSegmentIndex) {
+        this._toCurveInstruction(instructions[0], curvePoints);
       }
       return instructions;
     });
@@ -1301,7 +1323,7 @@ export class VizPath {
   /**
    * 闭合路径片段
    */
-  closeSegment(segment: PathSegment) {
+  closeSegment(segment: PathSegment, curvePoints: Coord[] = []) {
     // 未闭合的路径做闭合处理
     if (!this.isClosedSegment(segment)) {
       const updateCommands: {
@@ -1318,7 +1340,10 @@ export class VizPath {
         updateCommands.push({
           type: 'add',
           index: segment.length,
-          instruction: [InstructionType.LINE, startNode.x, startNode.y],
+          instruction: this._toCurveInstruction(
+            [InstructionType.LINE, startNode.x, startNode.y],
+            curvePoints,
+          ),
         });
       }
 
@@ -1483,7 +1508,7 @@ export class Path extends fabric.Path {
    * @returns vizpath 可视化路径对象
    */
   visualize() {
-    this.vizpath = new VizPath(this);
+    this.vizpath = this.vizpath ?? new VizPath(this);
     return this.vizpath;
   }
 
@@ -1491,35 +1516,29 @@ export class Path extends fabric.Path {
    * 退出可视化
    */
   exitVisualize() {
-    this.leaveEditting();
+    this.leaveEditing();
     this.vizpath?.destroy();
   }
 
   /**
    * 从所在画布中寻找编辑器并进入编辑态
    */
-  async enterEditting() {
-    if (!this.vizpath) {
-      throw Error(
-        '(VizPath Error) Path object visualization is pending. Complete visualization before continuing.',
-      );
-    }
-
+  enterEditing() {
     const editor: VizPathEditor | undefined = this.canvas?.[VizPathEditor.symbol];
     if (editor) {
-      editor.enterEditing(this.vizpath);
+      editor.enterEditing(this);
       return editor;
     }
 
     throw Error(
-      '(VizPath Error) The VizPath Editor has not been successfully mounted on this canvas!',
+      '(VizPath Error) You must ensure that the path is added to the canvas within the mounted editor prior to any editing operations.',
     );
   }
 
   /**
    * 退出编辑态
    */
-  leaveEditting() {
+  leaveEditing() {
     const editor: VizPathEditor | undefined = this.canvas?.[VizPathEditor.symbol];
     if (editor) {
       editor.leaveEditing();

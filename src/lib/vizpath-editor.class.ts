@@ -3,8 +3,7 @@ import VizPathDOMEvent from './vizpath-dom-event.class';
 import type VizPathModule from './vizpath-module.class';
 import VizPathTheme from './vizpath-theme.class';
 import { fabric } from 'fabric';
-import { InstructionType, type Instruction, type PathNode, type RCoord } from './vizpath.class';
-import type { PathSegment, VizPath } from './vizpath.class';
+import Path, { InstructionType, type VizPath, type PathNode, type RCoord } from './vizpath.class';
 import {
   calcCanvasCoord,
   calcCoordsAngle,
@@ -180,17 +179,6 @@ class VizPathEditor {
   /** 记录原路径对象配置，在退出编辑时重置路径对象配置 */
   private _originPathOptions: fabric.IPathOptions | null = null;
 
-  /** 废弃的画布对象池，可用于复用减少创建消耗 */
-  private _abandonedPool: {
-    nodes: fabric.Object[];
-    points: fabric.Object[];
-    lines: fabric.Line[];
-  } = {
-    nodes: [],
-    points: [],
-    lines: [],
-  };
-
   /* ---------------------------- 其他内部属性 ---------------------------- */
 
   /** 由于focus方法内部也有对元素聚焦失焦的操作，锁定避免循环执行事件监听造成死循环 */
@@ -253,27 +241,23 @@ class VizPathEditor {
   /**
    * 进入路径编辑
    */
-  async enterEditing(vizpath: VizPath) {
-    // 如果未挂载且路径对象未添加到任何画布，抛出错误
-    if (!this.canvas && !vizpath.path.canvas) {
-      throw Error(
-        '(VizPath Error) You must mount the canvas or add a path to fabric.canvas before continuing!',
-      );
+  enterEditing(path: Path) {
+    // 如果编辑器未挂载画布，抛出错误
+    if (!this.canvas) {
+      throw Error('(VizPath Error) You must mount the canvas before editing!');
     }
     // fabric.canvas画布不匹配，抛出错误
-    else if (this.canvas && vizpath.path.canvas && this.canvas !== vizpath.path.canvas) {
+    else if (path.canvas && this.canvas !== path.canvas) {
       throw Error(
         '(VizPath Error) The fabric.canvas editor must be mounted in an identical manner to the canvas where the path was added!',
       );
     }
-    // 如果编辑器未挂载画布则先挂载到路径对象中的画布中
-    else if (!this.canvas) await this.mount(vizpath.path.canvas!);
     // 如果路径对象未加入画布则先加入当前编辑器挂载画布
-    else if (!vizpath.path.canvas) this.canvas.add(vizpath.path);
+    if (!path.canvas) this.canvas.add(path);
 
-    await this.leaveEditing();
+    this.leaveEditing();
 
-    this.vizpath = vizpath;
+    this.vizpath = path.visualize();
 
     // 初始路径对象事件
     // this._initVizpathEvents();
@@ -291,7 +275,7 @@ class VizPathEditor {
   /**
    * 退出路径编辑
    */
-  async leaveEditing() {
+  leaveEditing() {
     if (!this.vizpath) return;
 
     const canvas = this.canvas;
@@ -321,11 +305,6 @@ class VizPathEditor {
     this.dotSymmetricAutoMode = 'none';
     this.currentConvertNodeObject = null;
     this._lockFocus = false;
-    this._abandonedPool = {
-      nodes: [],
-      points: [],
-      lines: [],
-    };
 
     const path = this.vizpath.path;
     delete path[VizPathEditor.symbol];
@@ -438,33 +417,6 @@ class VizPathEditor {
 
     let object = reuseObject ?? this.themes.create('node')(decorator);
     if (!object[VizPathEditor.symbol]) object = decorator(object);
-
-    // 加入画布时添加自动响应
-    // const onAddedNode = () => {
-    //   const position = vizpath.calcAbsolutePosition(node, vizpath.coordNodeMap.get(node)!.path);
-    //   if (object.group) {
-    //     const relativePosition = vizpath.calcRelativeCoord(position, object.group);
-    //     object
-    //       .set({
-    //         left: relativePosition.x,
-    //         top: relativePosition.y,
-    //       })
-    //       .setCoords();
-    //     object.group.addWithUpdate();
-    //   } else {
-    //     object.set(position).setCoords();
-    //   }
-    // };
-
-    // // 移除时结束自动响应
-    // const onRemovedNode = () => {
-    //   object.off('added', onAddedNode);
-    //   object.off('removed', onRemovedNode);
-    //   this._abandonedPool.nodes.push(object);
-    // };
-
-    // object.on('added', onAddedNode);
-    // object.on('removed', onRemovedNode);
 
     return object;
   }
@@ -801,10 +753,8 @@ class VizPathEditor {
 
       // 路径拼接
       if (event.target && event.target[VizPathEditor.symbol]) {
-        if (
-          this.activeNodes.length === 1 &&
-          event.target[VizPathEditor.symbol] === EditorObjectID.NODE
-        ) {
+        const isSingleNodeActived = this.activeNodes.length === 1;
+        if (isSingleNodeActived && event.target[VizPathEditor.symbol] === EditorObjectID.NODE) {
           newNodeObject = this.link(this.activeNodes[0], event.target);
         }
       }
@@ -1008,14 +958,14 @@ class VizPathEditor {
           y: curveDot.y - newCoord.y,
         },
         [
+          { scale: { x: scaleX, y: scaleY } },
+          { rotate: angle },
           {
             translate: {
               x: newCoord.x - oldCoord.x,
               y: newCoord.y - oldCoord.y,
             },
           },
-          { scale: { x: scaleX, y: scaleY } },
-          { rotate: angle },
         ],
       );
       curveDot.set(newCoord.x + relativeDiff.x, newCoord.y + relativeDiff.y);
@@ -1507,9 +1457,12 @@ class VizPathEditor {
 
   /**
    * 节点连线
+   * @param object1 起点
+   * @param object2 终点
+   * @param curvable 连线是否可弯曲的，如是则会根据起点的控制器自动计算
    * @returns 拼接点
    */
-  link(object1: fabric.Object, object2: fabric.Object) {
+  link(object1: fabric.Object, object2: fabric.Object, curvable = true) {
     const vizpath = this.vizpath;
     if (!vizpath) return;
 
@@ -1517,7 +1470,14 @@ class VizPathEditor {
     const endNode = this.objectNodeMap.get(object2);
     if (!startNode || !endNode) return;
 
-    const { action, node } = this.rerender(() => vizpath.joinSegment(startNode, endNode));
+    const curvePoints = curvable
+      ? ([
+          startNode === startNode.segment[0] ? startNode.deformers?.pre : startNode.deformers?.next,
+        ].filter(Boolean) as Coord[])
+      : [];
+    const { action, node } = this.rerender(() =>
+      vizpath.joinSegment(startNode, endNode, curvePoints),
+    );
     if (!node) return;
 
     const object = this.nodeObjectMap.get(node);
@@ -1626,6 +1586,22 @@ class VizPathEditor {
     this.modules.push(module);
 
     return this;
+  }
+
+  /**
+   * 通过模块ID查找模块
+   */
+  findModuleByID<Module extends Constructor>(ID: string) {
+    return this.modules.find((module) => (module.constructor as any).ID === ID) as
+      | InstanceType<Module>
+      | undefined;
+  }
+
+  /**
+   * 查找模块
+   */
+  findModule<Module extends Constructor>(moduleConstructor: Module) {
+    return this.findModuleByID<Module>((moduleConstructor as any).ID);
   }
 
   /**

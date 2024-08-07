@@ -1,21 +1,8 @@
 import React, { useCallback, useContext, useEffect } from 'react';
-import { fabric } from 'fabric';
-import {
-  EditorBackground,
-  EditorMove,
-  EditorResize,
-  EditorZoom,
-  EditorTheme,
-  Path,
-  VizPathEditor,
-  EditorShortcut,
-} from 'fabric-vizpath';
-import defaultTheme from 'fabric-vizpath/dist/themes/default';
+import { EditorMove, EditorResize, EditorZoom, Path, VizPathEditor } from 'fabric-vizpath';
 import { Instruction, PageContext } from '../Page';
 import content from './README.md';
 import { Markdown } from '../_components';
-import paths from '../paths.json';
-import { wait } from 'vivid-wait';
 
 function Demo01() {
   const { canvas, currentDemo, setEditor } = useContext(PageContext);
@@ -24,96 +11,27 @@ function Demo01() {
     if (!canvas) return;
     if (currentDemo !== Instruction._01_INSTALL_AND_START) return;
 
-    const path = new Path(paths.banana);
-    const vizpath = path.visualize();
+    // 创建路径对象，该对象继承于fabric.Path，所以也可以直接通过add方法添加进fabric画布
+    const path = new Path('M 0 100 L 100 0 L 0 -100 L -100 0 Z');
 
-    // console.log(vizpath.joinSegment(vizpath.segments[0][0], vizpath.segments[0][5]));
-
+    // 创建路径编辑器
     const editor = new VizPathEditor();
-    await editor
-      .use(new EditorBackground())
-      .use(new EditorMove())
-      .use(new EditorZoom())
-      .use(new EditorResize())
-      .use(
-        new EditorShortcut(
-          [
-            {
-              key: 'C',
-              combinationKeys: ['ctrl'],
-              onActivate: () => {
-                editor.draw(
-                  Path.transform(vizpath.getPathData(null), [{ translate: { x: 10, y: 10 } }]),
-                );
-              },
-            },
-            {
-              key: 'A',
-              combinationKeys: ['ctrl'],
-              onActivate: () => {
-                return editor.focus(...editor.nodes);
-              },
-            },
-            {
-              key: 'D',
-              onActivate: () => {
-                return editor.set('mode', 'delete');
-              },
-              onDeactivate: (e, reset) => {
-                reset();
-              },
-            },
-            {
-              key: 'P',
-              onActivate: () => {
-                return editor.set('mode', 'add');
-              },
-              onDeactivate: (e, reset) => {
-                reset();
-              },
-            },
-            {
-              key: 'V',
-              onActivate: () => {
-                return editor.set('mode', 'convert');
-              },
-              onDeactivate: (e, reset) => {
-                reset();
-              },
-            },
-            {
-              key: 'O',
-              combinationKeys: ['ctrl'],
-              onActivate: () => {
-                console.log(
-                  vizpath.getPathData(null, { withTransform: true, withTranslate: true }),
-                );
-              },
-            },
-            {
-              key: 'BACKSPACE',
-              onActivate: () => {
-                if (editor.activePoint) editor.remove(editor.activePoint);
-                else editor.remove(...editor.activeNodes);
-              },
-            },
-          ],
-          /** verbose */ false,
-        ),
-      )
-      .use(
-        new EditorTheme(defaultTheme, {
-          hoverNode: null,
-          hoverPoint: null,
-          hoverLine: null,
-          selectedNodes: [],
-          selectedPoint: null,
-          selectedLine: null,
-        }),
-      )
-      .mount(canvas);
 
-    await editor.enterEditing(vizpath);
+    // 应用增强模块
+    editor.use(new EditorMove()).use(new EditorZoom()).use(new EditorResize());
+
+    // 挂载编辑器
+    editor.mount(canvas);
+
+    // 进入路径编辑 ❗进入路径编辑前未挂载编辑器会抛出错误
+    editor.enterEditing(path);
+
+    // 或者直接通过路径自身方法进入编辑，但是要确保path已经加入编辑器所挂载的画布中
+    // canvas.add(path);
+    // path.enterEditing();
+
+    // 退出路径编辑
+    // path.leaveEditing();
 
     setEditor(editor);
   }, [currentDemo, canvas, setEditor]);

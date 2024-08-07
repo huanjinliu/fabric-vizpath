@@ -3,14 +3,15 @@
  * @param canvas 画布对象
  * @param callback 执行回调
  */
-const fabricOnceRender = <T extends fabric.Canvas | fabric.StaticCanvas>(
+const fabricOnceRender = <T extends fabric.Canvas | fabric.StaticCanvas, Q>(
   canvas: T,
-  callback: (canvas: T) => void,
+  callback: (canvas: T) => Q,
 ) => {
   canvas.renderOnAddRemove = false;
-  callback(canvas);
+  const result = callback(canvas);
   canvas.renderOnAddRemove = true;
   canvas.requestRenderAll();
+  return result;
 };
 
 export default fabricOnceRender;
