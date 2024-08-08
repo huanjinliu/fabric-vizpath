@@ -8,6 +8,7 @@ import {
   EditorTheme,
   EditorTrack,
   EditorSplitDot,
+  EditorQuickCurve,
   Path,
   VizPathEditor,
   EditorShortcut,
@@ -26,7 +27,7 @@ function Demo03() {
     if (!canvas) return;
     if (currentDemo !== Instruction._03_TRANSFORM_PATH) return;
 
-    const path = new Path(paths.shapes);
+    const path = new Path(paths.rect);
     const vizpath = path.visualize();
 
     const editor = new VizPathEditor();
@@ -113,9 +114,13 @@ function Demo03() {
       )
       .use(new EditorTrack())
       .use(new EditorSplitDot())
+      .use(new EditorQuickCurve())
       .mount(canvas);
 
     editor.enterEditing(path);
+
+    // editor.focus(editor.nodes[2]);
+    editor.findModule(EditorQuickCurve)?.curve(...editor.nodes);
 
     await wait(3000);
 

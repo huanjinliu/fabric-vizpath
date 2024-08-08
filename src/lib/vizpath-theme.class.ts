@@ -1,4 +1,4 @@
-import type { ThemeDecorator } from '../lib.bak/modules/editor-theme/index.class';
+import type { ThemeDecorator } from './modules/editor-theme/index.class';
 
 class VizPathTheme<
   Theme extends Record<string, (decorator: ThemeDecorator<any>, ...args: any[]) => any>,

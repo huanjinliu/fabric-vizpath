@@ -838,10 +838,10 @@ class VizPathEditor {
       const neighboringNodes = vizpath.getNeighboringNodes(targetNode, true);
 
       // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
-      let convertibleNodes = vizpath.getConvertibleNodes(targetNode);
+      let convertibleNodes = Object.entries(vizpath.getConvertibleNodes(targetNode));
       if (convertibleNodes.length === 0) {
         vizpath.degrade(targetNode, 'both');
-        convertibleNodes = vizpath.getConvertibleNodes(targetNode);
+        convertibleNodes = Object.entries(vizpath.getConvertibleNodes(targetNode));
       }
 
       const position = vizpath.calcRelativeCoord({ left: coord.x, top: coord.y });

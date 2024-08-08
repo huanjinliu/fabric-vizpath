@@ -1,7 +1,7 @@
 import type VizPathEditor from './vizpath-editor.class';
 import VizPathTheme from './vizpath-theme.class';
 import VizPathEvent from './vizpath-event.class';
-import type { ThemeDecorator } from '../lib.bak/modules/editor-theme/index.class';
+import type { ThemeDecorator } from './modules/editor-theme/index.class';
 
 abstract class VizPathModule {
   static ID: string;

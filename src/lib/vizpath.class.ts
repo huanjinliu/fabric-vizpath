@@ -616,8 +616,8 @@ export class VizPath {
   private _initSegmentDeformers(segment: PathSegment) {
     const nodes = segment;
 
-    const isQuadraticCurve = (node: PathNode) =>
-      node.instruction[0] === InstructionType.QUADRATIC_CURCE;
+    // const isQuadraticCurve = (node: PathNode) =>
+    //   node.instruction[0] === InstructionType.QUADRATIC_CURCE;
 
     nodes.forEach((node, index) => {
       // 旧的变换器
@@ -644,6 +644,8 @@ export class VizPath {
           node.instruction[length - 4] = x;
           node.instruction[length - 3] = y;
         });
+        curveDot.set(coord.x, coord.y);
+
         if (this.isCoincideNode(node)) {
           nodes[0].deformers = nodes[0].deformers ?? {};
           nodes[0].deformers.pre = curveDot;
@@ -850,7 +852,7 @@ export class VizPath {
     const { instruction } = node;
     const { pre, next } = this.getNeighboringInstructions(node);
 
-    const convertibleNodes: ['pre' | 'next', PathNode][] = [];
+    const convertibleNodes: Partial<Record<'pre' | 'next', PathNode>> = {};
 
     switch (instruction[0]) {
       case InstructionType.START:
@@ -858,31 +860,31 @@ export class VizPath {
           pre?.instruction[0] === InstructionType.LINE ||
           pre?.instruction[0] === InstructionType.QUADRATIC_CURCE
         ) {
-          convertibleNodes.push(['pre', pre]);
+          convertibleNodes.pre = pre;
         }
         if (
           next?.instruction[0] === InstructionType.LINE ||
           next?.instruction[0] === InstructionType.QUADRATIC_CURCE
         ) {
-          convertibleNodes.push(['next', next]);
+          convertibleNodes.next = next;
         }
         break;
       case InstructionType.LINE:
-        convertibleNodes.push(['pre', node]);
+        convertibleNodes.pre = node;
         if (
           next?.instruction[0] === InstructionType.LINE ||
           next?.instruction[0] === InstructionType.QUADRATIC_CURCE
         ) {
-          convertibleNodes.push(['next', next]);
+          convertibleNodes.next = next;
         }
         break;
       case InstructionType.QUADRATIC_CURCE:
-        convertibleNodes.push(['pre', node]);
+        convertibleNodes.pre = node;
         if (
           next?.instruction[0] === InstructionType.LINE ||
           next?.instruction[0] === InstructionType.QUADRATIC_CURCE
         ) {
-          convertibleNodes.push(['next', next]);
+          convertibleNodes.next = next;
         }
         break;
       case InstructionType.BEZIER_CURVE:
@@ -890,7 +892,7 @@ export class VizPath {
           next?.instruction[0] === InstructionType.LINE ||
           next?.instruction[0] === InstructionType.QUADRATIC_CURCE
         ) {
-          convertibleNodes.push(['next', next]);
+          convertibleNodes.next = next;
         }
         break;
       default:
@@ -1125,7 +1127,12 @@ export class VizPath {
    *
    * 直线先升级到二阶，再从二阶曲线升级到三阶曲线；
    */
-  upgrade(node: PathNode, direction: 'pre' | 'next' | 'both' = 'both', highest = false) {
+  upgrade(
+    node: PathNode,
+    direction: 'pre' | 'next' | 'both' = 'both',
+    highest = false,
+    curveCoords: Coord[] = [],
+  ) {
     const { instruction, node: nodeCoord } = node;
 
     const { pre, next } = this.getNeighboringInstructions(node, true);
@@ -1159,7 +1166,7 @@ export class VizPath {
       if (direction === 'pre') {
         const { pre } = this.getNeighboringInstructions(node);
         const insertIndex = -2;
-        const insertCoord = {
+        const insertCoord = curveCoords.shift() ?? {
           x: (coord.x + pre!.node!.x) / 2,
           y: (coord.y + pre!.node!.y) / 2,
         };
@@ -1169,7 +1176,7 @@ export class VizPath {
 
       if (direction === 'next') {
         const insertIndex = 1;
-        const insertCoord = {
+        const insertCoord = curveCoords.shift() ?? {
           x: (coord.x + nodeCoord!.x) / 2,
           y: (coord.y + nodeCoord!.y) / 2,
         };

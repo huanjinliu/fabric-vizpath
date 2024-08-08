@@ -3294,6 +3294,21 @@
 	};
 
 	/**
+	 * 计算一个点绕另一个点旋转特定角度后的新坐标
+	 */
+	var calcRotateCoord = function calcRotateCoord(p1, p0, angle) {
+	  var radians = angle * Math.PI / 180; // 角度转弧度
+	  var cos = Math.cos(radians);
+	  var sin = Math.sin(radians);
+	  var x = cos * (p1.x - p0.x) - sin * (p1.y - p0.y) + p0.x;
+	  var y = sin * (p1.x - p0.x) + cos * (p1.y - p0.y) + p0.y;
+	  return {
+	    x: x,
+	    y: y
+	  };
+	};
+
+	/**
 	 * 计算两点间的距离
 	 */
 	var calcCoordsDistance = function calcCoordsDistance(a, b) {
@@ -3309,343 +3324,83 @@
 	  return fabric.fabric.util.transformPoint(point, fabric.fabric.util.invertTransform(matrix));
 	};
 
-	/******************************************************************************
-	Copyright (c) Microsoft Corporation.
-
-	Permission to use, copy, modify, and/or distribute this software for any
-	purpose with or without fee is hereby granted.
-
-	THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-	REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-	AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-	INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-	LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-	OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-	PERFORMANCE OF THIS SOFTWARE.
-	***************************************************************************** */
-	/* global Reflect, Promise, SuppressedError, Symbol */
-
-	function __rest$1(s, e) {
-	  var t = {};
-	  for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0) t[p] = s[p];
-	  if (s != null && typeof Object.getOwnPropertySymbols === "function") for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-	    if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i])) t[p[i]] = s[p[i]];
+	/**
+	 * 计算相对位置点
+	 *
+	 * @example
+	 *
+	 * calcRelativeCoord({ x: 0, y: 0 }, { x: 100, y: 0 }, 20) // { x: 20, y: 0 }
+	 */
+	var calcRelativeCoord = function calcRelativeCoord(p0, p1, value) {
+	  var coord = Object.assign({}, p0);
+	  var d = {
+	    x: p1.x - p0.x,
+	    y: p1.y - p0.y
+	  };
+	  if (d.x === 0 && d.y === 0) return coord;
+	  if (d.x === 0) coord.y += value * Math.sign(d.y);else if (d.y === 0) coord.x += value * Math.sign(d.x);else {
+	    var distance = Math.sqrt(Math.pow(d.x, 2) + Math.pow(d.y, 2));
+	    coord.x += d.x * (value / distance);
+	    coord.y += d.y * (value / distance);
 	  }
-	  return t;
-	}
-	typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
-	  var e = new Error(message);
-	  return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+	  return coord;
 	};
 
 	/**
-	 * 加载svg文件并将内部基础形状转化为纯路径
+	 * 计算点对于另一个点的对称点坐标
 	 */
-	var loadSVGToPathFromURL = /*#__PURE__*/function () {
-	  var _ref = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee(url) {
-	    var shapeToPath, storeShapeSourceData, svgPromise, svg;
-	    return _regeneratorRuntime().wrap(function _callee$(_context) {
-	      while (1) switch (_context.prev = _context.next) {
-	        case 0:
-	          /**
-	           * 将svg基本图像转为路径
-	           */
-	          shapeToPath = function shapeToPath(svg) {
-	            var path = new fabric.fabric.Path();
-	            var type = svg.type;
-	            /** 如果是多形状组成,拼接路径 */
-	            if (type === 'group') {
-	              var group = svg;
-	              group.forEachObject(function (child, index) {
-	                var childPath = shapeToPath(child);
-	                group.insertAt(childPath, index, true);
-	              });
-	              return group;
-	            }
-	            /** 转化矩形形状 */
-	            var convertRectPath = function convertRectPath(params) {
-	              var w = params.w,
-	                h = params.h,
-	                x = params.x,
-	                y = params.y;
-	              var _params$rx = params.rx,
-	                rx = _params$rx === void 0 ? 0 : _params$rx,
-	                _params$ry = params.ry,
-	                ry = _params$ry === void 0 ? 0 : _params$ry;
-	              // normalise radius values, just like the original does it (or should do)
-	              if (rx < 0) rx = 0;
-	              if (ry < 0) ry = 0;
-	              rx = rx || ry;
-	              ry = ry || rx;
-	              if (rx > w / 2) rx = w / 2;
-	              if (ry > h / 2) ry = h / 2;
-	              var d = rx && ry ? [['M', rx + x, y], ['h', w - 2 * rx], ['a', rx, ry, 0, 0, 1, rx, ry], ['v', h - 2 * ry], ['a', rx, ry, 0, 0, 1, -rx, ry], ['h', -w + 2 * rx], ['a', rx, ry, 0, 0, 1, -rx, -ry], ['v', -h + 2 * ry], ['a', rx, ry, 0, 0, 1, rx, -ry], ['Z']] : [['M', x, y], ['h', w], ['v', h], ['h', -w], ['v', -h], ['Z']];
-	              return new fabric.fabric.Path(d);
-	            };
-	            /** 转化类椭圆形形状 */
-	            var convertEllipsePath = function convertEllipsePath(_ref2) {
-	              var x = _ref2.x,
-	                y = _ref2.y,
-	                _ref2$rx = _ref2.rx,
-	                rx = _ref2$rx === void 0 ? 0 : _ref2$rx,
-	                _ref2$ry = _ref2.ry,
-	                ry = _ref2$ry === void 0 ? 0 : _ref2$ry;
-	              var d = [['M', x - rx, y], ['A', rx, ry, 0, 0, 0, x + rx, y], ['A', rx, ry, 0, 0, 0, x - rx, y], ['Z']];
-	              return new fabric.fabric.Path(d);
-	            };
-	            /** 转化类多边形形状 */
-	            var convertPolygonPath = function convertPolygonPath(points) {
-	              var d = points.map(function (point) {
-	                return ['L', point.x, point.y];
-	              });
-	              d[0][0] = 'M';
-	              if (type === 'polygon') {
-	                d.push(['Z']);
-	              }
-	              return new fabric.fabric.Path(d);
-	            };
-	            /** 根据fabric元素类型进行转化 */
-	            switch (type) {
-	              case 'rect':
-	                {
-	                  var _a = svg.toJSON();
-	                    _a.type;
-	                    _a.visible;
-	                    var _a$width = _a.width,
-	                    width = _a$width === void 0 ? 0 : _a$width,
-	                    _a$height = _a.height,
-	                    height = _a$height === void 0 ? 0 : _a$height,
-	                    _a$x = _a.x,
-	                    x = _a$x === void 0 ? 0 : _a$x,
-	                    _a$y = _a.y,
-	                    y = _a$y === void 0 ? 0 : _a$y,
-	                    _a$rx = _a.rx,
-	                    rx = _a$rx === void 0 ? 0 : _a$rx,
-	                    _a$ry = _a.ry,
-	                    ry = _a$ry === void 0 ? 0 : _a$ry,
-	                    rest = __rest$1(_a, ["type", "visible", "width", "height", "x", "y", "rx", "ry"]);
-	                  path = convertRectPath({
-	                    w: width,
-	                    h: height,
-	                    x: x,
-	                    y: y,
-	                    rx: rx,
-	                    ry: ry
-	                  });
-	                  path.set(rest);
-	                  break;
-	                }
-	              case 'circle':
-	                {
-	                  var _b = svg;
-	                    _b.type;
-	                    _b.visible;
-	                    var _b$x = _b.x,
-	                    _x2 = _b$x === void 0 ? 0 : _b$x,
-	                    _b$y = _b.y,
-	                    _y = _b$y === void 0 ? 0 : _b$y,
-	                    _b$radius = _b.radius,
-	                    r = _b$radius === void 0 ? 0 : _b$radius,
-	                    _rest = __rest$1(_b, ["type", "visible", "x", "y", "radius"]);
-	                  path = convertEllipsePath({
-	                    x: _x2,
-	                    y: _y,
-	                    rx: r,
-	                    ry: r
-	                  });
-	                  path.set(_rest);
-	                  break;
-	                }
-	              case 'ellipse':
-	                {
-	                  var _c = svg;
-	                    _c.type;
-	                    _c.visible;
-	                    var _c$x = _c.x,
-	                    _x3 = _c$x === void 0 ? 0 : _c$x,
-	                    _c$y = _c.y,
-	                    _y2 = _c$y === void 0 ? 0 : _c$y,
-	                    _c$rx = _c.rx,
-	                    _rx = _c$rx === void 0 ? 0 : _c$rx,
-	                    _c$ry = _c.ry,
-	                    _ry = _c$ry === void 0 ? 0 : _c$ry,
-	                    _rest2 = __rest$1(_c, ["type", "visible", "x", "y", "rx", "ry"]);
-	                  path = convertEllipsePath({
-	                    x: _x3,
-	                    y: _y2,
-	                    rx: _rx,
-	                    ry: _ry
-	                  });
-	                  path.set(_rest2);
-	                  break;
-	                }
-	              case 'line':
-	                {
-	                  var _d = svg;
-	                    _d.type;
-	                    _d.visible;
-	                    var _d$x = _d.x1,
-	                    x1 = _d$x === void 0 ? 0 : _d$x,
-	                    _d$x2 = _d.x2,
-	                    x2 = _d$x2 === void 0 ? 0 : _d$x2,
-	                    _d$y = _d.y1,
-	                    y1 = _d$y === void 0 ? 0 : _d$y,
-	                    _d$y2 = _d.y2,
-	                    y2 = _d$y2 === void 0 ? 0 : _d$y2,
-	                    _rest3 = __rest$1(_d, ["type", "visible", "x1", "x2", "y1", "y2"]);
-	                  path = convertPolygonPath([new fabric.fabric.Point(x1, y1), new fabric.fabric.Point(x2, y2)]);
-	                  path.set(_rest3);
-	                  break;
-	                }
-	              case 'polygon':
-	              case 'polyline':
-	                {
-	                  var _e = svg;
-	                    _e.type;
-	                    _e.visible;
-	                    var _e$points = _e.points,
-	                    points = _e$points === void 0 ? [] : _e$points,
-	                    _rest4 = __rest$1(_e, ["type", "visible", "points"]);
-	                  path = convertPolygonPath(points);
-	                  path.set(_rest4);
-	                  break;
-	                }
-	              case 'path':
-	                {
-	                  path = svg;
-	                  break;
-	                }
-	            }
-	            return path;
-	          };
-	          _context.prev = 1;
-	          /** 保存部分形状的偏移属性值,直接生成的fabric对象不会记录相关信息 */
-	          storeShapeSourceData = function storeShapeSourceData(element, object) {
-	            if (object.type === 'circle' || object.type === 'ellipse') {
-	              object.set({
-	                x: Number(element.getAttribute('cx')),
-	                y: Number(element.getAttribute('cy'))
-	              });
-	            } else if (object.type === 'rect') {
-	              object.set({
-	                x: Number(element.getAttribute('x')),
-	                y: Number(element.getAttribute('y'))
-	              });
-	            }
-	          };
-	          svgPromise = new Promise(function (resolve) {
-	            fabric.fabric.loadSVGFromURL(url, function (objects) {
-	              resolve(fabric.fabric.util.groupSVGElements(objects));
-	            }, storeShapeSourceData);
-	          });
-	          _context.next = 6;
-	          return svgPromise;
-	        case 6:
-	          svg = _context.sent;
-	          return _context.abrupt("return", shapeToPath(svg));
-	        case 10:
-	          _context.prev = 10;
-	          _context.t0 = _context["catch"](1);
-	          console.log(_context.t0);
-	        case 13:
-	        case "end":
-	          return _context.stop();
-	      }
-	    }, _callee, null, [[1, 10]]);
-	  }));
-	  return function loadSVGToPathFromURL(_x) {
-	    return _ref.apply(this, arguments);
-	  };
-	}();
-
-	/**
-	 * 解析fabric.Path对象toJSON返回对象
-	 * @param path fabric.Path对象
-	 */
-	var parsePathJSON = function parsePathJSON(path) {
-	  var data = path.toJSON();
-	  var layoutKeys = ['left', 'top', 'scaleX', 'scaleY', 'angle', 'flipX', 'flipY', 'width', 'height', 'skewX', 'skewY', 'originX', 'originY'];
-	  var styleKeys = ['fill', 'stroke', 'strokeWidth', 'strokeDashArray', 'strokeLineCap', 'strokeDashOffset', 'strokeLineJoin', 'strokeUniform', 'strokeMiterLimit', 'opacity', 'shadow', 'backgroundColor', 'fillRule', 'paintFirst', 'globalCompositeOperation'];
-	  var layout = layoutKeys.reduce(function (styles, key) {
-	    styles[key] = data[key];
-	    return styles;
-	  }, {});
-	  var styles = styleKeys.reduce(function (styles, key) {
-	    styles[key] = data[key];
-	    return styles;
-	  }, {});
+	var calcSymmetricalCoord = function calcSymmetricalCoord(p1, p0) {
 	  return {
-	    path: data.path,
-	    layout: layout,
-	    styles: styles
+	    x: p0.x - (p1.x - p0.x),
+	    y: p0.y - (p1.y - p0.y)
 	  };
 	};
 
 	/**
-	 * 清除路径偏移
-	 * @param path fabric路径对象
+	 * 计算点到线段的垂直线交点坐标
 	 */
-	var clearPathOffset = function clearPathOffset(path) {
-	  var segment = path.path;
-	  segment.forEach(function (item, pathIdx) {
-	    var _item = _toArray(item),
-	      coords = _item.slice(1);
-	    for (var i = 0; i < coords.length; i += 2) {
-	      var _transform = _transform2({
-	          x: segment[pathIdx][i + 1],
-	          y: segment[pathIdx][i + 2]
-	        }, [{
-	          translate: {
-	            x: -path.pathOffset.x,
-	            y: -path.pathOffset.y
-	          }
-	        }]),
-	        x = _transform.x,
-	        y = _transform.y;
-	      segment[pathIdx][i + 1] = x;
-	      segment[pathIdx][i + 2] = y;
-	    }
-	  });
-	  path.pathOffset = new fabric.fabric.Point(0, 0);
-	  return path;
+	var calcPerpendicularIntersection = function calcPerpendicularIntersection(p1, p2, p0) {
+	  if (p1.x === p2.x) return {
+	    x: p1.x,
+	    y: p0.y
+	  };
+	  if (p1.y === p2.y) return {
+	    x: p0.x,
+	    y: p1.y
+	  };
+	  // 计算p1/p2斜率
+	  var slope = (p2.y - p1.y) / (p2.x - p1.x);
+	  // 计算垂直线的斜率
+	  var slopePerpendicular = -1 / slope;
+	  // 通过代入法求交点
+	  // 计算垂直线的方程：y - p0.y = slopePerpendicular * (x - p0.x)
+	  // 计算p1-p2线段方程：y - p1.y = slope * (x - p1.x)
+	  // y = (slopePerpendicular * (x - p0.x) + p0.y) = slope * (x - p1.x) + p1.y
+	  // slopePerpendicular * (x - p0.x) + p0.y = slope * (x - p1.x) + p1.y
+	  // slopePerpendicular * x - slopePerpendicular * p0.x + p0.y = slope * x - slope * p1.x + p1.y
+	  // slopePerpendicular * x - slope * x =  - slope * p1.x + p1.y + slopePerpendicular * p0.x - p0.y
+	  // x = (-slope * p1.x + p1.y + slopePerpendicular * p0.x - p0.y) / (slopePerpendicular - slope)
+	  var x = (-slope * p1.x + p1.y + slopePerpendicular * p0.x - p0.y) / (slopePerpendicular - slope);
+	  var y = slope * (x - p1.x) + p1.y;
+	  return {
+	    x: x,
+	    y: y
+	  };
 	};
 
 	/**
-	 * 反转路径
+	 * 计算点对于某线段中心垂直线的对称点坐标
 	 */
-	var reversePath = function reversePath(path) {
-	  var _path = [];
-	  var isClosedSegment = false;
-	  for (var i = path.length - 1; i >= 0; i--) {
-	    var instruction = path[i];
-	    var preInstruction = path[i - 1];
-	    var preInstructionCoord = preInstruction === null || preInstruction === void 0 ? void 0 : preInstruction.slice(preInstruction.length - 2);
-	    if (i === path.length - 1) {
-	      if (instruction[0] === InstructionType.CLOSE) {
-	        _path.push([InstructionType.START].concat(_toConsumableArray(preInstructionCoord)));
-	      } else {
-	        _path.push([InstructionType.START].concat(_toConsumableArray(instruction.slice(instruction.length - 2))));
-	      }
-	    }
-	    switch (instruction[0]) {
-	      case InstructionType.START:
-	        if (isClosedSegment) _path.push([InstructionType.CLOSE]);
-	        break;
-	      case InstructionType.LINE:
-	        _path.push([InstructionType.LINE].concat(_toConsumableArray(preInstructionCoord)));
-	        break;
-	      case InstructionType.QUADRATIC_CURCE:
-	        _path.push([InstructionType.QUADRATIC_CURCE, instruction[1], instruction[2]].concat(_toConsumableArray(preInstructionCoord)));
-	        break;
-	      case InstructionType.BEZIER_CURVE:
-	        _path.push([InstructionType.BEZIER_CURVE, instruction[3], instruction[4], instruction[1], instruction[2]].concat(_toConsumableArray(preInstructionCoord)));
-	        break;
-	      case InstructionType.CLOSE:
-	        isClosedSegment = true;
-	        break;
-	    }
-	  }
-	  return _path;
+	var calcPerpendicularSymmetricalCoord = function calcPerpendicularSymmetricalCoord(p1, p2, p0) {
+	  var p = calcPerpendicularIntersection(p1, p2, p0);
+	  var sp = {
+	    x: p2.x - (p.x - p1.x),
+	    y: p2.y - (p.y - p1.y)
+	  };
+	  return {
+	    x: sp.x + (p0.x - p.x),
+	    y: sp.y + (p0.y - p.y)
+	  };
 	};
 
 	// math-inlining.
@@ -5565,7 +5320,6 @@
 	    }
 	  }]);
 	}();
-
 	/**s
 	 * 根据路径指令上的一点拆分路径指令
 	 */
@@ -5586,6 +5340,345 @@
 	      next: path[3]
 	    };
 	  }
+	};
+
+	/******************************************************************************
+	Copyright (c) Microsoft Corporation.
+
+	Permission to use, copy, modify, and/or distribute this software for any
+	purpose with or without fee is hereby granted.
+
+	THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+	REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+	AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+	INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+	LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+	OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+	PERFORMANCE OF THIS SOFTWARE.
+	***************************************************************************** */
+	/* global Reflect, Promise, SuppressedError, Symbol */
+
+	function __rest$1(s, e) {
+	  var t = {};
+	  for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0) t[p] = s[p];
+	  if (s != null && typeof Object.getOwnPropertySymbols === "function") for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+	    if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i])) t[p[i]] = s[p[i]];
+	  }
+	  return t;
+	}
+	typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+	  var e = new Error(message);
+	  return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+	};
+
+	/**
+	 * 加载svg文件并将内部基础形状转化为纯路径
+	 */
+	var loadSVGToPathFromURL = /*#__PURE__*/function () {
+	  var _ref = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee(url) {
+	    var shapeToPath, storeShapeSourceData, svgPromise, svg;
+	    return _regeneratorRuntime().wrap(function _callee$(_context) {
+	      while (1) switch (_context.prev = _context.next) {
+	        case 0:
+	          /**
+	           * 将svg基本图像转为路径
+	           */
+	          shapeToPath = function shapeToPath(svg) {
+	            var path = new fabric.fabric.Path();
+	            var type = svg.type;
+	            /** 如果是多形状组成,拼接路径 */
+	            if (type === 'group') {
+	              var group = svg;
+	              group.forEachObject(function (child, index) {
+	                var childPath = shapeToPath(child);
+	                group.insertAt(childPath, index, true);
+	              });
+	              return group;
+	            }
+	            /** 转化矩形形状 */
+	            var convertRectPath = function convertRectPath(params) {
+	              var w = params.w,
+	                h = params.h,
+	                x = params.x,
+	                y = params.y;
+	              var _params$rx = params.rx,
+	                rx = _params$rx === void 0 ? 0 : _params$rx,
+	                _params$ry = params.ry,
+	                ry = _params$ry === void 0 ? 0 : _params$ry;
+	              // normalise radius values, just like the original does it (or should do)
+	              if (rx < 0) rx = 0;
+	              if (ry < 0) ry = 0;
+	              rx = rx || ry;
+	              ry = ry || rx;
+	              if (rx > w / 2) rx = w / 2;
+	              if (ry > h / 2) ry = h / 2;
+	              var d = rx && ry ? [['M', rx + x, y], ['h', w - 2 * rx], ['a', rx, ry, 0, 0, 1, rx, ry], ['v', h - 2 * ry], ['a', rx, ry, 0, 0, 1, -rx, ry], ['h', -w + 2 * rx], ['a', rx, ry, 0, 0, 1, -rx, -ry], ['v', -h + 2 * ry], ['a', rx, ry, 0, 0, 1, rx, -ry], ['Z']] : [['M', x, y], ['h', w], ['v', h], ['h', -w], ['v', -h], ['Z']];
+	              return new fabric.fabric.Path(d);
+	            };
+	            /** 转化类椭圆形形状 */
+	            var convertEllipsePath = function convertEllipsePath(_ref2) {
+	              var x = _ref2.x,
+	                y = _ref2.y,
+	                _ref2$rx = _ref2.rx,
+	                rx = _ref2$rx === void 0 ? 0 : _ref2$rx,
+	                _ref2$ry = _ref2.ry,
+	                ry = _ref2$ry === void 0 ? 0 : _ref2$ry;
+	              var d = [['M', x - rx, y], ['A', rx, ry, 0, 0, 0, x + rx, y], ['A', rx, ry, 0, 0, 0, x - rx, y], ['Z']];
+	              return new fabric.fabric.Path(d);
+	            };
+	            /** 转化类多边形形状 */
+	            var convertPolygonPath = function convertPolygonPath(points) {
+	              var d = points.map(function (point) {
+	                return ['L', point.x, point.y];
+	              });
+	              d[0][0] = 'M';
+	              if (type === 'polygon') {
+	                d.push(['Z']);
+	              }
+	              return new fabric.fabric.Path(d);
+	            };
+	            /** 根据fabric元素类型进行转化 */
+	            switch (type) {
+	              case 'rect':
+	                {
+	                  var _a = svg.toJSON();
+	                    _a.type;
+	                    _a.visible;
+	                    var _a$width = _a.width,
+	                    width = _a$width === void 0 ? 0 : _a$width,
+	                    _a$height = _a.height,
+	                    height = _a$height === void 0 ? 0 : _a$height,
+	                    _a$x = _a.x,
+	                    x = _a$x === void 0 ? 0 : _a$x,
+	                    _a$y = _a.y,
+	                    y = _a$y === void 0 ? 0 : _a$y,
+	                    _a$rx = _a.rx,
+	                    rx = _a$rx === void 0 ? 0 : _a$rx,
+	                    _a$ry = _a.ry,
+	                    ry = _a$ry === void 0 ? 0 : _a$ry,
+	                    rest = __rest$1(_a, ["type", "visible", "width", "height", "x", "y", "rx", "ry"]);
+	                  path = convertRectPath({
+	                    w: width,
+	                    h: height,
+	                    x: x,
+	                    y: y,
+	                    rx: rx,
+	                    ry: ry
+	                  });
+	                  path.set(rest);
+	                  break;
+	                }
+	              case 'circle':
+	                {
+	                  var _b = svg;
+	                    _b.type;
+	                    _b.visible;
+	                    var _b$x = _b.x,
+	                    _x2 = _b$x === void 0 ? 0 : _b$x,
+	                    _b$y = _b.y,
+	                    _y = _b$y === void 0 ? 0 : _b$y,
+	                    _b$radius = _b.radius,
+	                    r = _b$radius === void 0 ? 0 : _b$radius,
+	                    _rest = __rest$1(_b, ["type", "visible", "x", "y", "radius"]);
+	                  path = convertEllipsePath({
+	                    x: _x2,
+	                    y: _y,
+	                    rx: r,
+	                    ry: r
+	                  });
+	                  path.set(_rest);
+	                  break;
+	                }
+	              case 'ellipse':
+	                {
+	                  var _c = svg;
+	                    _c.type;
+	                    _c.visible;
+	                    var _c$x = _c.x,
+	                    _x3 = _c$x === void 0 ? 0 : _c$x,
+	                    _c$y = _c.y,
+	                    _y2 = _c$y === void 0 ? 0 : _c$y,
+	                    _c$rx = _c.rx,
+	                    _rx = _c$rx === void 0 ? 0 : _c$rx,
+	                    _c$ry = _c.ry,
+	                    _ry = _c$ry === void 0 ? 0 : _c$ry,
+	                    _rest2 = __rest$1(_c, ["type", "visible", "x", "y", "rx", "ry"]);
+	                  path = convertEllipsePath({
+	                    x: _x3,
+	                    y: _y2,
+	                    rx: _rx,
+	                    ry: _ry
+	                  });
+	                  path.set(_rest2);
+	                  break;
+	                }
+	              case 'line':
+	                {
+	                  var _d = svg;
+	                    _d.type;
+	                    _d.visible;
+	                    var _d$x = _d.x1,
+	                    x1 = _d$x === void 0 ? 0 : _d$x,
+	                    _d$x2 = _d.x2,
+	                    x2 = _d$x2 === void 0 ? 0 : _d$x2,
+	                    _d$y = _d.y1,
+	                    y1 = _d$y === void 0 ? 0 : _d$y,
+	                    _d$y2 = _d.y2,
+	                    y2 = _d$y2 === void 0 ? 0 : _d$y2,
+	                    _rest3 = __rest$1(_d, ["type", "visible", "x1", "x2", "y1", "y2"]);
+	                  path = convertPolygonPath([new fabric.fabric.Point(x1, y1), new fabric.fabric.Point(x2, y2)]);
+	                  path.set(_rest3);
+	                  break;
+	                }
+	              case 'polygon':
+	              case 'polyline':
+	                {
+	                  var _e = svg;
+	                    _e.type;
+	                    _e.visible;
+	                    var _e$points = _e.points,
+	                    points = _e$points === void 0 ? [] : _e$points,
+	                    _rest4 = __rest$1(_e, ["type", "visible", "points"]);
+	                  path = convertPolygonPath(points);
+	                  path.set(_rest4);
+	                  break;
+	                }
+	              case 'path':
+	                {
+	                  path = svg;
+	                  break;
+	                }
+	            }
+	            return path;
+	          };
+	          _context.prev = 1;
+	          /** 保存部分形状的偏移属性值,直接生成的fabric对象不会记录相关信息 */
+	          storeShapeSourceData = function storeShapeSourceData(element, object) {
+	            if (object.type === 'circle' || object.type === 'ellipse') {
+	              object.set({
+	                x: Number(element.getAttribute('cx')),
+	                y: Number(element.getAttribute('cy'))
+	              });
+	            } else if (object.type === 'rect') {
+	              object.set({
+	                x: Number(element.getAttribute('x')),
+	                y: Number(element.getAttribute('y'))
+	              });
+	            }
+	          };
+	          svgPromise = new Promise(function (resolve) {
+	            fabric.fabric.loadSVGFromURL(url, function (objects) {
+	              resolve(fabric.fabric.util.groupSVGElements(objects));
+	            }, storeShapeSourceData);
+	          });
+	          _context.next = 6;
+	          return svgPromise;
+	        case 6:
+	          svg = _context.sent;
+	          return _context.abrupt("return", shapeToPath(svg));
+	        case 10:
+	          _context.prev = 10;
+	          _context.t0 = _context["catch"](1);
+	          console.log(_context.t0);
+	        case 13:
+	        case "end":
+	          return _context.stop();
+	      }
+	    }, _callee, null, [[1, 10]]);
+	  }));
+	  return function loadSVGToPathFromURL(_x) {
+	    return _ref.apply(this, arguments);
+	  };
+	}();
+
+	/**
+	 * 解析fabric.Path对象toJSON返回对象
+	 * @param path fabric.Path对象
+	 */
+	var parsePathJSON = function parsePathJSON(path) {
+	  var data = path.toJSON();
+	  var layoutKeys = ['left', 'top', 'scaleX', 'scaleY', 'angle', 'flipX', 'flipY', 'width', 'height', 'skewX', 'skewY', 'originX', 'originY'];
+	  var styleKeys = ['fill', 'stroke', 'strokeWidth', 'strokeDashArray', 'strokeLineCap', 'strokeDashOffset', 'strokeLineJoin', 'strokeUniform', 'strokeMiterLimit', 'opacity', 'shadow', 'backgroundColor', 'fillRule', 'paintFirst', 'globalCompositeOperation'];
+	  var layout = layoutKeys.reduce(function (styles, key) {
+	    styles[key] = data[key];
+	    return styles;
+	  }, {});
+	  var styles = styleKeys.reduce(function (styles, key) {
+	    styles[key] = data[key];
+	    return styles;
+	  }, {});
+	  return {
+	    path: data.path,
+	    layout: layout,
+	    styles: styles
+	  };
+	};
+
+	/**
+	 * 清除路径偏移
+	 * @param path fabric路径对象
+	 */
+	var clearPathOffset = function clearPathOffset(path) {
+	  var segment = path.path;
+	  segment.forEach(function (item, pathIdx) {
+	    var _item = _toArray(item),
+	      coords = _item.slice(1);
+	    for (var i = 0; i < coords.length; i += 2) {
+	      var _transform = _transform2({
+	          x: segment[pathIdx][i + 1],
+	          y: segment[pathIdx][i + 2]
+	        }, [{
+	          translate: {
+	            x: -path.pathOffset.x,
+	            y: -path.pathOffset.y
+	          }
+	        }]),
+	        x = _transform.x,
+	        y = _transform.y;
+	      segment[pathIdx][i + 1] = x;
+	      segment[pathIdx][i + 2] = y;
+	    }
+	  });
+	  path.pathOffset = new fabric.fabric.Point(0, 0);
+	  return path;
+	};
+
+	/**
+	 * 反转路径
+	 */
+	var reversePath = function reversePath(path) {
+	  var _path = [];
+	  var isClosedSegment = false;
+	  for (var i = path.length - 1; i >= 0; i--) {
+	    var instruction = path[i];
+	    var preInstruction = path[i - 1];
+	    var preInstructionCoord = preInstruction === null || preInstruction === void 0 ? void 0 : preInstruction.slice(preInstruction.length - 2);
+	    if (i === path.length - 1) {
+	      if (instruction[0] === InstructionType.CLOSE) {
+	        _path.push([InstructionType.START].concat(_toConsumableArray(preInstructionCoord)));
+	      } else {
+	        _path.push([InstructionType.START].concat(_toConsumableArray(instruction.slice(instruction.length - 2))));
+	      }
+	    }
+	    switch (instruction[0]) {
+	      case InstructionType.START:
+	        if (isClosedSegment) _path.push([InstructionType.CLOSE]);
+	        break;
+	      case InstructionType.LINE:
+	        _path.push([InstructionType.LINE].concat(_toConsumableArray(preInstructionCoord)));
+	        break;
+	      case InstructionType.QUADRATIC_CURCE:
+	        _path.push([InstructionType.QUADRATIC_CURCE, instruction[1], instruction[2]].concat(_toConsumableArray(preInstructionCoord)));
+	        break;
+	      case InstructionType.BEZIER_CURVE:
+	        _path.push([InstructionType.BEZIER_CURVE, instruction[3], instruction[4], instruction[1], instruction[2]].concat(_toConsumableArray(preInstructionCoord)));
+	        break;
+	      case InstructionType.CLOSE:
+	        isClosedSegment = true;
+	        break;
+	    }
+	  }
+	  return _path;
 	};
 
 	/** Used to generate unique IDs. */
@@ -6464,10 +6557,10 @@
 	        var targetNode = _this15.objectNodeMap.get(target);
 	        var neighboringNodes = vizpath.getNeighboringNodes(targetNode, true);
 	        // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
-	        var convertibleNodes = vizpath.getConvertibleNodes(targetNode);
+	        var convertibleNodes = Object.entries(vizpath.getConvertibleNodes(targetNode));
 	        if (convertibleNodes.length === 0) {
 	          vizpath.degrade(targetNode, 'both');
-	          convertibleNodes = vizpath.getConvertibleNodes(targetNode);
+	          convertibleNodes = Object.entries(vizpath.getConvertibleNodes(targetNode));
 	        }
 	        var position = vizpath.calcRelativeCoord({
 	          left: coord.x,
@@ -7877,6 +7970,8 @@
 	    value: function _initSegmentDeformers(segment) {
 	      var _this28 = this;
 	      var nodes = segment;
+	      // const isQuadraticCurve = (node: PathNode) =>
+	      //   node.instruction[0] === InstructionType.QUADRATIC_CURCE;
 	      nodes.forEach(function (node, index) {
 	        var _a, _b, _c, _e, _f, _g;
 	        // 旧的变换器
@@ -7901,6 +7996,7 @@
 	            node.instruction[length - 4] = x;
 	            node.instruction[length - 3] = y;
 	          });
+	          curveDot.set(coord.x, coord.y);
 	          if (_this28.isCoincideNode(node)) {
 	            nodes[0].deformers = (_e = nodes[0].deformers) !== null && _e !== void 0 ? _e : {};
 	            nodes[0].deformers.pre = curveDot;
@@ -8108,31 +8204,31 @@
 	      var _this$getNeighboringI = this.getNeighboringInstructions(node),
 	        pre = _this$getNeighboringI.pre,
 	        next = _this$getNeighboringI.next;
-	      var convertibleNodes = [];
+	      var convertibleNodes = {};
 	      switch (instruction[0]) {
 	        case InstructionType.START:
 	          if ((pre === null || pre === void 0 ? void 0 : pre.instruction[0]) === InstructionType.LINE || (pre === null || pre === void 0 ? void 0 : pre.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-	            convertibleNodes.push(['pre', pre]);
+	            convertibleNodes.pre = pre;
 	          }
 	          if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-	            convertibleNodes.push(['next', next]);
+	            convertibleNodes.next = next;
 	          }
 	          break;
 	        case InstructionType.LINE:
-	          convertibleNodes.push(['pre', node]);
+	          convertibleNodes.pre = node;
 	          if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-	            convertibleNodes.push(['next', next]);
+	            convertibleNodes.next = next;
 	          }
 	          break;
 	        case InstructionType.QUADRATIC_CURCE:
-	          convertibleNodes.push(['pre', node]);
+	          convertibleNodes.pre = node;
 	          if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-	            convertibleNodes.push(['next', next]);
+	            convertibleNodes.next = next;
 	          }
 	          break;
 	        case InstructionType.BEZIER_CURVE:
 	          if ((next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.LINE || (next === null || next === void 0 ? void 0 : next.instruction[0]) === InstructionType.QUADRATIC_CURCE) {
-	            convertibleNodes.push(['next', next]);
+	            convertibleNodes.next = next;
 	          }
 	          break;
 	      }
@@ -8360,6 +8456,7 @@
 	      var _this30 = this;
 	      var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
 	      var highest = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+	      var curveCoords = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : [];
 	      var instruction = node.instruction,
 	        nodeCoord = node.node;
 	      var _this$getNeighboringI2 = this.getNeighboringInstructions(node, true),
@@ -8377,6 +8474,7 @@
 	        targets.push(['next', directionNodeMap.next]);
 	      }
 	      var upgrade = function upgrade(node, direction) {
+	        var _a, _b;
 	        var instruction = node.instruction;
 	        if (instruction[0] === InstructionType.BEZIER_CURVE) return;
 	        var coord = _this30.getInstructionCoord(instruction);
@@ -8385,7 +8483,7 @@
 	          var _this30$getNeighborin = _this30.getNeighboringInstructions(node),
 	            _pre = _this30$getNeighborin.pre;
 	          var insertIndex = -2;
-	          var insertCoord = {
+	          var insertCoord = (_a = curveCoords.shift()) !== null && _a !== void 0 ? _a : {
 	            x: (coord.x + _pre.node.x) / 2,
 	            y: (coord.y + _pre.node.y) / 2
 	          };
@@ -8394,7 +8492,7 @@
 	        }
 	        if (direction === 'next') {
 	          var _insertIndex = 1;
-	          var _insertCoord = {
+	          var _insertCoord = (_b = curveCoords.shift()) !== null && _b !== void 0 ? _b : {
 	            x: (coord.x + nodeCoord.x) / 2,
 	            y: (coord.y + nodeCoord.y) / 2
 	          };
@@ -8771,11 +8869,11 @@
 	          pathGroup,
 	          paths,
 	          extract,
-	          _args5 = arguments;
+	          _args6 = arguments;
 	        return _regeneratorRuntime().wrap(function _callee6$(_context6) {
 	          while (1) switch (_context6.prev = _context6.next) {
 	            case 0:
-	              options = _args5.length > 1 && _args5[1] !== undefined ? _args5[1] : {};
+	              options = _args6.length > 1 && _args6[1] !== undefined ? _args6[1] : {};
 	              _context6.next = 3;
 	              return loadSVGToPathFromURL(url);
 	            case 3:
@@ -10601,7 +10699,7 @@
 	    'trailing': trailing
 	  });
 	}
-	var DEFAUlT_OPTIONS$2 = {
+	var DEFAUlT_OPTIONS$3 = {
 	  interval: 60,
 	  autoAdjustView: 'center'
 	};
@@ -10614,7 +10712,7 @@
 	    _this39 = _callSuper(this, EditorResize);
 	    _this39.events = new VizPathEvent();
 	    _this39._parentNode = parentNode;
-	    _this39._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$2), options);
+	    _this39._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$3), options);
 	    return _this39;
 	  }
 	  _inherits(EditorResize, _VizPathModule3);
@@ -10696,7 +10794,7 @@
 	EditorResize.ID = 'editor-resize';
 
 	/** 默认内容区配置 */
-	var DEFAUlT_OPTIONS$1 = {
+	var DEFAUlT_OPTIONS$2 = {
 	  movable: true,
 	  spaceHoverCursor: 'move',
 	  moveCursor: 'move',
@@ -10732,7 +10830,7 @@
 	      canvas.setCursor(outerType);
 	      _this41._currentCursor = type;
 	    };
-	    _this41._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$1), options);
+	    _this41._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$2), options);
 	    return _this41;
 	  }
 	  /** 偏移画布 */
@@ -10896,7 +10994,7 @@
 	  }]);
 	}(VizPathModule);
 	EditorMoveModule.ID = 'editor-move';
-	var DEFAUlT_OPTIONS = {
+	var DEFAUlT_OPTIONS$1 = {
 	  zoomable: true,
 	  zoomCenter: 'mouse',
 	  zoomLimit: [0.5, 5]
@@ -10908,7 +11006,7 @@
 	    _classCallCheck(this, EditorZoom);
 	    _this43 = _callSuper(this, EditorZoom);
 	    _this43.events = new VizPathEvent();
-	    _this43._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS), options);
+	    _this43._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS$1), options);
 	    return _this43;
 	  }
 	  /**
@@ -11564,6 +11662,171 @@
 	  }]);
 	}(VizPathModule);
 	EditorSplitDot.ID = 'editor-split-dot';
+
+	/** 默认内容区配置 */
+	var DEFAUlT_OPTIONS = {
+	  curveDegree: 0.5522
+	};
+	/**
+	 * 编辑器快速曲线模块，实现双击节点可切换所在指令的形状（直线与曲线）
+	 */
+	var EditorQuickCurve = /*#__PURE__*/function (_VizPathModule9) {
+	  function EditorQuickCurve() {
+	    var _this53;
+	    var options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+	    _classCallCheck(this, EditorQuickCurve);
+	    _this53 = _callSuper(this, EditorQuickCurve);
+	    _this53._options = Object.assign(Object.assign({}, DEFAUlT_OPTIONS), options);
+	    return _this53;
+	  }
+	  /**
+	   * 直线化
+	   */
+	  _inherits(EditorQuickCurve, _VizPathModule9);
+	  return _createClass(EditorQuickCurve, [{
+	    key: "straighten",
+	    value: function straighten() {
+	      for (var _len6 = arguments.length, objects = new Array(_len6), _key6 = 0; _key6 < _len6; _key6++) {
+	        objects[_key6] = arguments[_key6];
+	      }
+	      var editor = this.editor;
+	      if (!editor) return;
+	      var vizpath = editor.vizpath;
+	      if (!vizpath) return;
+	      editor.rerender(function () {
+	        objects.forEach(function (object) {
+	          var node = editor.objectNodeMap.get(object);
+	          if (!node) return;
+	          vizpath.degrade(node, 'both', true);
+	        });
+	      });
+	    }
+	    /**
+	     * 曲线化
+	     */
+	  }, {
+	    key: "curve",
+	    value: function curve() {
+	      for (var _len7 = arguments.length, objects = new Array(_len7), _key7 = 0; _key7 < _len7; _key7++) {
+	        objects[_key7] = arguments[_key7];
+	      }
+	      var editor = this.editor;
+	      if (!editor) return;
+	      var vizpath = editor.vizpath;
+	      if (!vizpath) return;
+	      var curveDegree = Math.max(0, this._options.curveDegree);
+	      editor.rerender(function () {
+	        objects.forEach(function (object) {
+	          var _a, _b, _c, _d, _e, _f, _g;
+	          var node = editor.objectNodeMap.get(object);
+	          if (!node) return;
+	          var neighboringNodes = vizpath.getNeighboringNodes(node);
+	          var p0 = node.node;
+	          var p1 = (_a = neighboringNodes.pre) === null || _a === void 0 ? void 0 : _a.node;
+	          var p2 = (_b = neighboringNodes.next) === null || _b === void 0 ? void 0 : _b.node;
+	          // 两边没有节点，意味当前就只有一个路径点，无需生成变换器
+	          if (!p1 && !p2) return;
+	          // 两边都有节点，生成对称的平行变换器
+	          if (p1 && p2) {
+	            var center = {
+	              x: (p1.x + p2.x) / 2,
+	              y: (p1.y + p2.y) / 2
+	            };
+	            var curveP1 = {
+	              x: p0.x - center.x + (p1.x + center.x) * curveDegree,
+	              y: p0.y - center.y + (p1.y + center.y) * curveDegree
+	            };
+	            var _curveP = {
+	              x: p0.x - center.x + (p2.x + center.x) * curveDegree,
+	              y: p0.y - center.y + (p2.y + center.y) * curveDegree
+	            };
+	            vizpath.upgrade(node, 'pre', false, [curveP1]);
+	            vizpath.upgrade(node, 'next', false, [_curveP]);
+	            return;
+	          }
+	          // 没有变换器
+	          if (!node.deformers) {
+	            // 单边节点
+	            var p = p1 !== null && p1 !== void 0 ? p1 : p2;
+	            var _center = {
+	              x: (p.x + p0.x) / 2,
+	              y: (p.y + p0.y) / 2
+	            };
+	            var distance = calcCoordsDistance(p, p0);
+	            var _direction = p1 ? 'pre' : 'next';
+	            var _oppositeDirection = {
+	              next: 'pre',
+	              pre: 'next'
+	            }[_direction];
+	            var neighboringNode = neighboringNodes[_direction];
+	            var preNeighboringNode = vizpath.getNeighboringNodes(neighboringNode)[_direction];
+	            var rCoord = (_g = (_f = (_d = (_c = neighboringNode.deformers) === null || _c === void 0 ? void 0 : _c[_direction]) !== null && _d !== void 0 ? _d : (_e = preNeighboringNode === null || preNeighboringNode === void 0 ? void 0 : preNeighboringNode.deformers) === null || _e === void 0 ? void 0 : _e[_oppositeDirection]) !== null && _f !== void 0 ? _f : preNeighboringNode === null || preNeighboringNode === void 0 ? void 0 : preNeighboringNode.node) !== null && _g !== void 0 ? _g : calcRotateCoord(_center, p, -90);
+	            var angle = (360 - calcCoordsAngle(rCoord, p, p0) - 180) % 360;
+	            var _curveP2 = calcRelativeCoord(p, rCoord, -distance / (2 / curveDegree) * (1 + angle / 90));
+	            var _curveP3 = calcPerpendicularSymmetricalCoord(p0, p, _curveP2);
+	            vizpath.upgrade(node, _direction, true, [_curveP2, _curveP3]);
+	            vizpath.addNodeDeformer(node, _oppositeDirection, calcSymmetricalCoord(_curveP3, p0));
+	            return;
+	          }
+	          // 两边都有变换器无法再升级
+	          if (node.deformers.pre && node.deformers.next) return;
+	          // 只有单边有变换器升级对边变换器
+	          var direction = Object.keys(node.deformers)[0];
+	          var oppositeDirection = {
+	            next: 'pre',
+	            pre: 'next'
+	          }[direction];
+	          var curveP2 = calcSymmetricalCoord(node.deformers[direction], p0);
+	          if (neighboringNodes[oppositeDirection]) {
+	            vizpath.upgrade(node, oppositeDirection, false, [curveP2]);
+	          } else {
+	            vizpath.addNodeDeformer(node, oppositeDirection, curveP2);
+	          }
+	        });
+	      });
+	    }
+	    /**
+	     * 切换所在指令的形状（直线与曲线）
+	     * @param object 路径节点画布对象
+	     *
+	     * @note
+	     * 临近边只要存在曲线时则临近边都变为直线；临近边都为直线时则同时变为曲线边。
+	     */
+	  }, {
+	    key: "trigger",
+	    value: function trigger(object) {
+	      var _a, _b;
+	      if (!this.editor) return;
+	      var vizpath = this.editor.vizpath;
+	      if (!vizpath) return;
+	      var node = this.editor.objectNodeMap.get(object);
+	      if (!node) return;
+	      var _vizpath$getNeighbori6 = vizpath.getNeighboringNodes(node),
+	        pre = _vizpath$getNeighbori6.pre,
+	        next = _vizpath$getNeighbori6.next;
+	      if (node.deformers || ((_a = pre === null || pre === void 0 ? void 0 : pre.deformers) === null || _a === void 0 ? void 0 : _a.next) || ((_b = next === null || next === void 0 ? void 0 : next.deformers) === null || _b === void 0 ? void 0 : _b.pre)) {
+	        this.straighten(object);
+	      } else {
+	        this.curve(object);
+	      }
+	    }
+	  }, {
+	    key: "unload",
+	    value: function unload(editor) {}
+	  }, {
+	    key: "load",
+	    value: function load(editor) {
+	      var _this54 = this;
+	      var _a;
+	      (_a = editor.canvas) === null || _a === void 0 ? void 0 : _a.on('mouse:dblclick', function (event) {
+	        var target = event.target;
+	        if (!target || !editor.nodes.includes(target)) return;
+	        _this54.trigger(target);
+	      });
+	    }
+	  }]);
+	}(VizPathModule);
+	EditorQuickCurve.ID = 'editor-quick-curve';
 
 	function styleInject(css, ref) {
 	  if (ref === void 0) ref = {};
@@ -19435,7 +19698,7 @@
 	var spiral = "M 23.5296 117.9696 C 23.5296 117.9696 23.5009 117.9777 23.4892 117.9817 C 15.6793 119.9628 7.2337 121.9278 -1.6511 122.8701 C -13.0515 124.0857 -24.9443 123.6698 -37.0108 121.6325 C -59.034 117.9214 -79.0017 109.0888 -96.3677 95.3959 C -118.0763 78.2732 -133.1613 56.2982 -141.1879 30.0912 L -141.316 29.6723 C -152.0365 -6.3544 -149.1799 -41.6978 -132.8198 -75.3812 C -124.6557 -92.1925 -113.1862 -107.107 -98.7396 -119.7129 C -88.8397 -128.3516 -77.4946 -135.6064 -65.0201 -141.2725 C -43.5422 -151.0406 -19.8783 -155.3314 5.3047 -154.0363 C 21.5845 -153.1997 37.8936 -149.5028 53.7808 -143.0425 C 72.2356 -135.5424 89.0348 -124.513 103.7183 -110.2669 C 113.6378 -100.6403 122.3519 -89.3142 129.6072 -76.6012 C 134.7589 -67.5772 139.2375 -57.3425 143.3001 -45.2946 C 143.4609 -44.8152 143.2077 -44.299 142.7315 -44.1409 C 142.2674 -43.9729 141.743 -44.2393 141.5843 -44.7187 C 137.5578 -56.6503 133.1274 -66.7855 128.034 -75.7005 C 120.863 -88.261 112.2615 -99.4492 102.4585 -108.9593 C 87.9438 -123.041 71.3395 -133.9383 53.1037 -141.3535 C 37.407 -147.7316 21.2935 -151.3866 5.212 -152.2138 C -19.6711 -153.4988 -43.0531 -149.256 -64.2666 -139.6134 C -76.5792 -134.0158 -87.777 -126.8571 -97.5425 -118.3358 C -111.8117 -105.8924 -123.1241 -91.1657 -131.1859 -74.5765 C -147.3456 -41.3109 -150.1692 -6.4165 -139.5835 29.1489 L -139.4572 29.562 C -131.5426 55.4021 -116.6646 77.0717 -95.2528 93.9673 C -78.1327 107.4754 -58.439 116.1734 -36.7204 119.8402 C -24.8212 121.8434 -13.0868 122.2573 -1.851 121.0618 C 6.9038 120.1275 15.2684 118.1866 22.996 116.2236 L 23.2405 116.1372 C 43.0485 110.3968 60.5479 99.4224 75.2957 83.5053 C 88.8459 68.876 98.2552 51.4359 103.2622 31.6837 C 106.5392 18.759 107.6523 5.892 106.5653 -6.5702 C 105.8742 -14.5025 104.6084 -21.7622 102.6976 -28.7491 C 99.2759 -41.2604 94.3753 -52.1489 87.7228 -62.024 C 79.6095 -74.0682 69.5051 -84.1537 57.6767 -92.0078 C 44.552 -100.7247 30.2641 -106.414 15.2136 -108.9243 C 3.0419 -110.9537 -8.0997 -110.9758 -18.8547 -108.991 L -20.1684 -108.7483 C -24.3203 -107.9876 -28.6102 -107.2038 -32.7174 -105.9669 C -62.082 -96.7582 -82.989 -77.2018 -94.8596 -47.837 C -101.3247 -31.8442 -103.1177 -14.7671 -100.1939 2.9224 C -95.7581 29.7438 -82.4005 50.5659 -60.5013 64.8073 C -46.8164 73.7022 -31.3984 78.3857 -14.6679 78.7153 C -5.8255 78.8921 2.7178 77.6805 10.7129 75.1087 C 10.7418 75.0986 10.7764 75.0886 10.8053 75.0806 C 30.1329 68.4501 44.7025 56.5775 54.1224 39.7886 C 63.3588 23.3241 66.2099 5.6435 62.6074 -12.7611 C 58.9184 -31.585 49.2492 -46.27 33.8699 -56.4163 C 23.2162 -63.4458 12.133 -67.0103 -0.0106 -67.3178 C -18.7428 -67.7988 -33.5227 -61.9557 -45.1765 -49.4597 C -56.386 -37.4493 -61.2212 -23.0174 -59.5473 -6.568 C -57.1837 16.6752 -41.9533 32.523 -19.7983 34.7884 C -4.1488 36.3904 7.6748 31.0506 15.3575 18.9163 C 21.8959 8.5888 21.4543 -6.7806 14.3798 -15.35 C 9.0101 -21.8514 3.1473 -24.2513 -4.628 -23.1269 C -8.2418 -22.6071 -11.5279 -20.6861 -13.4178 -17.9959 C -15.1598 -15.5228 -15.7079 -12.5495 -15.0448 -9.1639 C -14.9508 -8.6711 -15.2711 -8.1915 -15.7583 -8.0932 C -16.2474 -8.001 -16.7252 -8.3257 -16.825 -8.817 C -17.5771 -12.6586 -16.9112 -16.1961 -14.901 -19.0502 C -12.729 -22.1384 -8.9916 -24.3373 -4.895 -24.9284 C 3.5759 -26.151 9.9462 -23.5565 15.7675 -16.5061 C 23.3106 -7.3737 23.8145 8.9627 16.8843 19.9064 C 8.8053 32.6645 -3.5954 38.2825 -19.9747 36.6048 C -31.4171 35.434 -41.3393 30.6936 -48.6657 22.8883 C -55.7911 15.3079 -60.1758 5.1778 -61.354 -6.3908 C -63.0826 -23.3899 -58.0838 -38.298 -46.5064 -50.7135 C -34.6413 -63.4269 -18.9882 -69.6324 0.0248 -69.1417 C 12.3418 -68.8239 24.0602 -65.059 34.8552 -57.9391 C 50.6599 -47.5158 60.5921 -32.4274 64.3835 -13.1006 C 68.0745 5.7409 65.1571 23.8427 55.6996 40.6935 C 46.0439 57.9097 31.0972 70.0776 11.2888 76.8467 C 11.2427 76.8607 11.2024 76.8728 11.162 76.8848 C 2.9995 79.5089 -5.6947 80.7245 -14.6956 80.5437 C -31.7639 80.2021 -47.5064 75.4281 -61.4772 66.3404 C -83.8321 51.8056 -97.4555 30.5682 -101.9785 3.2137 C -104.9616 -14.8141 -103.1324 -32.2267 -96.5361 -48.533 C -84.5362 -78.2172 -63.4509 -98.0574 -33.8726 -107.5161 C -33.8378 -107.5267 -33.8165 -107.5396 -33.7761 -107.5518 C -33.6262 -107.5976 -33.4761 -107.6437 -33.3262 -107.6895 L -33.2107 -107.7248 C -33.2107 -107.7248 -33.1878 -107.7319 -33.1703 -107.7371 C -28.998 -108.9876 -24.6908 -109.7767 -20.514 -110.5386 L -19.206 -110.7795 C -8.242 -112.8026 3.1078 -112.7807 15.485 -110.7188 C 30.7868 -108.1707 45.3131 -102.3825 58.6572 -93.529 C 70.6805 -85.5443 80.9597 -75.2886 89.2076 -63.0445 C 95.9707 -52.9992 100.9495 -41.9373 104.4315 -29.2283 C 106.3745 -22.1309 107.6584 -14.7745 108.3616 -6.7247 C 109.4586 5.9437 108.3335 19.0181 105.0022 32.1374 C 99.9188 52.1934 90.3669 69.8927 76.6097 84.751 C 61.6409 100.9133 43.8498 112.0484 23.784 117.8732 L 23.5509 117.9556 C 23.5509 117.9556 23.528 117.9636 23.5163 117.9676 L 23.5296 117.9696 Z";
 	var test = "M -150 50 z M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100";
 	var curve1 = "M 0 -197.5 Q -185 -195.5 -197 1.5 Q -174 176.5 2 176.5 Q 158 164.5 158 -1.5 Q 142 -134.5 0 -147.5 Q -141 -146.5 -148 0.5 Q -128 131.5 0 129.5 Q 106 110.5 110 -0.5 Q 95 -97.5 -2 -103.5 Q -96 -97.5 -102 0 Q -88 81.5 -7 80.5 Q 54 72.5 62 3.5 Q 51 -62.5 -3 -60.5 Q -57 -58.5 -57 -1.5 Q -44 35.5 -10 35.5 C 24 35.5 30 -0.5 17 -10.5 C 4 -20.5 -16 -21.5 -24 -4.5";
-	var curve2 = "M 12.969 12.166 Q 11.3986 62.4165 49.612 61.0162 Q 102.218 62.194 110.4623 0.9512 Q 102.6106 -59.5064 49.612 -59.5064 Q -3.3865 -59.1139 -10.0604 0.5586 Q -45.5891 -53.814 -118.6093 0.3623";
+	var rect = "M -100 -100 L 100 -100 L 100 100 L -100 100 z";
 	var paths = {
 		arc: arc,
 		arch: arch,
@@ -19458,7 +19721,7 @@
 		spiral: spiral,
 		test: test,
 		curve1: curve1,
-		curve2: curve2
+		rect: rect
 	};
 
 	function Demo02() {
@@ -19842,11 +20105,12 @@
 	function Demo03() {
 	    const { canvas, currentDemo, setEditor } = React.useContext(PageContext);
 	    const run = React.useCallback(async () => {
+	        var _a;
 	        if (!canvas)
 	            return;
 	        if (currentDemo !== Instruction._03_TRANSFORM_PATH)
 	            return;
-	        const path = new Path(paths.shapes);
+	        const path = new Path(paths.rect);
 	        const vizpath = path.visualize();
 	        const editor = new VizPathEditor();
 	        await editor
@@ -19924,8 +20188,11 @@
 	        }))
 	            .use(new EditorTrack())
 	            .use(new EditorSplitDot())
+	            .use(new EditorQuickCurve())
 	            .mount(canvas);
 	        editor.enterEditing(path);
+	        // editor.focus(editor.nodes[2]);
+	        (_a = editor.findModule(EditorQuickCurve)) === null || _a === void 0 ? void 0 : _a.curve(...editor.nodes);
 	        await index_umdExports.wait(3000);
 	        setEditor(editor);
 	    }, [currentDemo, canvas, setEditor]);
@@ -20056,7 +20323,7 @@
 	        React.createElement(Markdown$1, { content: content })));
 	}
 
-	var css_248z = "*{box-sizing:border-box;margin:0;padding:0}body,html{overflow:hidden}.style_page__0LoNd{align-items:stretch;display:flex;height:100vh;margin:0 auto}.style_page__0LoNd .style_instruction__22KM6{overflow:auto}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar{height:8px;width:8px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-track{background:transparent;border-radius:2px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb{background:#66666633;border-radius:8px;transition:all .1s}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb:hover{background:#66666666}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-corner{background:transparent}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0{background-color:#fff;padding:20px 32px 12px;position:sticky;top:0;z-index:1}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_title__fFbra{font-size:24px;line-height:32px}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_description__HJ2Pk{color:#666;font-size:14px;margin-top:12px}.style_page__0LoNd .style_instruction__22KM6 .style_content__t0e77{margin-bottom:12px}.style_page__0LoNd .style_instruction__22KM6>main{padding:0 32px}.style_page__0LoNd .style_instruction__22KM6.style_maximize__mTGAZ{flex:1}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx{pointer-events:none;position:absolute;user-select:none;z-index:0}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx .style_logo__3MEA0{background-color:unset}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx>main{display:none}.style_page__0LoNd .style_instruction__22KM6.style_half__Z-joI{box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);max-width:650px;z-index:999999}.style_page__0LoNd .style_container__y7Kec{flex:1;overflow:hidden;position:relative}.style_page__0LoNd .style_container__y7Kec>footer{background-color:#fff;border-radius:8px;bottom:32px;box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);display:flex;left:50%;max-width:80%;min-height:56px;overflow:auto;position:absolute;transform:translateX(-50%)}.style_page__0LoNd .style_container__y7Kec>footer svg{flex-shrink:0}.style_page__0LoNd .style_container__y7Kec>aside{bottom:20px;display:flex;flex-direction:column;gap:8px;position:absolute;right:20px}";
+	var css_248z = "*{box-sizing:border-box;margin:0;padding:0}body,html{overflow:hidden}.style_page__0LoNd{align-items:stretch;display:flex;height:100vh;margin:0 auto}.style_page__0LoNd .style_instruction__22KM6{overflow:auto}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar{height:8px;width:8px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-track{background:transparent;border-radius:2px}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb{background:#66666633;border-radius:8px;transition:all .1s}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-thumb:hover{background:#66666666}.style_page__0LoNd .style_instruction__22KM6::-webkit-scrollbar-corner{background:transparent}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0{background-color:#fff;display:none;padding:20px 32px 12px;position:sticky;top:0;z-index:1}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_title__fFbra{font-size:24px;line-height:32px}.style_page__0LoNd .style_instruction__22KM6 .style_logo__3MEA0 .style_description__HJ2Pk{color:#666;font-size:14px;margin-top:12px}.style_page__0LoNd .style_instruction__22KM6 .style_content__t0e77{margin-bottom:12px}.style_page__0LoNd .style_instruction__22KM6>main{padding:0 32px}.style_page__0LoNd .style_instruction__22KM6.style_maximize__mTGAZ{flex:1}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx{pointer-events:none;position:absolute;user-select:none;z-index:0}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx .style_logo__3MEA0{background-color:unset}.style_page__0LoNd .style_instruction__22KM6.style_minimize__ORKWx>main{display:none}.style_page__0LoNd .style_instruction__22KM6.style_half__Z-joI{box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);max-width:650px;z-index:999999}.style_page__0LoNd .style_container__y7Kec{flex:1;overflow:hidden;position:relative}.style_page__0LoNd .style_container__y7Kec>footer{background-color:#fff;border-radius:8px;bottom:32px;box-shadow:0 0 6px rgba(0,0,0,.08),0 0 12px rgba(0,0,0,.04);display:flex;left:50%;max-width:80%;min-height:56px;overflow:auto;position:absolute;transform:translateX(-50%)}.style_page__0LoNd .style_container__y7Kec>footer svg{flex-shrink:0}.style_page__0LoNd .style_container__y7Kec>aside{bottom:20px;display:flex;display:none;flex-direction:column;gap:8px;position:absolute;right:20px}";
 	var styles = {"page":"style_page__0LoNd","instruction":"style_instruction__22KM6","logo":"style_logo__3MEA0","title":"style_title__fFbra","description":"style_description__HJ2Pk","content":"style_content__t0e77","maximize":"style_maximize__mTGAZ","minimize":"style_minimize__ORKWx","half":"style_half__Z-joI","container":"style_container__y7Kec"};
 	styleInject(css_248z);
 

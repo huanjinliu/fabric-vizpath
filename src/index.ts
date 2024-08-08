@@ -19,9 +19,9 @@ export { default as EditorResize } from './lib/modules/editor-resize/index.class
 export { default as EditorMove } from './lib/modules/editor-move/index.class';
 export { default as EditorZoom } from './lib/modules/editor-zoom/index.class';
 export { default as EditorTheme } from './lib/modules/editor-theme/index.class';
-// export { default as EditorBezier } from './lib/modules/editor-bezier/index.class';
 export { default as EditorTrack } from './lib/modules/editor-track/index.class';
 export { default as EditorSplitDot } from './lib/modules/editor-split-dot/index.class';
+export { default as EditorQuickCurve } from './lib/modules/editor-quick-curve/index.class';
 
 /**
  * 共用方法
