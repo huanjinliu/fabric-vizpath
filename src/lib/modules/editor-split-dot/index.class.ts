@@ -137,19 +137,19 @@ class EditorSplitDot extends VizPathModule {
 
           if (['M', 'Z'].includes(item.instruction[0])) continue;
           if (item.instruction[0] === InstructionType.LINE) {
-            const { pre } = vizpath.getNeighboringNodes(item, true);
+            const { pre } = vizpath.getNeighboringNodes(item);
             const start = pre!.node!;
             const end = { x: item.instruction[1], y: item.instruction[2] };
             points = [start, { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }, end];
           } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
-            const { pre } = vizpath.getNeighboringNodes(item, true);
+            const { pre } = vizpath.getNeighboringNodes(item);
             points = [
               pre!.node!,
               { x: item.instruction[1], y: item.instruction[2] },
               { x: item.instruction[3], y: item.instruction[4] },
             ];
           } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
-            const { pre } = vizpath.getNeighboringNodes(item, true);
+            const { pre } = vizpath.getNeighboringNodes(item);
             points = [
               pre!.node!,
               { x: item.instruction[1], y: item.instruction[2] },
@@ -209,7 +209,7 @@ class EditorSplitDot extends VizPathModule {
       editor.rerender(() => {
         if (!pathNode || !splitCoord) return;
 
-        const { pre } = vizpath.getNeighboringInstructions(pathNode, true);
+        const { pre } = vizpath.getNeighboringPathNodes(pathNode);
         if (!pre || !pre.node) return;
 
         const splitCurves = splitInstruction(

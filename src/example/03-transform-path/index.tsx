@@ -27,7 +27,7 @@ function Demo03() {
     if (!canvas) return;
     if (currentDemo !== Instruction._03_TRANSFORM_PATH) return;
 
-    const path = new Path(paths.rect);
+    const path = new Path(paths.diamond);
     const vizpath = path.visualize();
 
     const editor = new VizPathEditor();
@@ -120,9 +120,24 @@ function Demo03() {
     editor.enterEditing(path);
 
     // editor.focus(editor.nodes[2]);
-    editor.findModule(EditorQuickCurve)?.curve(...editor.nodes);
+    // editor.findModule(EditorQuickCurve)?.straighten(editor.nodes[0]);
+    // editor.findModule(EditorQuickCurve)?.curve(editor.nodes[1]);
 
-    await wait(3000);
+    // editor.rerender(async () => {
+    //   const node = vizpath.segments[0][0];
+    //   vizpath.upgrade(node, 'pre', false, [{ x: -75, y: 75 }]);
+    //   await wait(3000);
+    //   const deformers = node.deformers;
+    //   editor.requestCreateDeformers({
+    //     type: 'pre',
+    //     dot: deformers!.pre!,
+    //     node: node,
+    //     symmetric: 'none',
+    //   });
+    //   // vizpath.upgrade(vizpath.segments[0][1], 'pre', false, [{ x: 75, y: 75 }]);
+    // });
+
+    // await wait(3000);
 
     setEditor(editor);
   }, [currentDemo, canvas, setEditor]);

@@ -5909,8 +5909,7 @@
 	     * @note 通过 set 方法更改会触发 set 钩子，避免直接修改该字段以导致 set 钩子未执行
 	     */
 	    this._settings = [{
-	      mode: Mode.MOVE,
-	      dotSymmetricMode: 'auto'
+	      mode: Mode.MOVE
 	    }];
 	    /** 内部用于比较值的误差值 */
 	    this.deviation = Math.pow(0.1, 8);
@@ -5929,6 +5928,8 @@
 	    this.nodes = [];
 	    /** 路径曲线变换器列表 */
 	    this.deformers = [];
+	    /** 变换器缓存 */
+	    this.deformerCaches = [];
 	    /** 元素画布对象 与 路径节点对象 映射 */
 	    this.objectNodeMap = new Map([]);
 	    /** 路径节点对象 与 元素画布对象 映射 */
@@ -5937,8 +5938,6 @@
 	    this.activeNodes = [];
 	    /** 当前活跃的曲线变换器画布对象 */
 	    this.activePoint = null;
-	    /** dotSymmetricMode为auto的情况下，会采用以下变换模式 */
-	    this.dotSymmetricAutoMode = 'none';
 	    /** 当前转换的路径节点 */
 	    this.currentConvertNodeObject = null;
 	    /** 记录原路径对象配置，在退出编辑时重置路径对象配置 */
@@ -6018,7 +6017,7 @@
 	      // 绘制节点操作对象
 	      this._renderPathNodes();
 	      // 绘制全部变换器
-	      // this._renderAllDeformers();
+	      this._renderAllDeformers();
 	    }
 	    /**
 	     * 退出路径编辑
@@ -6048,7 +6047,6 @@
 	      this.activePoint = null;
 	      this.nodeObjectMap.clear();
 	      this.objectNodeMap.clear();
-	      this.dotSymmetricAutoMode = 'none';
 	      this.currentConvertNodeObject = null;
 	      this._lockFocus = false;
 	      var path = this.vizpath.path;
@@ -6072,7 +6070,7 @@
 	      this.blur();
 	      var result = callback(storeActiveNodes, storeActivePoint);
 	      this._renderPathNodes();
-	      this._renderDeformers();
+	      this._renderAllDeformers();
 	      if ((storeActivePoint === null || storeActivePoint === void 0 ? void 0 : storeActivePoint.canvas) === this.canvas) this.focus(storeActivePoint);else if (storeActiveNodes.every(function (object) {
 	        return object.canvas === _this8.canvas;
 	      })) {
@@ -6296,77 +6294,69 @@
 	      });
 	    }
 	    /**
-	     * 绘制曲线变换器及其连接线
+	     * 生成当前路径变换器缓存
 	     */
 	  }, {
-	    key: "_renderDeformers",
-	    value: function _renderDeformers() {
-	      var _this10 = this;
+	    key: "_getLastestPathDeformerCache",
+	    value: function _getLastestPathDeformerCache() {
+	      var caches = [];
 	      var vizpath = this.vizpath;
-	      if (!vizpath) return;
-	      var canvas = this.canvas;
-	      if (!canvas) return;
-	      // 当前的活跃节点
-	      var curPathNode = this.activeNodes.length === 1 ? this.objectNodeMap.get(this.activeNodes[0]) : undefined;
-	      // 创建新的路径曲线变换器
-	      var deformers = [];
-	      if (curPathNode) {
-	        var _vizpath$getNeighbori = vizpath.getNeighboringNodes(curPathNode),
-	          pre = _vizpath$getNeighbori.pre,
-	          next = _vizpath$getNeighbori.next;
-	        [pre, curPathNode, next].forEach(function (node) {
+	      if (!vizpath) return caches;
+	      vizpath.segments.forEach(function (segment) {
+	        segment.forEach(function (node) {
 	          var _a;
-	          if (!node) return;
 	          Object.entries((_a = node.deformers) !== null && _a !== void 0 ? _a : {}).forEach(function (_ref4) {
 	            var _ref5 = _slicedToArray(_ref4, 2),
 	              direction = _ref5[0],
 	              dot = _ref5[1];
-	            var reuseDeformer = _this10.deformers.find(function (i) {
-	              return i.type === direction && i.node === node;
-	            });
-	            var _curveDot = {
+	            var _a;
+	            // 贝塞尔二阶曲线的变换点需要做特殊处理
+	            var isQuadraticCurve = node.instruction[0] === 'Q' || node.instruction[0] === 'M' && ((_a = node.previousSibling) === null || _a === void 0 ? void 0 : _a.instruction[0]) === 'Q';
+	            if (node.previousSiblingNode && isQuadraticCurve) {
+	              var preDeformer = caches[caches.length - 1];
+	              if (preDeformer && preDeformer.node === node.previousSiblingNode && preDeformer.type === 'pre') {
+	                caches.push({
+	                  type: 'next',
+	                  dot: dot,
+	                  node: node.previousSiblingNode,
+	                  symmetric: 'entire'
+	                });
+	                return;
+	              }
+	            }
+	            caches.push({
 	              type: direction,
 	              dot: dot,
 	              node: node,
-	              nodeObject: _this10.nodeObjectMap.get(node),
-	              curveDot: _this10._createCurveDotObject(reuseDeformer === null || reuseDeformer === void 0 ? void 0 : reuseDeformer.curveDot),
-	              curveBar: _this10._createCurveBarLine(reuseDeformer === null || reuseDeformer === void 0 ? void 0 : reuseDeformer.curveBar)
-	            };
-	            _this10._setDeformerObjectsCoords(_curveDot);
-	            deformers.push(_curveDot);
+	              symmetric: 'entire'
+	            });
 	          });
 	        });
-	      }
-	      fabricOnceRender(canvas, function () {
-	        var oldObjectSet = new Set(_this10.deformers.map(function (i) {
-	          return [i.curveDot, i.curveBar];
-	        }).flat(1));
-	        // 添加新的画布元素
-	        var baseIndex = canvas._objects.indexOf(vizpath.path) + 1;
-	        deformers.forEach(function (i, idx) {
-	          if (canvas.contains(i.curveBar)) {
-	            canvas.moveTo(i.curveBar, baseIndex + idx);
-	            oldObjectSet["delete"](i.curveBar);
-	          } else {
-	            canvas.insertAt(i.curveBar, baseIndex + idx, false);
-	          }
-	        });
-	        deformers.forEach(function (i, idx) {
-	          if (canvas.contains(i.curveDot)) {
-	            canvas.moveTo(i.curveDot, baseIndex + deformers.length + idx);
-	            oldObjectSet["delete"](i.curveDot);
-	          } else {
-	            canvas.insertAt(i.curveDot, baseIndex + deformers.length + idx, false);
-	          }
-	        });
-	        // 移除旧的无用对象
-	        canvas.remove.apply(canvas, _toConsumableArray(oldObjectSet.values()));
-	        oldObjectSet.clear();
 	      });
-	      this.deformers = deformers;
+	      return caches;
 	    }
 	    /**
-	     * 渲染全部的变换器
+	     * 合并新路径变换器缓存以获取正确的缓存数据
+	     */
+	  }, {
+	    key: "_mergeDeformCaches",
+	    value: function _mergeDeformCaches(caches) {
+	      var _this10 = this;
+	      this.deformerCaches.forEach(function (cache) {
+	        if (!_this10.nodeObjectMap.has(cache.node)) return;
+	        var newCache = caches.find(function (item) {
+	          return item.node === cache.node && item.dot === cache.dot;
+	        });
+	        if (newCache) {
+	          newCache.type = cache.type;
+	          newCache.symmetric = cache.symmetric;
+	        }
+	      });
+	      this.deformerCaches = caches;
+	      return this.deformerCaches;
+	    }
+	    /**
+	     * 渲染变换器列表
 	     */
 	  }, {
 	    key: "_renderAllDeformers",
@@ -6378,33 +6368,31 @@
 	      if (!canvas) return;
 	      // 创建新的路径曲线变换器
 	      var deformers = [];
-	      vizpath.segments.forEach(function (segment) {
-	        segment.forEach(function (node) {
-	          var _a;
-	          Object.entries((_a = node.deformers) !== null && _a !== void 0 ? _a : {}).forEach(function (_ref6) {
-	            var _ref7 = _slicedToArray(_ref6, 2),
-	              direction = _ref7[0],
-	              dot = _ref7[1];
-	            var reuseDeformer = _this11.deformers.find(function (i) {
-	              return i.type === direction && i.node === node;
-	            });
-	            var _curveDot = {
-	              type: direction,
-	              dot: dot,
-	              node: node,
-	              nodeObject: _this11.nodeObjectMap.get(node),
-	              curveDot: _this11._createCurveDotObject(reuseDeformer === null || reuseDeformer === void 0 ? void 0 : reuseDeformer.curveDot),
-	              curveBar: _this11._createCurveBarLine(reuseDeformer === null || reuseDeformer === void 0 ? void 0 : reuseDeformer.curveBar)
-	            };
-	            _this11._setDeformerObjectsCoords(_curveDot);
-	            deformers.push(_curveDot);
-	          });
+	      this.deformerCaches = this._mergeDeformCaches(this._getLastestPathDeformerCache());
+	      this.deformerCaches.forEach(function (_ref6) {
+	        var node = _ref6.node,
+	          dot = _ref6.dot,
+	          type = _ref6.type,
+	          symmetric = _ref6.symmetric;
+	        var reuseDeformer = _this11.deformers.find(function (i) {
+	          return i.type === type && i.node === node;
 	        });
+	        var deformer = {
+	          type: type,
+	          dot: dot,
+	          node: node,
+	          nodeObject: _this11.nodeObjectMap.get(node),
+	          curveDot: _this11._createCurveDotObject(reuseDeformer === null || reuseDeformer === void 0 ? void 0 : reuseDeformer.curveDot),
+	          curveBar: _this11._createCurveBarLine(reuseDeformer === null || reuseDeformer === void 0 ? void 0 : reuseDeformer.curveBar),
+	          symmetric: symmetric
+	        };
+	        _this11._setDeformerObjectsCoords(deformer);
+	        deformers.push(deformer);
 	      });
 	      fabricOnceRender(canvas, function () {
 	        var oldObjectSet = new Set(_this11.deformers.map(function (i) {
 	          return [i.curveDot, i.curveBar];
-	        }).flat(1));
+	        }).flat(2));
 	        // 添加新的画布元素
 	        var baseIndex = canvas._objects.indexOf(vizpath.path) + 1;
 	        deformers.forEach(function (i, idx) {
@@ -6430,6 +6418,17 @@
 	      this.deformers = deformers;
 	    }
 	    /**
+	     * 申请创建变换器，会缓存配置，并在每一次渲染变换器的时候优先考虑配置来生成新的变换器列表
+	     */
+	  }, {
+	    key: "requestCreateDeformers",
+	    value: function requestCreateDeformers() {
+	      for (var _len2 = arguments.length, cache = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+	        cache[_key2] = arguments[_key2];
+	      }
+	      this._mergeDeformCaches([].concat(_toConsumableArray(this.deformerCaches), cache));
+	    }
+	    /**
 	     * 初始节点选择事件
 	     */
 	  }, {
@@ -6438,8 +6437,8 @@
 	      var _this12 = this;
 	      var canvas = this.canvas;
 	      if (!canvas) return;
-	      var handler = function handler(eventName) {
-	        return function (e) {
+	      var handler = function handler() {
+	        return function () {
 	          _this12.focus.apply(_this12, _toConsumableArray(canvas.getActiveObjects()));
 	        };
 	      };
@@ -6555,7 +6554,7 @@
 	        if (target.containsPoint(pointer)) return;
 	        var coord = calcCanvasCoord(canvas, pointer);
 	        var targetNode = _this15.objectNodeMap.get(target);
-	        var neighboringNodes = vizpath.getNeighboringNodes(targetNode, true);
+	        var neighboringNodes = vizpath.getNeighboringNodes(targetNode);
 	        // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
 	        var convertibleNodes = Object.entries(vizpath.getConvertibleNodes(targetNode));
 	        if (convertibleNodes.length === 0) {
@@ -6577,42 +6576,60 @@
 	          });
 	        }
 	        _this15.rerender(function () {
-	          vizpath.upgrade(targetNode, 'both', true);
-	          // 非闭合路径给端点添加虚拟变换器
-	          if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
-	            if (targetNode === targetNode.segment[0] && !targetNode.deformers.pre && targetNode.deformers.next) {
-	              vizpath.addNodeDeformer(targetNode, 'pre', {
-	                x: targetNode.node.x - (targetNode.deformers.next.x - targetNode.node.x),
-	                y: targetNode.node.y - (targetNode.deformers.next.y - targetNode.node.y)
-	              });
-	            }
-	            if (targetNode === targetNode.segment[targetNode.segment.length - 1] && !targetNode.deformers.next && targetNode.deformers.pre) {
-	              vizpath.addNodeDeformer(targetNode, 'next', {
-	                x: targetNode.node.x - (targetNode.deformers.pre.x - targetNode.node.x),
-	                y: targetNode.node.y - (targetNode.deformers.pre.y - targetNode.node.y)
-	              });
-	            }
-	          }
+	          vizpath.upgrade(targetNode, 'both');
+	          convertibleNodes.length === 1 ? [oppositePosition, position] : [position, oppositePosition];
+	          // const {} = vizpath.getNeighboringCurveDots(targetNode)
+	          // this.requestCreateDeformers(
+	          //   {
+	          //     type: 'pre',
+	          //     node: targetNode,
+	          //     symmetric: 'entire',
+	          //   },
+	          //   {
+	          //     type: 'next',
+	          //     node: targetNode,
+	          //     symmetric: 'entire',
+	          //   },
+	          // );
+	          // // 非闭合路径给端点添加虚拟变换器
+	          // if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
+	          //   if (
+	          //     targetNode === targetNode.segment[0] &&
+	          //     !targetNode.deformers.pre &&
+	          //     targetNode.deformers.next
+	          //   ) {
+	          //     vizpath.addNodeDeformer(targetNode, 'pre', {
+	          //       x: targetNode.node!.x - (targetNode.deformers.next.x - targetNode.node!.x),
+	          //       y: targetNode.node!.y - (targetNode.deformers.next.y - targetNode.node!.y),
+	          //     });
+	          //   }
+	          //   if (
+	          //     targetNode === targetNode.segment[targetNode.segment.length - 1] &&
+	          //     !targetNode.deformers.next &&
+	          //     targetNode.deformers.pre
+	          //   ) {
+	          //     vizpath.addNodeDeformer(targetNode, 'next', {
+	          //       x: targetNode.node!.x - (targetNode.deformers.pre.x - targetNode.node!.x),
+	          //       y: targetNode.node!.y - (targetNode.deformers.pre.y - targetNode.node!.y),
+	          //     });
+	          //   }
+	          // }
 	          // 设置控制点的位置
-	          if (targetNode.deformers) {
-	            Object.keys(targetNode.deformers).forEach(function (direction, index) {
-	              var coord = (convertibleNodes.length === 1 ? [oppositePosition, position] : [position, oppositePosition])[index];
-	              targetNode.deformers[direction].set(coord.x, coord.y);
-	            });
-	          }
+	          // if (targetNode.deformers) {
+	          //   Object.keys(targetNode.deformers).forEach((direction, index) => {
+	          //     const coord = (
+	          //       convertibleNodes.length === 1
+	          //         ? [oppositePosition, position]
+	          //         : [position, oppositePosition]
+	          //     )[index];
+	          //     targetNode.deformers![direction].set(coord.x, coord.y);
+	          //   });
+	          // }
 	        });
-	        var targetCurveDot;
-	        var nodeDeformers = _this15.deformers.filter(function (i) {
-	          return i.node === targetNode;
+	        var targetCurveDot = _this15.deformers.find(function (i) {
+	          var _a;
+	          return i.node === targetNode && i.type !== ((_a = convertibleNodes[0]) === null || _a === void 0 ? void 0 : _a[0]);
 	        });
-	        if (nodeDeformers.length === 1) {
-	          targetCurveDot = nodeDeformers[0];
-	        } else {
-	          targetCurveDot = _this15.deformers.find(function (i) {
-	            var _a;
-	            return i.node === targetNode && i.type !== ((_a = convertibleNodes[0]) === null || _a === void 0 ? void 0 : _a[0]);
-	          });
-	        }
 	        if (targetCurveDot) {
 	          fireMouseUpAndSelect(targetCurveDot.curveDot);
 	        }
@@ -6690,19 +6707,7 @@
 	          return i.dot === curveDot;
 	        });
 	        if (!deformer) return;
-	        // 创建指令曲线变换器并设置位置
-	        deformer.curveDot.set(vizpath.calcAbsolutePosition(curveDot)).setCoords();
-	        // 创建变换器连接线并设置位置
-	        var startPosition = vizpath.calcAbsolutePosition(node);
-	        deformer.curveBar.set({
-	          x1: startPosition.left,
-	          y1: startPosition.top
-	        });
-	        var endPosition = vizpath.calcAbsolutePosition(curveDot);
-	        deformer.curveBar.set({
-	          x2: endPosition.left,
-	          y2: endPosition.top
-	        });
+	        _this16._setDeformerObjectsCoords(deformer);
 	      });
 	      (_a = object.canvas) === null || _a === void 0 ? void 0 : _a.requestRenderAll();
 	    }
@@ -6715,21 +6720,18 @@
 	      var _this17 = this;
 	      this._observer = {
 	        target: object,
-	        unobserve: observe(object, ['left', 'top'], function (_ref8) {
-	          var left = _ref8.left,
-	            top = _ref8.top;
-	          var _a, _b;
+	        unobserve: observe(object, ['left', 'top'], function (_ref7) {
+	          var left = _ref7.left,
+	            top = _ref7.top;
+	          var _a;
 	          var followCurveDots = [];
 	          var pathNode = _this17.objectNodeMap.get(object);
-	          var deformers = (_b = (_a = _this17.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
-	          deformers === null || deformers === void 0 ? void 0 : deformers.forEach(function (_ref9) {
-	            var position = _ref9.position,
-	              direction = _ref9.direction,
-	              from = _ref9.from;
-	            var _a;
-	            var coord = (_a = from.deformers) === null || _a === void 0 ? void 0 : _a[direction];
-	            if (position !== 'cur' || !coord) return;
-	            followCurveDots.push(coord);
+	          (_a = _this17.deformers) === null || _a === void 0 ? void 0 : _a.forEach(function (_ref8) {
+	            var node = _ref8.node,
+	              dot = _ref8.dot;
+	            if (node === pathNode) {
+	              followCurveDots.push(dot);
+	            }
 	          });
 	          _this17._transform(object, {
 	            left: left,
@@ -6762,10 +6764,10 @@
 	              var followCurveDots = [];
 	              var pathNode = _this18.objectNodeMap.get(object);
 	              var deformers = (_b = (_a = _this18.vizpath) === null || _a === void 0 ? void 0 : _a.getNeighboringCurveDots(pathNode)) !== null && _b !== void 0 ? _b : [];
-	              deformers === null || deformers === void 0 ? void 0 : deformers.forEach(function (_ref10) {
-	                var position = _ref10.position,
-	                  direction = _ref10.direction,
-	                  from = _ref10.from;
+	              deformers === null || deformers === void 0 ? void 0 : deformers.forEach(function (_ref9) {
+	                var position = _ref9.position,
+	                  direction = _ref9.direction,
+	                  from = _ref9.from;
 	                var _a;
 	                var coord = (_a = from.deformers) === null || _a === void 0 ? void 0 : _a[direction];
 	                if (position !== 'cur' || !coord) return;
@@ -6817,9 +6819,9 @@
 	      if (!vizpath) return;
 	      this._observer = {
 	        target: object,
-	        unobserve: observe(object, ['left', 'top'], function (_ref11) {
-	          var left = _ref11.left,
-	            top = _ref11.top;
+	        unobserve: observe(object, ['left', 'top'], function (_ref10) {
+	          var left = _ref10.left,
+	            top = _ref10.top;
 	          var coord = vizpath.calcRelativeCoord({
 	            left: left,
 	            top: top
@@ -6827,8 +6829,7 @@
 	          deformer.dot.set(coord.x, coord.y);
 	          _this19._setDeformerObjectsCoords(deformer, /* skipSelfDot */true);
 	          // 对向变换器同步操作
-	          var symmetricMode = _this19.get('dotSymmetricMode') === 'auto' ? _this19.dotSymmetricAutoMode : _this19.get('dotSymmetricMode');
-	          if (symmetricMode !== 'none') {
+	          if (deformer.symmetric !== 'none') {
 	            var opositeDeformer = _this19.getOppositeDeformer(object);
 	            if (opositeDeformer) {
 	              var nodeCoord = deformer.node.node;
@@ -6839,7 +6840,7 @@
 	                x: nodeCoord.x - (coord.x - nodeCoord.x),
 	                y: nodeCoord.y - (coord.y - nodeCoord.y)
 	              }, nodeCoord);
-	              var scale = symmetricMode === 'entire' ? 1 : d / new_d;
+	              var scale = deformer.symmetric === 'entire' ? 1 : d / new_d;
 	              opositeDeformer.dot.set(nodeCoord.x - (coord.x - nodeCoord.x) * scale, nodeCoord.y - (coord.y - nodeCoord.y) * scale);
 	              _this19._setDeformerObjectsCoords(opositeDeformer);
 	            }
@@ -6900,8 +6901,8 @@
 	      // 提取有效活跃元素
 	      var focusNodes = [];
 	      var focusCurveDotPoints = [];
-	      for (var _len2 = arguments.length, selectedObjects = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-	        selectedObjects[_key2] = arguments[_key2];
+	      for (var _len3 = arguments.length, selectedObjects = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+	        selectedObjects[_key3] = arguments[_key3];
 	      }
 	      selectedObjects.forEach(function (object) {
 	        switch (object[VizPathEditor.symbol]) {
@@ -6961,27 +6962,10 @@
 	        this.activePoint = null;
 	      }
 	      // 绘制曲线变换器及其连接线
-	      this._renderDeformers();
+	      this._renderAllDeformers();
 	      // 注册活跃对象观测者
 	      this._registerActiveObjectsObserver();
 	      this.events.fire('selected', this.activeNodes, this.activePoint);
-	      // 如果当前选中的是变换器需要确定其自动变换的模式
-	      if (this.activePoint) {
-	        var deformer = this.deformers.find(function (i) {
-	          return i.curveDot === _this20.activePoint;
-	        });
-	        var relativeDot = this.getOppositeDeformer(this.activePoint);
-	        if (relativeDot && 180 - calcCoordsAngle(deformer.dot, deformer.node.node, relativeDot.dot) <= this.deviation) {
-	          this.dotSymmetricAutoMode = 'angle';
-	          if (Math.abs(calcCoordsDistance(deformer.dot, deformer.node.node) - calcCoordsDistance(deformer.node.node, relativeDot.dot)) <= this.deviation) {
-	            this.dotSymmetricAutoMode = 'entire';
-	          }
-	        } else {
-	          this.dotSymmetricAutoMode = 'none';
-	        }
-	      } else {
-	        this.dotSymmetricAutoMode = 'none';
-	      }
 	      this._lockFocus = false;
 	    }
 	    /**
@@ -7113,8 +7097,8 @@
 	          });
 	        }
 	      };
-	      for (var _len3 = arguments.length, objects = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
-	        objects[_key3] = arguments[_key3];
+	      for (var _len4 = arguments.length, objects = new Array(_len4), _key4 = 0; _key4 < _len4; _key4++) {
+	        objects[_key4] = arguments[_key4];
 	      }
 	      objects.forEach(function (object) {
 	        if (!object) return;
@@ -7124,9 +7108,9 @@
 	      });
 	      if (degradeQueue.length) {
 	        this.rerender(function () {
-	          degradeQueue.forEach(function (_ref12) {
-	            var node = _ref12.node,
-	              direction = _ref12.direction;
+	          degradeQueue.forEach(function (_ref11) {
+	            var node = _ref11.node,
+	              direction = _ref11.direction;
 	            vizpath.degrade(node, direction);
 	          });
 	        });
@@ -7423,7 +7407,7 @@
 	              return new Promise(function (resolve) {
 	                var next = 0;
 	                var loadModule = /*#__PURE__*/function () {
-	                  var _ref13 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
+	                  var _ref12 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2() {
 	                    var module;
 	                    return _regeneratorRuntime().wrap(function _callee2$(_context2) {
 	                      while (1) switch (_context2.prev = _context2.next) {
@@ -7451,7 +7435,7 @@
 	                    }, _callee2);
 	                  }));
 	                  return function loadModule() {
-	                    return _ref13.apply(this, arguments);
+	                    return _ref12.apply(this, arguments);
 	                  };
 	                }();
 	                loadModule();
@@ -7731,19 +7715,52 @@
 	      var newSegments = [];
 	      this._splitPathSegments(instructions).forEach(function (segment) {
 	        var pathNodes = [];
-	        segment.forEach(function (instruction) {
+	        segment.forEach(function (instruction, index) {
 	          var reuseNode = _this25.instructionNodeMap.get(instruction);
 	          var pathNode = reuseNode !== null && reuseNode !== void 0 ? reuseNode : {
 	            id: uniqueId(),
 	            path: _this25,
 	            segment: pathNodes,
-	            instruction: instruction
+	            instruction: instruction,
+	            index: index,
+	            node: null,
+	            deformers: null,
+	            previousSibling: null,
+	            previousSiblingNode: null,
+	            nextSibling: null,
+	            nextSiblingNode: null
 	          };
 	          pathNode.path = _this25;
 	          pathNode.segment = pathNodes;
+	          pathNode.index = index;
+	          pathNode.previousSibling = null;
+	          pathNode.previousSiblingNode = null;
+	          pathNode.nextSibling = null;
+	          pathNode.nextSiblingNode = null;
 	          pathNodes.push(pathNode);
 	          _this25.instructionNodeMap.set(instruction, pathNode);
 	        });
+	        // 整理节点相互之间的指向
+	        var length = pathNodes.length;
+	        if (_this25.isClosedSegment(pathNodes)) {
+	          for (var i = 0; i <= length - 2; i++) {
+	            var pathNode = pathNodes[i];
+	            pathNode.nextSibling = i === length - 2 ? pathNodes[0] : pathNodes[i + 1];
+	            pathNode.nextSibling.previousSibling = pathNode;
+	            if (i <= length - 3 && length > 3) {
+	              pathNode.nextSiblingNode = i === length - 3 ? pathNodes[0] : pathNodes[i + 1];
+	              if (pathNode.nextSiblingNode) pathNode.nextSiblingNode.previousSiblingNode = pathNode;
+	            }
+	          }
+	        } else {
+	          for (var _i = 0; _i < length; _i++) {
+	            var _pathNode = pathNodes[_i];
+	            _pathNode.nextSibling = pathNodes[_i + 1];
+	            _pathNode.nextSiblingNode = pathNodes[_i + 1];
+	            if (_pathNode.nextSibling) _pathNode.nextSibling.previousSibling = _pathNode;
+	            if (_pathNode.nextSiblingNode) _pathNode.nextSiblingNode.previousSibling = _pathNode;
+	          }
+	        }
 	        newSegments.push(pathNodes);
 	      });
 	      // 将路径段转为响应式
@@ -7854,10 +7871,9 @@
 	     * @returns
 	     */
 	  }, {
-	    key: "_toResponsiveCoord",
-	    value: function _toResponsiveCoord(coord) {
+	    key: "toRCoord",
+	    value: function toRCoord(coord) {
 	      var _this27 = this;
-	      var temporaryIgnoreIds = [];
 	      var proxy = new Proxy(coord, {
 	        set: function set(target, p, value, receiver) {
 	          if (p === 'x' || p === 'y') {
@@ -7873,7 +7889,6 @@
 	                try {
 	                  for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
 	                    var _observe = _step3.value;
-	                    if (_observe.id && temporaryIgnoreIds.indexOf(_observe.id) !== -1) continue;
 	                    _observe.handler(x, y);
 	                  }
 	                } catch (err) {
@@ -7891,13 +7906,8 @@
 	        }
 	      });
 	      proxy.set = function (x, y) {
-	        var skipObserverIDs = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
-	        if (Array.isArray(skipObserverIDs)) {
-	          temporaryIgnoreIds = skipObserverIDs;
-	        }
 	        proxy.x = x;
 	        proxy.y = y;
-	        temporaryIgnoreIds = [];
 	      };
 	      proxy.observe = function (handler) {
 	        var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
@@ -7951,7 +7961,7 @@
 	            instruction[instruction.length - 1] = y;
 	          });
 	        } else {
-	          node.node = (_b = node.node) !== null && _b !== void 0 ? _b : this._toResponsiveCoord(coord);
+	          node.node = (_b = node.node) !== null && _b !== void 0 ? _b : this.toRCoord(coord);
 	          node.node.unobserve();
 	          node.node.observe(function (x, y) {
 	            instruction[instruction.length - 2] = x;
@@ -7970,83 +7980,71 @@
 	    value: function _initSegmentDeformers(segment) {
 	      var _this28 = this;
 	      var nodes = segment;
-	      // const isQuadraticCurve = (node: PathNode) =>
-	      //   node.instruction[0] === InstructionType.QUADRATIC_CURCE;
 	      nodes.forEach(function (node, index) {
-	        var _a, _b, _c, _e, _f, _g;
+	        var _a, _b, _c, _e;
+	        if (!node.node) return;
 	        // 旧的变换器
 	        var oldDeformers = (_a = node.deformers) !== null && _a !== void 0 ? _a : {};
 	        // 指令曲线变换器
 	        var deformers = {};
-	        var _this28$getNeighborin = _this28.getNeighboringInstructions(node),
+	        var _this28$getNeighborin = _this28.getNeighboringPathNodes(node),
 	          pre = _this28$getNeighborin.pre,
 	          next = _this28$getNeighborin.next;
-	        // 前一个节点是否已经有next变换器
-	        var preNodeHadNextDeformer = index > 0 && pre && ((_b = pre.deformers) === null || _b === void 0 ? void 0 : _b.next) !== undefined;
 	        // 前曲线变换器
-	        if (node.instruction[0] === 'C' || node.instruction[0] === 'Q' && !preNodeHadNextDeformer) {
+	        if (['Q', 'C'].includes(node.instruction[0])) {
 	          var length = node.instruction.length;
 	          var coord = {
 	            x: node.instruction[length - 4],
 	            y: node.instruction[length - 3]
 	          };
-	          var curveDot = (_c = oldDeformers.pre) !== null && _c !== void 0 ? _c : _this28._toResponsiveCoord(coord);
+	          var curveDot = (_b = oldDeformers.pre) !== null && _b !== void 0 ? _b : _this28.toRCoord(coord);
 	          curveDot.unobserve();
 	          curveDot.observe(function (x, y) {
 	            node.instruction[length - 4] = x;
 	            node.instruction[length - 3] = y;
 	          });
 	          curveDot.set(coord.x, coord.y);
-	          if (_this28.isCoincideNode(node)) {
-	            nodes[0].deformers = (_e = nodes[0].deformers) !== null && _e !== void 0 ? _e : {};
-	            nodes[0].deformers.pre = curveDot;
-	          } else {
-	            deformers.pre = curveDot;
-	          }
+	          deformers.pre = curveDot;
+	        }
+	        // 特殊情况：闭合路径起始点的前曲线变换器
+	        if (node.instruction[0] === 'M' && pre && ['Q', 'C'].includes(pre.instruction[0])) {
+	          var _length = pre.instruction.length;
+	          var _coord = {
+	            x: pre.instruction[_length - 4],
+	            y: pre.instruction[_length - 3]
+	          };
+	          var _curveDot = (_c = oldDeformers.pre) !== null && _c !== void 0 ? _c : _this28.toRCoord(_coord);
+	          _curveDot.unobserve();
+	          _curveDot.observe(function (x, y) {
+	            pre.instruction[_length - 4] = x;
+	            pre.instruction[_length - 3] = y;
+	          });
+	          _curveDot.set(_coord.x, _coord.y);
+	          deformers.pre = _curveDot;
 	        }
 	        // 后曲线变换器
-	        if (next && (next.instruction[0] === 'C' || next.instruction[0] === 'Q' && !preNodeHadNextDeformer)) {
-	          var _coord = {
+	        if (next && next.instruction[0] === 'C') {
+	          var _coord2 = {
 	            x: next.instruction[1],
 	            y: next.instruction[2]
 	          };
-	          var _curveDot2 = (_f = oldDeformers.next) !== null && _f !== void 0 ? _f : _this28._toResponsiveCoord(_coord);
+	          var _curveDot2 = (_e = oldDeformers.next) !== null && _e !== void 0 ? _e : _this28.toRCoord(_coord2);
 	          _curveDot2.unobserve();
 	          _curveDot2.observe(function (x, y) {
 	            next.instruction[1] = x;
 	            next.instruction[2] = y;
 	          });
-	          _curveDot2.set(_coord.x, _coord.y);
-	          if (next.instruction[0] === 'Q' && _this28.isCoincideNode(next)) {
-	            nodes[0].deformers = (_g = nodes[0].deformers) !== null && _g !== void 0 ? _g : {};
-	            nodes[0].deformers.pre = _curveDot2;
-	          } else {
-	            deformers.next = _curveDot2;
-	          }
+	          _curveDot2.set(_coord2.x, _coord2.y);
+	          deformers.next = _curveDot2;
 	        }
 	        if (oldDeformers.pre && !deformers.pre) oldDeformers.pre.unobserve();
 	        if (oldDeformers.next && !deformers.next) oldDeformers.next.unobserve();
 	        if (Object.keys(deformers).length) {
 	          node.deformers = deformers;
 	        } else {
-	          delete node.deformers;
+	          node.deformers = null;
 	        }
 	      });
-	    }
-	    /**
-	     * 添加变换器
-	     */
-	  }, {
-	    key: "addNodeDeformer",
-	    value: function addNodeDeformer(node, type, coord) {
-	      var _a;
-	      node.deformers = (_a = node.deformers) !== null && _a !== void 0 ? _a : {};
-	      if (node.deformers[type]) {
-	        node.deformers[type].set(coord.x, coord.y);
-	        return;
-	      }
-	      node.deformers[type] = this._toResponsiveCoord(coord);
-	      node.deformers[type].set(coord.x, coord.y);
 	    }
 	    /**
 	     * 将画布坐标转化为特定路径的相对指令坐标位置
@@ -8099,67 +8097,27 @@
 	      };
 	    }
 	    /**
-	     * 获取前后的指令信息
+	     * 获取前后的路径节点
 	     * @param pathNode 路径节点
-	     * @param cycle 闭合路径是否开启循环查找
 	     */
 	  }, {
-	    key: "getNeighboringInstructions",
-	    value: function getNeighboringInstructions(node) {
-	      var cycle = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
-	      var segment = node.segment;
-	      var index = segment.indexOf(node);
-	      var pre = segment[index - 1];
-	      var next = segment[index + 1];
-	      // 是否循环并且是闭合路径
-	      if (cycle && this.isClosedSegment(segment)) {
-	        // 如果没有上一个指令，则倒数第二个指令视为上一个指令（倒数第一是闭合指令，倒数第二是起始同步指令）
-	        if (!pre) {
-	          pre = segment[segment.length - 2];
-	        }
-	        // 如果有下一个指令但下一个指令是闭合指令，则指向起始指令下一个指令
-	        if (!next || next.instruction[0] === InstructionType.CLOSE) {
-	          next = segment[1];
-	        }
-	      }
+	    key: "getNeighboringPathNodes",
+	    value: function getNeighboringPathNodes(node) {
 	      return {
-	        pre: pre,
-	        next: next
+	        pre: node.previousSibling,
+	        next: node.nextSibling
 	      };
 	    }
 	    /**
-	     * 获取前后的指令节点信息
+	     * 获取前后带有实际操纵点的路径节点
 	     * @param pathNode 路径节点
-	     * @param cycle 闭合路径是否开启循环查找
 	     */
 	  }, {
 	    key: "getNeighboringNodes",
 	    value: function getNeighboringNodes(node) {
-	      var cycle = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
-	      var segment = node.segment;
-	      var _cycle = cycle && this.isClosedSegment(segment);
-	      var _index = segment.indexOf(node);
-	      var pre;
-	      var next;
-	      if (_index !== -1) {
-	        var i = _index;
-	        while (!pre && segment[i]) {
-	          if (i !== _index && segment[i]) pre = segment[i];
-	          i--;
-	          if (_cycle && i === -1) i = segment.length - 3;
-	          if (i === _index) break;
-	        }
-	        i = _index;
-	        while (!next && segment[i]) {
-	          if (i !== _index && segment[i]) next = segment[i];
-	          i++;
-	          if (_cycle && i === segment.length - 2) i = 0;
-	          if (i === _index) break;
-	        }
-	      }
 	      return {
-	        pre: pre,
-	        next: next
+	        pre: node.previousSiblingNode,
+	        next: node.nextSiblingNode
 	      };
 	    }
 	    /**
@@ -8201,9 +8159,9 @@
 	    key: "getConvertibleNodes",
 	    value: function getConvertibleNodes(node) {
 	      var instruction = node.instruction;
-	      var _this$getNeighboringI = this.getNeighboringInstructions(node),
-	        pre = _this$getNeighboringI.pre,
-	        next = _this$getNeighboringI.next;
+	      var _this$getNeighboringP = this.getNeighboringPathNodes(node),
+	        pre = _this$getNeighboringP.pre,
+	        next = _this$getNeighboringP.next;
 	      var convertibleNodes = {};
 	      switch (instruction[0]) {
 	        case InstructionType.START:
@@ -8353,8 +8311,8 @@
 	    key: "remove",
 	    value: function remove() {
 	      var _this29 = this;
-	      for (var _len4 = arguments.length, nodes = new Array(_len4), _key4 = 0; _key4 < _len4; _key4++) {
-	        nodes[_key4] = arguments[_key4];
+	      for (var _len5 = arguments.length, nodes = new Array(_len5), _key5 = 0; _key5 < _len5; _key5++) {
+	        nodes[_key5] = arguments[_key5];
 	      }
 	      // 找出需要删除的路径和指令索引映射，便于后续同路径下节点的批量操作
 	      var segmentRemoveIndexsMap = nodes.reduce(function (maps, node) {
@@ -8380,11 +8338,11 @@
 	        var isClosedSegment = segment[segment.length - 1].instruction[0] === InstructionType.CLOSE;
 	        indexes.sort();
 	        for (var i = 0; i < indexes.length; i++) {
-	          var _index2 = indexes[i] - i;
-	          if (instructions[_index2 + 1] && instructions[_index2 + 1][0] !== InstructionType.CLOSE) {
-	            _this29._toStartInstruction(instructions[_index2 + 1]);
+	          var _index = indexes[i] - i;
+	          if (instructions[_index + 1] && instructions[_index + 1][0] !== InstructionType.CLOSE) {
+	            _this29._toStartInstruction(instructions[_index + 1]);
 	          }
-	          instructions.splice(_index2, 1);
+	          instructions.splice(_index, 1);
 	        }
 	        // 处理闭合路径
 	        if (isClosedSegment) {
@@ -8459,9 +8417,9 @@
 	      var curveCoords = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : [];
 	      var instruction = node.instruction,
 	        nodeCoord = node.node;
-	      var _this$getNeighboringI2 = this.getNeighboringInstructions(node, true),
-	        pre = _this$getNeighboringI2.pre,
-	        next = _this$getNeighboringI2.next;
+	      var _this$getNeighboringP2 = this.getNeighboringPathNodes(node),
+	        pre = _this$getNeighboringP2.pre,
+	        next = _this$getNeighboringP2.next;
 	      var directionNodeMap = {
 	        pre: instruction[0] === InstructionType.START ? pre : node,
 	        next: next
@@ -8480,7 +8438,7 @@
 	        var coord = _this30.getInstructionCoord(instruction);
 	        instruction[0] = _defineProperty(_defineProperty({}, InstructionType.LINE, InstructionType.QUADRATIC_CURCE), InstructionType.QUADRATIC_CURCE, InstructionType.BEZIER_CURVE)[instruction[0]];
 	        if (direction === 'pre') {
-	          var _this30$getNeighborin = _this30.getNeighboringInstructions(node),
+	          var _this30$getNeighborin = _this30.getNeighboringPathNodes(node),
 	            _pre = _this30$getNeighborin.pre;
 	          var insertIndex = -2;
 	          var insertCoord = (_a = curveCoords.shift()) !== null && _a !== void 0 ? _a : {
@@ -8500,10 +8458,10 @@
 	          _this30.replace(node, instruction);
 	        }
 	      };
-	      targets.forEach(function (_ref14) {
-	        var _ref15 = _slicedToArray(_ref14, 2),
-	          direction = _ref15[0],
-	          pathNode = _ref15[1];
+	      targets.forEach(function (_ref13) {
+	        var _ref14 = _slicedToArray(_ref13, 2),
+	          direction = _ref14[0],
+	          pathNode = _ref14[1];
 	        upgrade(pathNode, direction);
 	        if (highest) upgrade(pathNode, direction);
 	      });
@@ -8521,9 +8479,9 @@
 	      var _this31 = this;
 	      var direction = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'both';
 	      var lowest = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
-	      var _this$getNeighboringI3 = this.getNeighboringInstructions(node, true),
-	        pre = _this$getNeighboringI3.pre,
-	        next = _this$getNeighboringI3.next;
+	      var _this$getNeighboringP3 = this.getNeighboringPathNodes(node),
+	        pre = _this$getNeighboringP3.pre,
+	        next = _this$getNeighboringP3.next;
 	      var directionNodeMap = {
 	        pre: node.instruction[0] === InstructionType.START ? pre : node,
 	        next: next
@@ -8535,10 +8493,10 @@
 	      if ((direction === 'both' || direction === 'next') && directionNodeMap.next) {
 	        targets.push(['next', directionNodeMap.next]);
 	      }
-	      targets.forEach(function (_ref16) {
-	        var _ref17 = _slicedToArray(_ref16, 2),
-	          direction = _ref17[0],
-	          pathNode = _ref17[1];
+	      targets.forEach(function (_ref15) {
+	        var _ref16 = _slicedToArray(_ref15, 2),
+	          direction = _ref16[0],
+	          pathNode = _ref16[1];
 	        var instruction = pathNode.instruction;
 	        if (['M', 'L'].includes(instruction[0])) return;
 	        if (lowest) {
@@ -8571,10 +8529,10 @@
 	          queue.sort(function (a, b) {
 	            return b.index - a.index;
 	          });
-	          queue.forEach(function (_ref18) {
-	            var type = _ref18.type,
-	              index = _ref18.index,
-	              instruction = _ref18.instruction;
+	          queue.forEach(function (_ref17) {
+	            var type = _ref17.type,
+	              index = _ref17.index,
+	              instruction = _ref17.instruction;
 	            // 如果需要修复指令
 	            if (index === 0 && instruction[0] !== InstructionType.START) {
 	              _this32._toStartInstruction(instruction);
@@ -8758,8 +8716,8 @@
 	            (_a = node.node) === null || _a === void 0 ? void 0 : _a.unobserve();
 	            (_c = (_b = node.deformers) === null || _b === void 0 ? void 0 : _b.pre) === null || _c === void 0 ? void 0 : _c.unobserve();
 	            (_f = (_e = node.deformers) === null || _e === void 0 ? void 0 : _e.next) === null || _f === void 0 ? void 0 : _f.unobserve();
-	            delete node.node;
-	            delete node.deformers;
+	            node.node = null;
+	            node.deformers = null;
 	          }
 	        });
 	      });
@@ -10916,10 +10874,10 @@
 	          var leftClick = space && event.e.buttons === 1,
 	            rightClick = _this42._options.rightClickMove && event.e.buttons === 2;
 	          if (leftClick || rightClick) {
-	            var _ref19 = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0],
-	              _ref20 = _slicedToArray(_ref19, 6),
-	              offsetX = _ref20[4],
-	              offsetY = _ref20[5];
+	            var _ref18 = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0],
+	              _ref19 = _slicedToArray(_ref18, 6),
+	              offsetX = _ref19[4],
+	              offsetY = _ref19[5];
 	            var dragCursor = moveCursor;
 	            // 开始移动起取消当前画布聚焦元素并将所以元素设为不可操作
 	            canvas.forEachObject(function (object) {
@@ -11044,9 +11002,9 @@
 	          zoomCenter = _this44$_options.zoomCenter;
 	        if (!zoomable) return;
 	        event.e.preventDefault();
-	        var _ref21 = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0],
-	          _ref22 = _slicedToArray(_ref21, 1),
-	          zoom = _ref22[0];
+	        var _ref20 = (_a = canvas.viewportTransform) !== null && _a !== void 0 ? _a : [1, 0, 0, 1, 0, 0],
+	          _ref21 = _slicedToArray(_ref20, 1),
+	          zoom = _ref21[0];
 	        var zoomLimit = _this44._options.zoomLimit;
 	        var _event$e = event.e,
 	          offsetX = _event$e.offsetX,
@@ -11139,16 +11097,16 @@
 	      var _this47 = this;
 	      var editor = this.editor;
 	      if (!editor) return;
-	      this._stashConfigurators.forEach(function (_ref23) {
-	        var module = _ref23.module,
-	          configurator = _ref23.configurator;
+	      this._stashConfigurators.forEach(function (_ref22) {
+	        var module = _ref22.module,
+	          configurator = _ref22.configurator;
 	        _this47._configurators.set(module !== null && module !== void 0 ? module : editor, function (editor, shareState) {
 	          var themes = configurator(editor, shareState);
 	          var _loop2 = function _loop2() {
 	            var theme = themes[themeKey];
 	            themes[themeKey] = function (decorator) {
-	              for (var _len5 = arguments.length, args = new Array(_len5 > 1 ? _len5 - 1 : 0), _key5 = 1; _key5 < _len5; _key5++) {
-	                args[_key5 - 1] = arguments[_key5];
+	              for (var _len6 = arguments.length, args = new Array(_len6 > 1 ? _len6 - 1 : 0), _key6 = 1; _key6 < _len6; _key6++) {
+	                args[_key6 - 1] = arguments[_key6];
 	              }
 	              return theme.apply(void 0, [function (customObject, callback) {
 	                decorator(customObject);
@@ -11176,10 +11134,10 @@
 	        });
 	      });
 	      this._stashConfigurators.length = 0;
-	      Array.from(this._configurators.entries()).forEach(function (_ref24) {
-	        var _ref25 = _slicedToArray(_ref24, 2),
-	          module = _ref25[0],
-	          configurator = _ref25[1];
+	      Array.from(this._configurators.entries()).forEach(function (_ref23) {
+	        var _ref24 = _slicedToArray(_ref23, 2),
+	          module = _ref24[0],
+	          configurator = _ref24[1];
 	        module.themes.__themes = Object.assign(Object.assign({}, module.themes.__themes), configurator(editor, _this47.shareState));
 	      });
 	    }
@@ -11551,8 +11509,8 @@
 	              var points = [];
 	              if (['M', 'Z'].includes(item.instruction[0])) continue;
 	              if (item.instruction[0] === InstructionType.LINE) {
-	                var _vizpath$getNeighbori2 = vizpath.getNeighboringNodes(item, true),
-	                  pre = _vizpath$getNeighbori2.pre;
+	                var _vizpath$getNeighbori = vizpath.getNeighboringNodes(item),
+	                  pre = _vizpath$getNeighbori.pre;
 	                var start = pre.node;
 	                var end = {
 	                  x: item.instruction[1],
@@ -11563,8 +11521,8 @@
 	                  y: (start.y + end.y) / 2
 	                }, end];
 	              } else if (item.instruction[0] === InstructionType.QUADRATIC_CURCE) {
-	                var _vizpath$getNeighbori3 = vizpath.getNeighboringNodes(item, true),
-	                  _pre2 = _vizpath$getNeighbori3.pre;
+	                var _vizpath$getNeighbori2 = vizpath.getNeighboringNodes(item),
+	                  _pre2 = _vizpath$getNeighbori2.pre;
 	                points = [_pre2.node, {
 	                  x: item.instruction[1],
 	                  y: item.instruction[2]
@@ -11573,8 +11531,8 @@
 	                  y: item.instruction[4]
 	                }];
 	              } else if (item.instruction[0] === InstructionType.BEZIER_CURVE) {
-	                var _vizpath$getNeighbori4 = vizpath.getNeighboringNodes(item, true),
-	                  _pre3 = _vizpath$getNeighbori4.pre;
+	                var _vizpath$getNeighbori3 = vizpath.getNeighboringNodes(item),
+	                  _pre3 = _vizpath$getNeighbori3.pre;
 	                points = [_pre3.node, {
 	                  x: item.instruction[1],
 	                  y: item.instruction[2]
@@ -11632,8 +11590,8 @@
 	        if (!_this52.splitDot.containsPoint(e.pointer)) return;
 	        editor.rerender(function () {
 	          if (!pathNode || !splitCoord) return;
-	          var _vizpath$getNeighbori5 = vizpath.getNeighboringInstructions(pathNode, true),
-	            pre = _vizpath$getNeighbori5.pre;
+	          var _vizpath$getNeighbori4 = vizpath.getNeighboringPathNodes(pathNode),
+	            pre = _vizpath$getNeighbori4.pre;
 	          if (!pre || !pre.node) return;
 	          var splitCurves = splitInstruction([pre.node].concat(_toConsumableArray(pathNode.instruction.slice(1).reduce(function (list, _, i, arr) {
 	            if (i % 2 === 0) {
@@ -11686,8 +11644,8 @@
 	  return _createClass(EditorQuickCurve, [{
 	    key: "straighten",
 	    value: function straighten() {
-	      for (var _len6 = arguments.length, objects = new Array(_len6), _key6 = 0; _key6 < _len6; _key6++) {
-	        objects[_key6] = arguments[_key6];
+	      for (var _len7 = arguments.length, objects = new Array(_len7), _key7 = 0; _key7 < _len7; _key7++) {
+	        objects[_key7] = arguments[_key7];
 	      }
 	      var editor = this.editor;
 	      if (!editor) return;
@@ -11707,8 +11665,8 @@
 	  }, {
 	    key: "curve",
 	    value: function curve() {
-	      for (var _len7 = arguments.length, objects = new Array(_len7), _key7 = 0; _key7 < _len7; _key7++) {
-	        objects[_key7] = arguments[_key7];
+	      for (var _len8 = arguments.length, objects = new Array(_len8), _key8 = 0; _key8 < _len8; _key8++) {
+	        objects[_key8] = arguments[_key8];
 	      }
 	      var editor = this.editor;
 	      if (!editor) return;
@@ -11765,7 +11723,7 @@
 	            var _curveP2 = calcRelativeCoord(p, rCoord, -distance / (2 / curveDegree) * (1 + angle / 90));
 	            var _curveP3 = calcPerpendicularSymmetricalCoord(p0, p, _curveP2);
 	            vizpath.upgrade(node, _direction, true, [_curveP2, _curveP3]);
-	            vizpath.addNodeDeformer(node, _oppositeDirection, calcSymmetricalCoord(_curveP3, p0));
+	            // vizpath.addNodeDeformer(node, oppositeDirection, calcSymmetricalCoord(curveP2, p0));
 	            return;
 	          }
 	          // 两边都有变换器无法再升级
@@ -11779,8 +11737,6 @@
 	          var curveP2 = calcSymmetricalCoord(node.deformers[direction], p0);
 	          if (neighboringNodes[oppositeDirection]) {
 	            vizpath.upgrade(node, oppositeDirection, false, [curveP2]);
-	          } else {
-	            vizpath.addNodeDeformer(node, oppositeDirection, curveP2);
 	          }
 	        });
 	      });
@@ -11801,9 +11757,9 @@
 	      if (!vizpath) return;
 	      var node = this.editor.objectNodeMap.get(object);
 	      if (!node) return;
-	      var _vizpath$getNeighbori6 = vizpath.getNeighboringNodes(node),
-	        pre = _vizpath$getNeighbori6.pre,
-	        next = _vizpath$getNeighbori6.next;
+	      var _vizpath$getNeighbori5 = vizpath.getNeighboringNodes(node),
+	        pre = _vizpath$getNeighbori5.pre,
+	        next = _vizpath$getNeighbori5.next;
 	      if (node.deformers || ((_a = pre === null || pre === void 0 ? void 0 : pre.deformers) === null || _a === void 0 ? void 0 : _a.next) || ((_b = next === null || next === void 0 ? void 0 : next.deformers) === null || _b === void 0 ? void 0 : _b.pre)) {
 	        this.straighten(object);
 	      } else {
@@ -19696,9 +19652,9 @@
 	var polyline = "M 40 40 L 160 40 L 40 100 L 160 100 L 40 160 L 160 160";
 	var shapes = "M -61.1077 -171 L 26.7539 -27 L -128.6769 -27 L -61.1077 -171 Z M 218.6769 -97.5 C 218.6769 -61.8777 189.7992 -33 154.1769 -33 C 118.5546 -33 89.6769 -61.8777 89.6769 -97.5 C 89.6769 -133.1223 118.5546 -162 154.1769 -162 C 189.7992 -162 218.6769 -133.1223 218.6769 -97.5 Z M -124.3231 181 L 28.6769 180 L 28.6769 28 L -124.3231 28 L -124.3231 181 Z M 230.6769 180 L 79.6769 177 L 230.6769 27 L 79.6769 28";
 	var spiral = "M 23.5296 117.9696 C 23.5296 117.9696 23.5009 117.9777 23.4892 117.9817 C 15.6793 119.9628 7.2337 121.9278 -1.6511 122.8701 C -13.0515 124.0857 -24.9443 123.6698 -37.0108 121.6325 C -59.034 117.9214 -79.0017 109.0888 -96.3677 95.3959 C -118.0763 78.2732 -133.1613 56.2982 -141.1879 30.0912 L -141.316 29.6723 C -152.0365 -6.3544 -149.1799 -41.6978 -132.8198 -75.3812 C -124.6557 -92.1925 -113.1862 -107.107 -98.7396 -119.7129 C -88.8397 -128.3516 -77.4946 -135.6064 -65.0201 -141.2725 C -43.5422 -151.0406 -19.8783 -155.3314 5.3047 -154.0363 C 21.5845 -153.1997 37.8936 -149.5028 53.7808 -143.0425 C 72.2356 -135.5424 89.0348 -124.513 103.7183 -110.2669 C 113.6378 -100.6403 122.3519 -89.3142 129.6072 -76.6012 C 134.7589 -67.5772 139.2375 -57.3425 143.3001 -45.2946 C 143.4609 -44.8152 143.2077 -44.299 142.7315 -44.1409 C 142.2674 -43.9729 141.743 -44.2393 141.5843 -44.7187 C 137.5578 -56.6503 133.1274 -66.7855 128.034 -75.7005 C 120.863 -88.261 112.2615 -99.4492 102.4585 -108.9593 C 87.9438 -123.041 71.3395 -133.9383 53.1037 -141.3535 C 37.407 -147.7316 21.2935 -151.3866 5.212 -152.2138 C -19.6711 -153.4988 -43.0531 -149.256 -64.2666 -139.6134 C -76.5792 -134.0158 -87.777 -126.8571 -97.5425 -118.3358 C -111.8117 -105.8924 -123.1241 -91.1657 -131.1859 -74.5765 C -147.3456 -41.3109 -150.1692 -6.4165 -139.5835 29.1489 L -139.4572 29.562 C -131.5426 55.4021 -116.6646 77.0717 -95.2528 93.9673 C -78.1327 107.4754 -58.439 116.1734 -36.7204 119.8402 C -24.8212 121.8434 -13.0868 122.2573 -1.851 121.0618 C 6.9038 120.1275 15.2684 118.1866 22.996 116.2236 L 23.2405 116.1372 C 43.0485 110.3968 60.5479 99.4224 75.2957 83.5053 C 88.8459 68.876 98.2552 51.4359 103.2622 31.6837 C 106.5392 18.759 107.6523 5.892 106.5653 -6.5702 C 105.8742 -14.5025 104.6084 -21.7622 102.6976 -28.7491 C 99.2759 -41.2604 94.3753 -52.1489 87.7228 -62.024 C 79.6095 -74.0682 69.5051 -84.1537 57.6767 -92.0078 C 44.552 -100.7247 30.2641 -106.414 15.2136 -108.9243 C 3.0419 -110.9537 -8.0997 -110.9758 -18.8547 -108.991 L -20.1684 -108.7483 C -24.3203 -107.9876 -28.6102 -107.2038 -32.7174 -105.9669 C -62.082 -96.7582 -82.989 -77.2018 -94.8596 -47.837 C -101.3247 -31.8442 -103.1177 -14.7671 -100.1939 2.9224 C -95.7581 29.7438 -82.4005 50.5659 -60.5013 64.8073 C -46.8164 73.7022 -31.3984 78.3857 -14.6679 78.7153 C -5.8255 78.8921 2.7178 77.6805 10.7129 75.1087 C 10.7418 75.0986 10.7764 75.0886 10.8053 75.0806 C 30.1329 68.4501 44.7025 56.5775 54.1224 39.7886 C 63.3588 23.3241 66.2099 5.6435 62.6074 -12.7611 C 58.9184 -31.585 49.2492 -46.27 33.8699 -56.4163 C 23.2162 -63.4458 12.133 -67.0103 -0.0106 -67.3178 C -18.7428 -67.7988 -33.5227 -61.9557 -45.1765 -49.4597 C -56.386 -37.4493 -61.2212 -23.0174 -59.5473 -6.568 C -57.1837 16.6752 -41.9533 32.523 -19.7983 34.7884 C -4.1488 36.3904 7.6748 31.0506 15.3575 18.9163 C 21.8959 8.5888 21.4543 -6.7806 14.3798 -15.35 C 9.0101 -21.8514 3.1473 -24.2513 -4.628 -23.1269 C -8.2418 -22.6071 -11.5279 -20.6861 -13.4178 -17.9959 C -15.1598 -15.5228 -15.7079 -12.5495 -15.0448 -9.1639 C -14.9508 -8.6711 -15.2711 -8.1915 -15.7583 -8.0932 C -16.2474 -8.001 -16.7252 -8.3257 -16.825 -8.817 C -17.5771 -12.6586 -16.9112 -16.1961 -14.901 -19.0502 C -12.729 -22.1384 -8.9916 -24.3373 -4.895 -24.9284 C 3.5759 -26.151 9.9462 -23.5565 15.7675 -16.5061 C 23.3106 -7.3737 23.8145 8.9627 16.8843 19.9064 C 8.8053 32.6645 -3.5954 38.2825 -19.9747 36.6048 C -31.4171 35.434 -41.3393 30.6936 -48.6657 22.8883 C -55.7911 15.3079 -60.1758 5.1778 -61.354 -6.3908 C -63.0826 -23.3899 -58.0838 -38.298 -46.5064 -50.7135 C -34.6413 -63.4269 -18.9882 -69.6324 0.0248 -69.1417 C 12.3418 -68.8239 24.0602 -65.059 34.8552 -57.9391 C 50.6599 -47.5158 60.5921 -32.4274 64.3835 -13.1006 C 68.0745 5.7409 65.1571 23.8427 55.6996 40.6935 C 46.0439 57.9097 31.0972 70.0776 11.2888 76.8467 C 11.2427 76.8607 11.2024 76.8728 11.162 76.8848 C 2.9995 79.5089 -5.6947 80.7245 -14.6956 80.5437 C -31.7639 80.2021 -47.5064 75.4281 -61.4772 66.3404 C -83.8321 51.8056 -97.4555 30.5682 -101.9785 3.2137 C -104.9616 -14.8141 -103.1324 -32.2267 -96.5361 -48.533 C -84.5362 -78.2172 -63.4509 -98.0574 -33.8726 -107.5161 C -33.8378 -107.5267 -33.8165 -107.5396 -33.7761 -107.5518 C -33.6262 -107.5976 -33.4761 -107.6437 -33.3262 -107.6895 L -33.2107 -107.7248 C -33.2107 -107.7248 -33.1878 -107.7319 -33.1703 -107.7371 C -28.998 -108.9876 -24.6908 -109.7767 -20.514 -110.5386 L -19.206 -110.7795 C -8.242 -112.8026 3.1078 -112.7807 15.485 -110.7188 C 30.7868 -108.1707 45.3131 -102.3825 58.6572 -93.529 C 70.6805 -85.5443 80.9597 -75.2886 89.2076 -63.0445 C 95.9707 -52.9992 100.9495 -41.9373 104.4315 -29.2283 C 106.3745 -22.1309 107.6584 -14.7745 108.3616 -6.7247 C 109.4586 5.9437 108.3335 19.0181 105.0022 32.1374 C 99.9188 52.1934 90.3669 69.8927 76.6097 84.751 C 61.6409 100.9133 43.8498 112.0484 23.784 117.8732 L 23.5509 117.9556 C 23.5509 117.9556 23.528 117.9636 23.5163 117.9676 L 23.5296 117.9696 Z";
-	var test = "M -150 50 z M 0 0 Q 50 0 50 50 Q 50 100 0 100 Q -50 100 -50 50 Q -50 0 0 0 z M 80 0 L 180 0 L 80 50 L 180 50 L 80 100 L 180 100";
-	var curve1 = "M 0 -197.5 Q -185 -195.5 -197 1.5 Q -174 176.5 2 176.5 Q 158 164.5 158 -1.5 Q 142 -134.5 0 -147.5 Q -141 -146.5 -148 0.5 Q -128 131.5 0 129.5 Q 106 110.5 110 -0.5 Q 95 -97.5 -2 -103.5 Q -96 -97.5 -102 0 Q -88 81.5 -7 80.5 Q 54 72.5 62 3.5 Q 51 -62.5 -3 -60.5 Q -57 -58.5 -57 -1.5 Q -44 35.5 -10 35.5 C 24 35.5 30 -0.5 17 -10.5 C 4 -20.5 -16 -21.5 -24 -4.5";
-	var rect = "M -100 -100 L 100 -100 L 100 100 L -100 100 z";
+	var test = "M 6.7522 157.2683 L 6.7522 157.2683 Q -44.3277 157.2683 -84.526 133.6169 Q -124.6345 109.9655 -147.6564 69.2275 Q -170.5884 28.3996 -170.5884 -22.7702 L -170.5884 -22.7702 Q -170.5884 -74.5695 -148.286 -115.3074 Q -125.9835 -156.1354 -87.4038 -179.7867 Q -48.9141 -203.3482 1.6262 -203.3482 L 1.6262 -203.3482 Q 40.4757 -203.3482 73.4797 -188.1501 Q 106.4837 -172.9521 131.7539 -142.556 L 131.7539 -142.556 Q 139.4878 -133.4732 137.2396 -124.0306 Q 134.9913 -114.678 125.2789 -107.5735 L 125.2789 -107.5735 Q 117.545 -102.3576 108.1025 -103.9763 Q 98.7498 -105.5951 90.926 -114.0484 L 90.926 -114.0484 Q 55.3139 -154.1569 1.6262 -154.1569 L 1.6262 -154.1569 Q -33.9858 -154.1569 -60.8747 -137.3401 Q -87.7635 -120.5233 -102.6019 -91.0265 Q -117.5301 -61.6196 -117.5301 -22.7702 L -117.5301 -22.7702 Q -117.5301 14.8202 -101.7026 44.3171 Q -85.7851 73.7239 -57.6372 90.9005 Q -29.4893 108.0769 6.7522 108.0769 L 6.7522 108.0769 Q 31.3928 108.0769 51.1773 101.6021 Q 70.8717 95.1272 86.4296 81.5478 L 86.4296 81.5478 Q 95.5124 74.3535 104.5953 73.7239 Q 113.5882 73.0944 121.412 78.9399 L 121.412 78.9399 Q 129.7754 86.6738 131.1244 96.3861 Q 132.3834 106.0985 124.6495 113.9224 L 124.6495 113.9224 Q 77.3467 157.2683 6.7522 157.2683 Z";
+	var curve = "M -76.8889 -77.8889 Q -0.5 -154.2778 75.8889 -77.8889 L 75.8889 74.8889 Q -0.5 151.2778 -76.8889 74.8889 L -76.8889 -77.8889 Z";
+	var curve2 = "M 0 -100 Q 100 -100 100 0 Q 100 100 0 100 Q -100 100 -100 0 Q -100 -100 0 -100 z";
 	var paths = {
 		arc: arc,
 		arch: arch,
@@ -19720,8 +19676,8 @@
 		shapes: shapes,
 		spiral: spiral,
 		test: test,
-		curve1: curve1,
-		rect: rect
+		curve: curve,
+		curve2: curve2
 	};
 
 	function Demo02() {
@@ -20105,12 +20061,11 @@
 	function Demo03() {
 	    const { canvas, currentDemo, setEditor } = React.useContext(PageContext);
 	    const run = React.useCallback(async () => {
-	        var _a;
 	        if (!canvas)
 	            return;
 	        if (currentDemo !== Instruction._03_TRANSFORM_PATH)
 	            return;
-	        const path = new Path(paths.rect);
+	        const path = new Path(paths.diamond);
 	        const vizpath = path.visualize();
 	        const editor = new VizPathEditor();
 	        await editor
@@ -20192,8 +20147,22 @@
 	            .mount(canvas);
 	        editor.enterEditing(path);
 	        // editor.focus(editor.nodes[2]);
-	        (_a = editor.findModule(EditorQuickCurve)) === null || _a === void 0 ? void 0 : _a.curve(...editor.nodes);
-	        await index_umdExports.wait(3000);
+	        // editor.findModule(EditorQuickCurve)?.straighten(editor.nodes[0]);
+	        // editor.findModule(EditorQuickCurve)?.curve(editor.nodes[1]);
+	        // editor.rerender(async () => {
+	        //   const node = vizpath.segments[0][0];
+	        //   vizpath.upgrade(node, 'pre', false, [{ x: -75, y: 75 }]);
+	        //   await wait(3000);
+	        //   const deformers = node.deformers;
+	        //   editor.requestCreateDeformers({
+	        //     type: 'pre',
+	        //     dot: deformers!.pre!,
+	        //     node: node,
+	        //     symmetric: 'none',
+	        //   });
+	        //   // vizpath.upgrade(vizpath.segments[0][1], 'pre', false, [{ x: 75, y: 75 }]);
+	        // });
+	        // await wait(3000);
 	        setEditor(editor);
 	    }, [currentDemo, canvas, setEditor]);
 	    React.useEffect(() => {

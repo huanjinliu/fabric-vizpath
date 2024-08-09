@@ -48,20 +48,6 @@ type EditorSetting = {
    * @default 'move'
    */
   mode: `${Mode}`;
-  /**
-   * 是否开启强制曲线变换器对称
-   *
-   * none - 单杆变换，不对称变换
-   *
-   * auto - 自动变换，操作前若角度恰好对称则保持角度对称状态，如完全对称则完全对称，反之则不对称变换
-   *
-   * angle - 角度对称变换
-   *
-   * entire - 角度与位置保存完全对称变换
-   *
-   * @default 'auto'
-   */
-  dotSymmetricMode: 'none' | 'auto' | 'angle' | 'entire';
 };
 
 type EditorDeformer = {
@@ -71,7 +57,21 @@ type EditorDeformer = {
   nodeObject: fabric.Object;
   curveDot: fabric.Object;
   curveBar: fabric.Line;
+  /**
+   * 是否开启强制曲线变换器对称
+   *
+   * none - 单杆变换，不对称变换
+   *
+   * angle - 角度对称变换
+   *
+   * entire - 角度与位置保存完全对称变换
+   *
+   * @default 'none'
+   */
+  symmetric: 'none' | 'angle' | 'entire';
 };
+
+type EditorDeformerCache = Pick<EditorDeformer, 'type' | 'node' | 'symmetric' | 'dot'>;
 
 /**
  * 可视路径编辑器
@@ -87,7 +87,6 @@ class VizPathEditor {
   private _settings: Partial<EditorSetting>[] = [
     {
       mode: Mode.MOVE,
-      dotSymmetricMode: 'auto',
     },
   ];
 
@@ -159,6 +158,9 @@ class VizPathEditor {
   /** 路径曲线变换器列表 */
   deformers: EditorDeformer[] = [];
 
+  /** 变换器缓存 */
+  deformerCaches: EditorDeformerCache[] = [];
+
   /** 元素画布对象 与 路径节点对象 映射 */
   objectNodeMap: Map<fabric.Object, PathNode> = new Map([]);
 
@@ -170,9 +172,6 @@ class VizPathEditor {
 
   /** 当前活跃的曲线变换器画布对象 */
   activePoint: fabric.Object | null = null;
-
-  /** dotSymmetricMode为auto的情况下，会采用以下变换模式 */
-  dotSymmetricAutoMode: 'none' | 'angle' | 'entire' = 'none';
 
   /** 当前转换的路径节点 */
   currentConvertNodeObject: fabric.Object | null = null;
@@ -274,7 +273,7 @@ class VizPathEditor {
     this._renderPathNodes();
 
     // 绘制全部变换器
-    // this._renderAllDeformers();
+    this._renderAllDeformers();
   }
 
   /**
@@ -307,7 +306,6 @@ class VizPathEditor {
     this.nodeObjectMap.clear();
     this.objectNodeMap.clear();
 
-    this.dotSymmetricAutoMode = 'none';
     this.currentConvertNodeObject = null;
     this._lockFocus = false;
 
@@ -333,7 +331,7 @@ class VizPathEditor {
     const result = callback(storeActiveNodes, storeActivePoint);
 
     this._renderPathNodes();
-    this._renderDeformers();
+    this._renderAllDeformers();
 
     if (storeActivePoint?.canvas === this.canvas) this.focus(storeActivePoint);
     else if (storeActiveNodes.every((object) => object.canvas === this.canvas)) {
@@ -578,75 +576,69 @@ class VizPathEditor {
   }
 
   /**
-   * 绘制曲线变换器及其连接线
+   * 生成当前路径变换器缓存
    */
-  private _renderDeformers() {
+  private _getLastestPathDeformerCache() {
+    const caches: EditorDeformerCache[] = [];
+
     const vizpath = this.vizpath;
-    if (!vizpath) return;
+    if (!vizpath) return caches;
 
-    const canvas = this.canvas;
-    if (!canvas) return;
-
-    // 当前的活跃节点
-    const curPathNode =
-      this.activeNodes.length === 1 ? this.objectNodeMap.get(this.activeNodes[0]) : undefined;
-
-    // 创建新的路径曲线变换器
-    const deformers: EditorDeformer[] = [];
-
-    if (curPathNode) {
-      const { pre, next } = vizpath.getNeighboringNodes(curPathNode);
-
-      [pre, curPathNode, next].forEach((node) => {
-        if (!node) return;
+    vizpath.segments.forEach((segment) => {
+      segment.forEach((node) => {
         Object.entries(node.deformers ?? {}).forEach(([direction, dot]) => {
-          const reuseDeformer = this.deformers.find((i) => i.type === direction && i.node === node);
-          const _curveDot = {
+          // 贝塞尔二阶曲线的变换点需要做特殊处理
+          const isQuadraticCurve =
+            node.instruction[0] === 'Q' ||
+            (node.instruction[0] === 'M' && node.previousSibling?.instruction[0] === 'Q');
+          if (node.previousSiblingNode && isQuadraticCurve) {
+            const preDeformer = caches[caches.length - 1];
+            if (
+              preDeformer &&
+              preDeformer.node === node.previousSiblingNode &&
+              preDeformer.type === 'pre'
+            ) {
+              caches.push({
+                type: 'next' as const,
+                dot,
+                node: node.previousSiblingNode!,
+                symmetric: 'entire' as const,
+              });
+              return;
+            }
+          }
+
+          caches.push({
             type: direction as 'pre' | 'next',
             dot,
             node,
-            nodeObject: this.nodeObjectMap.get(node)!,
-            curveDot: this._createCurveDotObject(reuseDeformer?.curveDot),
-            curveBar: this._createCurveBarLine(reuseDeformer?.curveBar),
-          };
-          this._setDeformerObjectsCoords(_curveDot);
-          deformers.push(_curveDot);
+            symmetric: 'entire' as const,
+          });
         });
       });
-    }
-
-    fabricOnceRender(canvas, () => {
-      const oldObjectSet = new Set<fabric.Object | fabric.Line>(
-        this.deformers.map((i) => [i.curveDot, i.curveBar]).flat(1),
-      );
-      // 添加新的画布元素
-      const baseIndex = canvas._objects.indexOf(vizpath.path) + 1;
-      deformers.forEach((i, idx) => {
-        if (canvas.contains(i.curveBar)) {
-          canvas.moveTo(i.curveBar, baseIndex + idx);
-          oldObjectSet.delete(i.curveBar);
-        } else {
-          canvas.insertAt(i.curveBar, baseIndex + idx, false);
-        }
-      });
-      deformers.forEach((i, idx) => {
-        if (canvas.contains(i.curveDot)) {
-          canvas.moveTo(i.curveDot, baseIndex + deformers.length + idx);
-          oldObjectSet.delete(i.curveDot);
-        } else {
-          canvas.insertAt(i.curveDot, baseIndex + deformers.length + idx, false);
-        }
-      });
-      // 移除旧的无用对象
-      canvas.remove(...oldObjectSet.values());
-      oldObjectSet.clear();
     });
 
-    this.deformers = deformers;
+    return caches;
   }
 
   /**
-   * 渲染全部的变换器
+   * 合并新路径变换器缓存以获取正确的缓存数据
+   */
+  private _mergeDeformCaches(caches: EditorDeformerCache[]) {
+    this.deformerCaches.forEach((cache) => {
+      if (!this.nodeObjectMap.has(cache.node)) return;
+      const newCache = caches.find((item) => item.node === cache.node && item.dot === cache.dot);
+      if (newCache) {
+        newCache.type = cache.type;
+        newCache.symmetric = cache.symmetric;
+      }
+    });
+    this.deformerCaches = caches;
+    return this.deformerCaches;
+  }
+
+  /**
+   * 渲染变换器列表
    */
   private _renderAllDeformers() {
     const vizpath = this.vizpath;
@@ -658,27 +650,25 @@ class VizPathEditor {
     // 创建新的路径曲线变换器
     const deformers: EditorDeformer[] = [];
 
-    vizpath.segments.forEach((segment) => {
-      segment.forEach((node) => {
-        Object.entries(node.deformers ?? {}).forEach(([direction, dot]) => {
-          const reuseDeformer = this.deformers.find((i) => i.type === direction && i.node === node);
-          const _curveDot = {
-            type: direction as 'pre' | 'next',
-            dot,
-            node,
-            nodeObject: this.nodeObjectMap.get(node)!,
-            curveDot: this._createCurveDotObject(reuseDeformer?.curveDot),
-            curveBar: this._createCurveBarLine(reuseDeformer?.curveBar),
-          };
-          this._setDeformerObjectsCoords(_curveDot);
-          deformers.push(_curveDot);
-        });
-      });
+    this.deformerCaches = this._mergeDeformCaches(this._getLastestPathDeformerCache());
+    this.deformerCaches.forEach(({ node, dot, type, symmetric }) => {
+      const reuseDeformer = this.deformers.find((i) => i.type === type && i.node === node);
+      const deformer = {
+        type,
+        dot,
+        node,
+        nodeObject: this.nodeObjectMap.get(node)!,
+        curveDot: this._createCurveDotObject(reuseDeformer?.curveDot),
+        curveBar: this._createCurveBarLine(reuseDeformer?.curveBar),
+        symmetric,
+      };
+      this._setDeformerObjectsCoords(deformer);
+      deformers.push(deformer);
     });
 
     fabricOnceRender(canvas, () => {
       const oldObjectSet = new Set<fabric.Object | fabric.Line>(
-        this.deformers.map((i) => [i.curveDot, i.curveBar]).flat(1),
+        this.deformers.map((i) => [i.curveDot, i.curveBar]).flat(2),
       );
       // 添加新的画布元素
       const baseIndex = canvas._objects.indexOf(vizpath.path) + 1;
@@ -707,18 +697,25 @@ class VizPathEditor {
   }
 
   /**
+   * 申请创建变换器，会缓存配置，并在每一次渲染变换器的时候优先考虑配置来生成新的变换器列表
+   */
+  requestCreateDeformers(...cache: EditorDeformerCache[]) {
+    this._mergeDeformCaches([...this.deformerCaches, ...cache]);
+  }
+
+  /**
    * 初始节点选择事件
    */
   private _initSelectEvents() {
     const canvas = this.canvas;
     if (!canvas) return;
-    const handler = (eventName: string) => (e: fabric.IEvent) => {
+    const handler = () => () => {
       this.focus(...canvas.getActiveObjects());
     };
 
-    this.events.canvas.on('selection:created', handler('selection:created'));
-    this.events.canvas.on('selection:updated', handler('selection:updated'));
-    this.events.canvas.on('selection:cleared', handler('selection:cleared'));
+    this.events.canvas.on('selection:created', handler());
+    this.events.canvas.on('selection:updated', handler());
+    this.events.canvas.on('selection:cleared', handler());
 
     // 选中路径段时自动选中路线段内的所有指令路径节点
     // this.events.canvas.on('mouse:dblclick', (e) => {
@@ -835,7 +832,7 @@ class VizPathEditor {
       const coord = calcCanvasCoord(canvas, pointer);
 
       const targetNode = this.objectNodeMap.get(target)!;
-      const neighboringNodes = vizpath.getNeighboringNodes(targetNode, true);
+      const neighboringNodes = vizpath.getNeighboringNodes(targetNode);
 
       // 获取可转换点，如果无法转换了则先转变为直线再提取转换点
       let convertibleNodes = Object.entries(vizpath.getConvertibleNodes(targetNode));
@@ -861,56 +858,72 @@ class VizPathEditor {
       }
 
       this.rerender(() => {
-        vizpath.upgrade(targetNode, 'both', true);
+        vizpath.upgrade(targetNode, 'both');
 
-        // 非闭合路径给端点添加虚拟变换器
-        if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
-          if (
-            targetNode === targetNode.segment[0] &&
-            !targetNode.deformers.pre &&
-            targetNode.deformers.next
-          ) {
-            vizpath.addNodeDeformer(targetNode, 'pre', {
-              x: targetNode.node!.x - (targetNode.deformers.next.x - targetNode.node!.x),
-              y: targetNode.node!.y - (targetNode.deformers.next.y - targetNode.node!.y),
-            });
-          }
+        const coords =
+          convertibleNodes.length === 1
+            ? [oppositePosition, position]
+            : [position, oppositePosition];
 
-          if (
-            targetNode === targetNode.segment[targetNode.segment.length - 1] &&
-            !targetNode.deformers.next &&
-            targetNode.deformers.pre
-          ) {
-            vizpath.addNodeDeformer(targetNode, 'next', {
-              x: targetNode.node!.x - (targetNode.deformers.pre.x - targetNode.node!.x),
-              y: targetNode.node!.y - (targetNode.deformers.pre.y - targetNode.node!.y),
-            });
-          }
-        }
+        const list = vizpath.getNeighboringCurveDots(targetNode);
+
+        // this.requestCreateDeformers(
+        //   {
+        //     type: 'pre',
+        //     dot:
+        //       list.find((i) => i.position === 'cur' && i.direction === 'pre') ??
+        //       list.find((i) => i.position === 'pre' && i.direction === 'next') ??
+        //       vizpath.toRCoord({ x: 0, y: 0 }),
+        //     node: targetNode,
+        //     symmetric: 'entire',
+        //   },
+        //   {
+        //     type: 'next',
+        //     node: targetNode,
+        //     symmetric: 'entire',
+        //   },
+        // );
+        // // 非闭合路径给端点添加虚拟变换器
+        // if (!vizpath.isClosedSegment(targetNode.segment) && targetNode.deformers) {
+        //   if (
+        //     targetNode === targetNode.segment[0] &&
+        //     !targetNode.deformers.pre &&
+        //     targetNode.deformers.next
+        //   ) {
+        //     vizpath.addNodeDeformer(targetNode, 'pre', {
+        //       x: targetNode.node!.x - (targetNode.deformers.next.x - targetNode.node!.x),
+        //       y: targetNode.node!.y - (targetNode.deformers.next.y - targetNode.node!.y),
+        //     });
+        //   }
+
+        //   if (
+        //     targetNode === targetNode.segment[targetNode.segment.length - 1] &&
+        //     !targetNode.deformers.next &&
+        //     targetNode.deformers.pre
+        //   ) {
+        //     vizpath.addNodeDeformer(targetNode, 'next', {
+        //       x: targetNode.node!.x - (targetNode.deformers.pre.x - targetNode.node!.x),
+        //       y: targetNode.node!.y - (targetNode.deformers.pre.y - targetNode.node!.y),
+        //     });
+        //   }
+        // }
 
         // 设置控制点的位置
-        if (targetNode.deformers) {
-          Object.keys(targetNode.deformers).forEach((direction, index) => {
-            const coord = (
-              convertibleNodes.length === 1
-                ? [oppositePosition, position]
-                : [position, oppositePosition]
-            )[index];
-            targetNode.deformers![direction].set(coord.x, coord.y);
-          });
-        }
+        // if (targetNode.deformers) {
+        //   Object.keys(targetNode.deformers).forEach((direction, index) => {
+        //     const coord = (
+        //       convertibleNodes.length === 1
+        //         ? [oppositePosition, position]
+        //         : [position, oppositePosition]
+        //     )[index];
+        //     targetNode.deformers![direction].set(coord.x, coord.y);
+        //   });
+        // }
       });
 
-      let targetCurveDot: EditorDeformer | undefined;
-      const nodeDeformers = this.deformers.filter((i) => i.node === targetNode);
-      if (nodeDeformers.length === 1) {
-        targetCurveDot = nodeDeformers[0];
-      } else {
-        targetCurveDot = this.deformers.find((i) => {
-          return i.node === targetNode && i.type !== convertibleNodes[0]?.[0];
-        });
-      }
-
+      const targetCurveDot = this.deformers.find((i) => {
+        return i.node === targetNode && i.type !== convertibleNodes[0]?.[0];
+      });
       if (targetCurveDot) {
         fireMouseUpAndSelect(targetCurveDot.curveDot);
       }
@@ -985,14 +998,7 @@ class VizPathEditor {
       const deformer = this.deformers.find((i) => i.dot === curveDot);
       if (!deformer) return;
 
-      // 创建指令曲线变换器并设置位置
-      deformer.curveDot.set(vizpath.calcAbsolutePosition(curveDot)).setCoords();
-
-      // 创建变换器连接线并设置位置
-      const startPosition = vizpath.calcAbsolutePosition(node);
-      deformer.curveBar.set({ x1: startPosition.left, y1: startPosition.top });
-      const endPosition = vizpath.calcAbsolutePosition(curveDot);
-      deformer.curveBar.set({ x2: endPosition.left, y2: endPosition.top });
+      this._setDeformerObjectsCoords(deformer);
     });
 
     object.canvas?.requestRenderAll();
@@ -1008,11 +1014,10 @@ class VizPathEditor {
         const followCurveDots: RCoord[] = [];
         const pathNode = this.objectNodeMap.get(object)!;
 
-        const deformers = this.vizpath?.getNeighboringCurveDots(pathNode) ?? [];
-        deformers?.forEach(({ position, direction, from }) => {
-          const coord = from.deformers?.[direction];
-          if (position !== 'cur' || !coord) return;
-          followCurveDots.push(coord);
+        this.deformers?.forEach(({ node, dot }) => {
+          if (node === pathNode) {
+            followCurveDots.push(dot);
+          }
         });
 
         this._transform(object, { left: left!, top: top! }, followCurveDots);
@@ -1093,11 +1098,7 @@ class VizPathEditor {
         this._setDeformerObjectsCoords(deformer, /* skipSelfDot */ true);
 
         // 对向变换器同步操作
-        const symmetricMode =
-          this.get('dotSymmetricMode') === 'auto'
-            ? this.dotSymmetricAutoMode
-            : this.get('dotSymmetricMode');
-        if (symmetricMode !== 'none') {
+        if (deformer.symmetric !== 'none') {
           const opositeDeformer = this.getOppositeDeformer(object);
           if (opositeDeformer) {
             const nodeCoord = deformer.node.node!;
@@ -1111,7 +1112,7 @@ class VizPathEditor {
               },
               nodeCoord,
             );
-            const scale = symmetricMode === 'entire' ? 1 : d / new_d;
+            const scale = deformer.symmetric === 'entire' ? 1 : d / new_d;
             opositeDeformer.dot.set(
               nodeCoord.x - (coord.x - nodeCoord.x) * scale,
               nodeCoord.y - (coord.y - nodeCoord.y) * scale,
@@ -1228,36 +1229,12 @@ class VizPathEditor {
     }
 
     // 绘制曲线变换器及其连接线
-    this._renderDeformers();
+    this._renderAllDeformers();
 
     // 注册活跃对象观测者
     this._registerActiveObjectsObserver();
 
     this.events.fire('selected', this.activeNodes, this.activePoint);
-
-    // 如果当前选中的是变换器需要确定其自动变换的模式
-    if (this.activePoint) {
-      const deformer = this.deformers.find((i) => i.curveDot === this.activePoint)!;
-      const relativeDot = this.getOppositeDeformer(this.activePoint)!;
-      if (
-        relativeDot &&
-        180 - calcCoordsAngle(deformer.dot, deformer.node.node!, relativeDot.dot) <= this.deviation
-      ) {
-        this.dotSymmetricAutoMode = 'angle';
-        if (
-          Math.abs(
-            calcCoordsDistance(deformer.dot, deformer.node.node!) -
-              calcCoordsDistance(deformer.node.node!, relativeDot.dot),
-          ) <= this.deviation
-        ) {
-          this.dotSymmetricAutoMode = 'entire';
-        }
-      } else {
-        this.dotSymmetricAutoMode = 'none';
-      }
-    } else {
-      this.dotSymmetricAutoMode = 'none';
-    }
 
     this._lockFocus = false;
   }

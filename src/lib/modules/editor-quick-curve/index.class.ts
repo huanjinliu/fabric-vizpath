@@ -136,7 +136,7 @@ class EditorQuickCurve extends VizPathModule {
           const curveP2 = calcPerpendicularSymmetricalCoord(p0, p, curveP1);
 
           vizpath.upgrade(node, direction, true, [curveP1, curveP2]);
-          vizpath.addNodeDeformer(node, oppositeDirection, calcSymmetricalCoord(curveP2, p0));
+          // vizpath.addNodeDeformer(node, oppositeDirection, calcSymmetricalCoord(curveP2, p0));
           return;
         }
 
@@ -153,7 +153,7 @@ class EditorQuickCurve extends VizPathModule {
         if (neighboringNodes[oppositeDirection]) {
           vizpath.upgrade(node, oppositeDirection, false, [curveP2]);
         } else {
-          vizpath.addNodeDeformer(node, oppositeDirection, curveP2);
+          // vizpath.addNodeDeformer(node, oppositeDirection, curveP2);
         }
       });
     });

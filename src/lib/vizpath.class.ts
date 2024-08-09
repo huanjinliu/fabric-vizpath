@@ -53,14 +53,19 @@ export type RCoord = Coord & {
 /** 路径节点 */
 export type PathNode = {
   id: string;
+  index: number;
   path: VizPath;
   segment: PathSegment;
-  instruction: Instruction;
-  node?: RCoord;
-  deformers?: Partial<{
+  node: RCoord | null;
+  deformers: Partial<{
     pre: RCoord;
     next: RCoord;
-  }>;
+  }> | null;
+  instruction: Instruction;
+  previousSibling: PathNode | null;
+  nextSibling: PathNode | null;
+  previousSiblingNode: PathNode | null;
+  nextSiblingNode: PathNode | null;
 };
 
 /** 路径子段 */
@@ -376,21 +381,56 @@ export class VizPath {
     const newSegments = [] as PathSegment[];
     this._splitPathSegments(instructions).forEach((segment) => {
       const pathNodes = [] as PathNode[];
-      segment.forEach((instruction) => {
+      segment.forEach((instruction, index) => {
         const reuseNode = this.instructionNodeMap.get(instruction);
         const pathNode = reuseNode ?? {
           id: uniqueId(),
           path: this,
           segment: pathNodes,
           instruction,
+          index,
+          node: null,
+          deformers: null,
+          previousSibling: null,
+          previousSiblingNode: null,
+          nextSibling: null,
+          nextSiblingNode: null,
         };
 
         pathNode.path = this;
         pathNode.segment = pathNodes;
-
+        pathNode.index = index;
+        pathNode.previousSibling = null;
+        pathNode.previousSiblingNode = null;
+        pathNode.nextSibling = null;
+        pathNode.nextSiblingNode = null;
         pathNodes.push(pathNode);
         this.instructionNodeMap.set(instruction, pathNode);
       });
+
+      // 整理节点相互之间的指向
+      const length = pathNodes.length;
+      if (this.isClosedSegment(pathNodes)) {
+        for (let i = 0; i <= length - 2; i++) {
+          const pathNode = pathNodes[i];
+          pathNode.nextSibling = i === length - 2 ? pathNodes[0] : pathNodes[i + 1];
+          pathNode.nextSibling.previousSibling = pathNode;
+
+          if (i <= length - 3 && length > 3) {
+            pathNode.nextSiblingNode = i === length - 3 ? pathNodes[0] : pathNodes[i + 1];
+            if (pathNode.nextSiblingNode) pathNode.nextSiblingNode.previousSiblingNode = pathNode;
+          }
+        }
+      } else {
+        for (let i = 0; i < length; i++) {
+          const pathNode = pathNodes[i];
+          pathNode.nextSibling = pathNodes[i + 1];
+          pathNode.nextSiblingNode = pathNodes[i + 1];
+          if (pathNode.nextSibling) pathNode.nextSibling.previousSibling = pathNode;
+          if (pathNode.nextSiblingNode) pathNode.nextSiblingNode.previousSibling = pathNode;
+        }
+      }
+
       newSegments.push(pathNodes);
     });
 
@@ -518,8 +558,7 @@ export class VizPath {
    * @param callback 响应式更改回调
    * @returns
    */
-  private _toResponsiveCoord(coord: Coord) {
-    let temporaryIgnoreIds: (string | undefined)[] = [];
+  toRCoord(coord: Coord) {
     const proxy = new Proxy(coord, {
       set: (target: RCoord, p: string, value: any, receiver: any) => {
         if (p === 'x' || p === 'y') {
@@ -531,7 +570,6 @@ export class VizPath {
               const x = p === 'x' ? value : target.x;
               const y = p === 'y' ? value : target.y;
               for (const observe of observers) {
-                if (observe.id && temporaryIgnoreIds.indexOf(observe.id) !== -1) continue;
                 observe.handler(x, y);
               }
             }
@@ -543,14 +581,9 @@ export class VizPath {
         }
       },
     }) as RCoord;
-    proxy.set = (x: number, y: number, skipObserverIDs = []) => {
-      if (Array.isArray(skipObserverIDs)) {
-        temporaryIgnoreIds = skipObserverIDs;
-      }
+    proxy.set = (x: number, y: number) => {
       proxy.x = x;
       proxy.y = y;
-
-      temporaryIgnoreIds = [];
     };
     proxy.observe = (handler, options = {}) => {
       const { immediate, id } = options;
@@ -597,7 +630,7 @@ export class VizPath {
           instruction[instruction.length - 1] = y;
         });
       } else {
-        node.node = node.node ?? this._toResponsiveCoord(coord);
+        node.node = node.node ?? this.toRCoord(coord);
         node.node.unobserve();
         node.node.observe((x, y) => {
           instruction[instruction.length - 2] = x;
@@ -616,67 +649,65 @@ export class VizPath {
   private _initSegmentDeformers(segment: PathSegment) {
     const nodes = segment;
 
-    // const isQuadraticCurve = (node: PathNode) =>
-    //   node.instruction[0] === InstructionType.QUADRATIC_CURCE;
-
     nodes.forEach((node, index) => {
+      if (!node.node) return;
+
       // 旧的变换器
       const oldDeformers = node.deformers ?? {};
 
       // 指令曲线变换器
       const deformers = {} as NonNullable<PathNode['deformers']>;
 
-      const { pre, next } = this.getNeighboringInstructions(node);
-
-      // 前一个节点是否已经有next变换器
-      const preNodeHadNextDeformer = index > 0 && pre && pre.deformers?.next !== undefined;
+      const { pre, next } = this.getNeighboringPathNodes(node);
 
       // 前曲线变换器
-      if (node.instruction[0] === 'C' || (node.instruction[0] === 'Q' && !preNodeHadNextDeformer)) {
+      if (['Q', 'C'].includes(node.instruction[0])) {
         const length = node.instruction.length;
         const coord = {
           x: node.instruction[length - 4] as number,
           y: node.instruction[length - 3] as number,
         };
-        const curveDot = oldDeformers.pre ?? this._toResponsiveCoord(coord);
+        const curveDot = oldDeformers.pre ?? this.toRCoord(coord);
         curveDot.unobserve();
         curveDot.observe((x, y) => {
           node.instruction[length - 4] = x;
           node.instruction[length - 3] = y;
         });
         curveDot.set(coord.x, coord.y);
+        deformers.pre = curveDot;
+      }
 
-        if (this.isCoincideNode(node)) {
-          nodes[0].deformers = nodes[0].deformers ?? {};
-          nodes[0].deformers.pre = curveDot;
-        } else {
-          deformers.pre = curveDot;
-        }
+      // 特殊情况：闭合路径起始点的前曲线变换器
+      if (node.instruction[0] === 'M' && pre && ['Q', 'C'].includes(pre.instruction[0])) {
+        const length = pre.instruction.length;
+        const coord = {
+          x: pre.instruction[length - 4] as number,
+          y: pre.instruction[length - 3] as number,
+        };
+        const curveDot = oldDeformers.pre ?? this.toRCoord(coord);
+        curveDot.unobserve();
+        curveDot.observe((x, y) => {
+          pre.instruction[length - 4] = x;
+          pre.instruction[length - 3] = y;
+        });
+        curveDot.set(coord.x, coord.y);
+        deformers.pre = curveDot;
       }
 
       // 后曲线变换器
-      if (
-        next &&
-        (next.instruction[0] === 'C' || (next.instruction[0] === 'Q' && !preNodeHadNextDeformer))
-      ) {
+      if (next && next.instruction[0] === 'C') {
         const coord = {
           x: next.instruction[1] as number,
           y: next.instruction[2] as number,
         };
-        const curveDot = oldDeformers.next ?? this._toResponsiveCoord(coord);
+        const curveDot = oldDeformers.next ?? this.toRCoord(coord);
         curveDot.unobserve();
         curveDot.observe((x, y) => {
           next.instruction[1] = x;
           next.instruction[2] = y;
         });
         curveDot.set(coord.x, coord.y);
-
-        if (next.instruction[0] === 'Q' && this.isCoincideNode(next)) {
-          nodes[0].deformers = nodes[0].deformers ?? {};
-          nodes[0].deformers.pre = curveDot;
-        } else {
-          deformers.next = curveDot;
-        }
+        deformers.next = curveDot;
       }
 
       if (oldDeformers.pre && !deformers.pre) oldDeformers.pre.unobserve();
@@ -685,22 +716,9 @@ export class VizPath {
       if (Object.keys(deformers).length) {
         node.deformers = deformers;
       } else {
-        delete node.deformers;
+        node.deformers = null;
       }
     });
-  }
-
-  /**
-   * 添加变换器
-   */
-  addNodeDeformer(node: PathNode, type: 'pre' | 'next', coord: Coord) {
-    node.deformers = node.deformers ?? {};
-    if (node.deformers[type]) {
-      node.deformers[type]!.set(coord.x, coord.y);
-      return;
-    }
-    node.deformers[type] = this._toResponsiveCoord(coord);
-    node.deformers[type]!.set(coord.x, coord.y);
   }
 
   /**
@@ -757,72 +775,19 @@ export class VizPath {
   }
 
   /**
-   * 获取前后的指令信息
+   * 获取前后的路径节点
    * @param pathNode 路径节点
-   * @param cycle 闭合路径是否开启循环查找
    */
-  getNeighboringInstructions(node: PathNode, cycle = true) {
-    const { segment } = node;
-
-    const index = segment.indexOf(node);
-
-    let pre: PathNode | undefined = segment[index - 1];
-    let next: PathNode | undefined = segment[index + 1];
-
-    // 是否循环并且是闭合路径
-    if (cycle && this.isClosedSegment(segment)) {
-      // 如果没有上一个指令，则倒数第二个指令视为上一个指令（倒数第一是闭合指令，倒数第二是起始同步指令）
-      if (!pre) {
-        pre = segment[segment.length - 2];
-      }
-
-      // 如果有下一个指令但下一个指令是闭合指令，则指向起始指令下一个指令
-      if (!next || next.instruction[0] === InstructionType.CLOSE) {
-        next = segment[1];
-      }
-    }
-
-    return { pre, next } as Partial<{
-      pre: PathNode;
-      next: PathNode;
-    }>;
+  getNeighboringPathNodes(node: PathNode) {
+    return { pre: node.previousSibling, next: node.nextSibling };
   }
 
   /**
-   * 获取前后的指令节点信息
+   * 获取前后带有实际操纵点的路径节点
    * @param pathNode 路径节点
-   * @param cycle 闭合路径是否开启循环查找
    */
-  getNeighboringNodes(node: PathNode, cycle = true) {
-    const { segment } = node;
-
-    const _cycle = cycle && this.isClosedSegment(segment);
-    const _index = segment.indexOf(node);
-
-    let pre: PathNode | undefined;
-    let next: PathNode | undefined;
-
-    if (_index !== -1) {
-      let i = _index;
-      while (!pre && segment[i]) {
-        if (i !== _index && segment[i]) pre = segment[i];
-        i--;
-        if (_cycle && i === -1) i = segment.length - 3;
-        if (i === _index) break;
-      }
-      i = _index;
-      while (!next && segment[i]) {
-        if (i !== _index && segment[i]) next = segment[i];
-        i++;
-        if (_cycle && i === segment.length - 2) i = 0;
-        if (i === _index) break;
-      }
-    }
-
-    return { pre, next } as Partial<{
-      pre: PathNode;
-      next: PathNode;
-    }>;
+  getNeighboringNodes(node: PathNode) {
+    return { pre: node.previousSiblingNode, next: node.nextSiblingNode };
   }
 
   /**
@@ -850,7 +815,7 @@ export class VizPath {
    */
   getConvertibleNodes(node: PathNode) {
     const { instruction } = node;
-    const { pre, next } = this.getNeighboringInstructions(node);
+    const { pre, next } = this.getNeighboringPathNodes(node);
 
     const convertibleNodes: Partial<Record<'pre' | 'next', PathNode>> = {};
 
@@ -1135,7 +1100,7 @@ export class VizPath {
   ) {
     const { instruction, node: nodeCoord } = node;
 
-    const { pre, next } = this.getNeighboringInstructions(node, true);
+    const { pre, next } = this.getNeighboringPathNodes(node);
 
     const directionNodeMap = {
       pre: instruction[0] === InstructionType.START ? pre : node,
@@ -1164,7 +1129,7 @@ export class VizPath {
       }[instruction[0]];
 
       if (direction === 'pre') {
-        const { pre } = this.getNeighboringInstructions(node);
+        const { pre } = this.getNeighboringPathNodes(node);
         const insertIndex = -2;
         const insertCoord = curveCoords.shift() ?? {
           x: (coord.x + pre!.node!.x) / 2,
@@ -1199,7 +1164,7 @@ export class VizPath {
    * 二阶贝塞尔曲线会降级为直线；三阶贝塞尔曲线会先降级为二阶贝塞尔曲线，再降级才会转化为直线。
    */
   degrade(node: PathNode, direction: 'pre' | 'next' | 'both' = 'both', lowest = false) {
-    const { pre, next } = this.getNeighboringInstructions(node, true);
+    const { pre, next } = this.getNeighboringPathNodes(node);
 
     const directionNodeMap = {
       pre: node.instruction[0] === InstructionType.START ? pre : node,
@@ -1446,8 +1411,9 @@ export class VizPath {
           node.node?.unobserve();
           node.deformers?.pre?.unobserve();
           node.deformers?.next?.unobserve();
-          delete node.node;
-          delete node.deformers;
+
+          node.node = null;
+          node.deformers = null;
         }
       });
     });
